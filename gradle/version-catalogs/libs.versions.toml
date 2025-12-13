@@ -1,0 +1,10 @@
+[versions]
+projektor = "4.+"
+
+kotlin = "2.0.21"
+
+[plugins]
+projektor = { id = "io.github.diskria.projektor", version.ref = "projektor" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+
+[libraries]
