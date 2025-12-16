@@ -1,6 +1,5 @@
 import io.github.diskria.projektor.common.licenses.LicenseType.MIT
 import io.github.diskria.projektor.common.publishing.PublishingTargetType.MAVEN_CENTRAL
-import io.github.diskria.projektor.settings.configurators.AndroidLibraryConfigurator
 
 pluginManagement {
     repositories {
@@ -14,7 +13,7 @@ plugins {
 }
 
 projekt {
-    version = "0.1.0"
+    version = "0.1.1"
     license = MIT
     publish = setOf(MAVEN_CENTRAL)
 
