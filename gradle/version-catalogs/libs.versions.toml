@@ -2,9 +2,28 @@
 projektor = "4.+"
 
 kotlin = "2.0.21"
+ksp = "2.0.21-1.0.25"
+
+mixin = "0.8.7"
+
+java-poet = "0.9.0"
+kotlin-poet-ksp = "2.2.0"
+
+auto-service = "1.2.0"
+auto-service-annotations = "1.1.1"
 
 [plugins]
 projektor = { id = "io.github.diskria.projektor", version.ref = "projektor" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [libraries]
+ksp-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
+
+mixin = { group = "org.spongepowered", name = "mixin", version.ref = "mixin" }
+
+java-poet = { group = "com.palantir.javapoet", name = "javapoet", version.ref = "java-poet" }
+kotlin-poet-ksp = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "kotlin-poet-ksp" }
+
+auto-service = { group = "dev.zacsweers.autoservice", name = "auto-service-ksp", version.ref = "auto-service" }
+auto-service-annotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "auto-service-annotations" }

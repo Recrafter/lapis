@@ -1,1 +1,1 @@
-KSP library for declarative Mixin accessors in Kotlin — generates Java interfaces and Kotlin extensions.
+KSP-based annotation library for declarative Mixins in Kotlin.
