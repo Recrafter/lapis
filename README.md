@@ -1,8 +1,8 @@
-# Crafter Kotlin Mixins
+# Nametag
 
-KSP library for declarative Mixin accessors in Kotlin — generates Java interfaces and Kotlin extensions.
+KSP-based annotation library for declarative Mixins in Kotlin.
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.recrafter/crafter-kotlin-mixins.svg?label=Maven+Central&style=for-the-badge)](https://central.sonatype.com/artifact/io.github.recrafter/crafter-kotlin-mixins) [![License: MIT](https://img.shields.io/static/v1?label=License&style=for-the-badge&message=MIT&color=yellow)](https://spdx.org/licenses/MIT)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.recrafter/nametag.svg?label=Maven+Central&style=for-the-badge)](https://central.sonatype.com/artifact/io.github.recrafter/nametag) [![License: MIT](https://img.shields.io/static/v1?label=License&style=for-the-badge&message=MIT&color=yellow)](https://spdx.org/licenses/MIT)
 
 ---
 
