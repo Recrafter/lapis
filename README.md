@@ -47,7 +47,7 @@ interface MinecraftClientAccessor {
 1. Define a Kotlin interface annotated with `@KAccessor`.  
 2. Specify the `target` class and (optionally) a `widener`.  
 3. Declare abstract properties and functions for the fields and methods to expose.  
-4. Run the Gradle build â Nametag will generate the Mixin interface, Kotlin factory, and extensions.
+4. Run the Gradle build - Nametag will generate the Mixin interface, Kotlin factory, and extensions.
 
 ---
 
@@ -72,9 +72,9 @@ interface OuterAccessor {
 
 Generated files are grouped by purpose:
 
-- `mixins/` â generated Java Mixin interfaces  
-- `factory/` â Kotlin factory objects for static members  
-- `extensions/` â Kotlin extension APIs for instance members  
+- `mixins/` - generated Java Mixin interfaces  
+- `factory/` - Kotlin factory objects for static members  
+- `extensions/` - Kotlin extension APIs for instance members  
 
 All outputs follow standard Mixin conventions:
 - Java code uses `@Accessor` and `@Invoker`.  
