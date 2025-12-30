@@ -10,14 +10,24 @@ KSP-based annotation library for declarative Mixins in Kotlin.
 
 ### `@KAccessor`
 
-Marks a Kotlin interface as an accessor definition and specifies the target class.  
-The processor generates a corresponding Java mixin interface and Kotlin extensions for the given targets.
+Marks a Kotlin interface as an accessor definition and specifies its Mixin target.
 
-The `widener` parameter is optional.  
-If the target class is not accessible (for example, it is private),  
-first specify only the `widener` and run **Gradle sync**.  
-Crafter will generate the necessary **AW/AT** configuration to widen the class,  
-after which the class can be referenced normally in the `target` parameter.
+The processor generates:
+- a Java Mixin interface with `@Accessor` / `@Invoker` members,  
+- a Kotlin factory object,  
+- Kotlin extension functions and properties for the target type.
+
+**Parameters**
+
+| Parameter | Type | Description |
+|------------|------|-------------|
+| `target` | `KClass<*>` | Target class for the accessor. |
+| `widener` | `String?` | Optional widener ID for inaccessible classes. |
+
+If the target class is private or package-restricted, specify only the `widener` first and run Gradle sync.  
+The widener configuration will be generated automatically; after that, the class can be referenced normally.
+
+**Example**
 
 ```kotlin
 @KAccessor(
@@ -25,36 +35,64 @@ after which the class can be referenced normally in the `target` parameter.
     target = MinecraftClient::class
 )
 interface MinecraftClientAccessor {
-
-    @Open("window")
     val window: Window
-
-    @Open("setScreen")
     fun setScreen(screen: Screen)
 }
 ```
 
-### `@Open`
+---
 
-Declares a property or function inside a `@KAccessor` interface that should be opened in the target class.
+## Usage Workflow
 
-When used on a property, it generates a Mixin `@Accessor` for the specified field.  
-When used on a function, it generates a Mixin `@Invoker` for the specified method.
+1. Define a Kotlin interface annotated with `@KAccessor`.  
+2. Specify the `target` class and (optionally) a `widener`.  
+3. Declare abstract properties and functions for the fields and methods to expose.  
+4. Run the Gradle build â Nametag will generate the Mixin interface, Kotlin factory, and extensions.
 
-If the `target` parameter is omitted, the processor infers the target name from the member name  
-(similar to the standard Mixin behavior, where `getFoo` maps to the field `foo`).
+---
+
+## Nesting and Wideners
+
+Nested accessor interfaces may reference their parent accessor or widener.  
+When referencing nested classes, use **simple inner names** instead of fully qualified outer paths.
+
+Example:
 
 ```kotlin
-@Open
-val currentScreen: Screen
+@KAccessor(target = Outer::class)
+interface OuterAccessor {
+    @KAccessor(target = Inner::class)
+    interface InnerAccessor
+}
 ```
 
-## Usage workflow
+---
 
-1. Declare a Kotlin interface annotated with `@KAccessor`.
-2. Specify the `target` class and, if needed, the `widener`.
-3. Annotate members with `@Open` to expose fields or methods.
-4. Run the Gradle build. Crafter KSP will generate Java Mixin interfaces and Kotlin extensions automatically.
+## Generated Output
+
+Generated files are grouped by purpose:
+
+- `mixins/` â generated Java Mixin interfaces  
+- `factory/` â Kotlin factory objects for static members  
+- `extensions/` â Kotlin extension APIs for instance members  
+
+All outputs follow standard Mixin conventions:
+- Java code uses `@Accessor` and `@Invoker`.  
+- Kotlin code exposes idiomatic extensions for field and method access.  
+- Static members are placed in generated `Factory` objects.
+
+---
+
+## Future Work: Lexicon Layer
+
+Upcoming versions of Nametag will extend beyond accessors.
+
+The **Lexicon** layer will introduce:
+- full Mixin authoring directly in Kotlin,  
+- aliasing of class, method, and field names,  
+- a unified symbolic mapping layer to replace direct reference mappings.
+
+This system will serve as a new abstraction over mappings inside **Recrafter SDK**, allowing complete integration between accessors, mixins, and aliases.
 
 ---
 
