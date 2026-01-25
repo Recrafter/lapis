@@ -1,6 +1,9 @@
 package io.github.recrafter.lapis.utils
 
-import io.github.recrafter.lapis.extensions.ksp.*
+import io.github.recrafter.lapis.extensions.ksp.KspFileLocation
+import io.github.recrafter.lapis.extensions.ksp.KspLogger
+import io.github.recrafter.lapis.extensions.ksp.KspNode
+import io.github.recrafter.lapis.extensions.ksp.file
 import io.github.recrafter.lapis.extensions.psi.PsiFactory
 import io.github.recrafter.lapis.extensions.psi.PsiFile
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
@@ -26,15 +29,15 @@ class PsiCompanion(val logger: KspLogger) {
     private val cache: MutableMap<String, PsiFile> = mutableMapOf()
 
     @OptIn(UnsafeCastFunction::class)
-    fun loadPsiFile(node: KspNode): PsiFile {
-        val file = node.location.safeAs<KspFileLocation>()?.file ?: resolvingError(node)
+    fun loadPsiFile(logger: KspLogger, node: KspNode): PsiFile {
+        val file = node.location.safeAs<KspFileLocation>()?.file ?: resolvingError(logger, node)
         if (!file.exists()) {
-            resolvingError(node)
+            resolvingError(logger, node)
         }
         return cache.getOrPut(file.canonicalPath) {
             val contents = file.readText()
             if (contents.trim().isEmpty()) {
-                resolvingError(node)
+                resolvingError(logger, node)
             }
             factory.createFile(file.name, contents)
         }
@@ -45,6 +48,9 @@ class PsiCompanion(val logger: KspLogger) {
         cache.clear()
     }
 
-    fun resolvingError(node: KspNode): Nothing =
-        logger.error(node) { "Unable to resolve KSP node in PSI model." }
+    fun resolvingError(logger: KspLogger, node: KspNode): Nothing {
+        val message = "Unable to resolve KSP node in PSI model."
+        logger.error(message, node)
+        throw IllegalStateException(message)
+    }
 }

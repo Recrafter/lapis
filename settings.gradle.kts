@@ -12,8 +12,15 @@ plugins {
     id("io.github.diskria.projektor.settings") version "4.+"
 }
 
+dependencyResolutionManagement {
+    @Suppress("UnstableApiUsage")
+    repositories {
+        mavenLocal()
+    }
+}
+
 projekt {
-    version = "0.4.1"
+    version = "0.4.4"
     license = MIT
     publish = setOf(MAVEN_CENTRAL)
 

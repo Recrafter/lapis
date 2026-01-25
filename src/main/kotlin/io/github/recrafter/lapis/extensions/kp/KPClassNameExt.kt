@@ -1,28 +1,13 @@
 package io.github.recrafter.lapis.extensions.kp
 
-import io.github.recrafter.lapis.extensions.jp.JPBoolean
-import io.github.recrafter.lapis.extensions.jp.JPByte
-import io.github.recrafter.lapis.extensions.jp.JPChar
-import io.github.recrafter.lapis.extensions.jp.JPDouble
-import io.github.recrafter.lapis.extensions.jp.JPFloat
-import io.github.recrafter.lapis.extensions.jp.JPInt
-import io.github.recrafter.lapis.extensions.jp.JPList
-import io.github.recrafter.lapis.extensions.jp.JPLong
-import io.github.recrafter.lapis.extensions.jp.JPMap
-import io.github.recrafter.lapis.extensions.jp.JPObject
-import io.github.recrafter.lapis.extensions.jp.JPSet
-import io.github.recrafter.lapis.extensions.jp.JPShort
-import io.github.recrafter.lapis.extensions.jp.JPString
-import io.github.recrafter.lapis.extensions.jp.JPTypeName
-import io.github.recrafter.lapis.extensions.jp.JPVoid
-import io.github.recrafter.lapis.extensions.jp.boxIfPrimitive
+import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.kj.KJClassName
 
 fun KPClassName.asKJClassName(): KJClassName =
     KJClassName(packageName, *simpleNames.toTypedArray())
 
-fun KPClassName.toJavaType(shouldBox: Boolean): JPTypeName =
-    when (copy(nullable = false)) {
+fun KPClassName.asJP(shouldBox: Boolean): JPTypeName =
+    when (this) {
         KPAny -> JPObject
         KPUnit -> JPVoid.boxIfPrimitive(shouldBox || isNullable)
         KPBoolean -> JPBoolean.boxIfPrimitive(shouldBox || isNullable)
