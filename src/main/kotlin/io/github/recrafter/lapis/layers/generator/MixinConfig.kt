@@ -1,6 +1,6 @@
-package io.github.recrafter.lapis.config
+package io.github.recrafter.lapis.layers.generator
 
-import io.github.recrafter.lapis.api.LapisPatchSide
+import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -9,16 +9,11 @@ data class MixinConfig(
     @SerialName("required")
     val isRequired: Boolean,
 
-    val minVersion: String,
-
-    @SerialName("mixinextras")
-    val extrasConfig: ExtrasConfig,
-
     @SerialName("package")
-    val packageName: String,
+    val mixinPackage: String,
 
     @SerialName("compatibilityLevel")
-    val jvmTargetVersion: String,
+    val javaVersion: String,
 
     @SerialName("injectors")
     val injectorConfig: InjectorConfig,
@@ -39,9 +34,6 @@ data class MixinConfig(
     val dedicatedServerOnlyMixins: List<String>? = null,
 ) {
     @Serializable
-    class ExtrasConfig(val minVersion: String)
-
-    @Serializable
     data class InjectorConfig(val defaultRequire: Int)
 
     @Serializable
@@ -49,18 +41,14 @@ data class MixinConfig(
 
     companion object {
         fun of(
-            packageName: String,
+            mixinPackage: String,
             refmapFileName: String,
-            mixinQualifiedNames: Map<LapisPatchSide, List<String>>,
+            qualifiedNames: Map<LapisPatchSide, List<String>>,
         ): MixinConfig =
             MixinConfig(
                 isRequired = true,
-                packageName = packageName,
-                minVersion = "0.8.7",
-                extrasConfig = ExtrasConfig(
-                    minVersion = "0.5.3"
-                ),
-                jvmTargetVersion = "JAVA_8",
+                mixinPackage = mixinPackage,
+                javaVersion = "JAVA_8",
                 injectorConfig = InjectorConfig(
                     defaultRequire = 1,
                 ),
@@ -68,12 +56,24 @@ data class MixinConfig(
                     requireAnnotations = true,
                 ),
                 refmapFileName = refmapFileName,
-                commonMixins = mixinQualifiedNames[LapisPatchSide.Common]?.ifEmpty { null }
-                    ?.map { it.removePrefix("$packageName.") },
-                clientOnlyMixins = mixinQualifiedNames[LapisPatchSide.ClientOnly]?.ifEmpty { null }
-                    ?.map { it.removePrefix("$packageName.") },
-                dedicatedServerOnlyMixins = mixinQualifiedNames[LapisPatchSide.DedicatedServerOnly]?.ifEmpty { null }
-                    ?.map { it.removePrefix("$packageName.") },
+                commonMixins = qualifiedNames.getPackageRelativeClassNames(
+                    LapisPatchSide.Common,
+                    mixinPackage
+                ),
+                clientOnlyMixins = qualifiedNames.getPackageRelativeClassNames(
+                    LapisPatchSide.ClientOnly,
+                    mixinPackage
+                ),
+                dedicatedServerOnlyMixins = qualifiedNames.getPackageRelativeClassNames(
+                    LapisPatchSide.DedicatedServerOnly,
+                    mixinPackage
+                ),
             )
+
+        private fun Map<LapisPatchSide, List<String>>.getPackageRelativeClassNames(
+            side: LapisPatchSide,
+            packageName: String,
+        ): List<String>? =
+            get(side)?.ifEmpty { null }?.map { it.removePrefix("$packageName.").replace(".", "$") }
     }
 }

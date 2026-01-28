@@ -15,8 +15,8 @@ inline fun <reified A : Annotation> KspAnnotated.hasAnnotation(): Boolean =
     hasAnnotation(A::class)
 
 @OptIn(KspExperimental::class)
-inline fun <reified A : Annotation> KspAnnotated.getSingleAnnotationOrNull(): A? =
-    getAnnotationsByType(A::class).singleOrNull()
+inline fun <reified A : Annotation> KspAnnotated.getAnnotationOrNull(): A? =
+    getAnnotationsByType(A::class).firstOrNull()
 
 fun Iterable<KspAnnotated>.toDependencies(aggregating: Boolean = false): KspDependencies {
     val containingFiles = mapNotNull { it.containingFile }

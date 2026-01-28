@@ -1,22 +1,22 @@
 package io.github.recrafter.lapis.extensions.jp
 
-import io.github.recrafter.lapis.kj.KJTypeName
+import io.github.recrafter.lapis.layers.lowering.IrClassName
 
-fun JPAnnotationBuilder.addIntMember(name: String, value: Int) {
-    addMember(name, "\$L", value)
+fun JPAnnotationBuilder.addIntMember(name: String, int: Int) {
+    addMember(name, buildJavaCodeBlock("%L") { arg(int) })
 }
 
-fun JPAnnotationBuilder.addStringMember(name: String, value: String) {
-    addMember(name, "\$S", value)
+fun JPAnnotationBuilder.addStringMember(name: String, string: String) {
+    addMember(name, buildJavaCodeBlock("%S") { arg(string) })
 }
 
-fun JPAnnotationBuilder.addClassMember(name: String, type: KJTypeName) {
-    addMember(name, "\$T.class", type.javaVersion)
+fun JPAnnotationBuilder.addClassMember(name: String, type: IrClassName) {
+    addMember(name, buildJavaCodeBlock("%T.class") { arg(type) })
 }
 
 inline fun <reified A : Annotation> JPAnnotationBuilder.addAnnotationMember(
     name: String,
-    builder: JPAnnotationBuilder.() -> Unit = {},
+    crossinline builder: JPAnnotationBuilder.() -> Unit = {},
 ) {
-    addMember(name, "\$L", buildJavaAnnotation<A>(builder))
+    addMember(name, buildJavaCodeBlock("%L") { arg(buildJavaAnnotation<A>(builder)) })
 }

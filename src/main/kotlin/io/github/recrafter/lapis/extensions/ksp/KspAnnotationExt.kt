@@ -1,18 +1,16 @@
 package io.github.recrafter.lapis.extensions.ksp
 
-import org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
+import io.github.recrafter.lapis.extensions.common.castOrNull
+import kotlin.reflect.KClass
+import kotlin.reflect.KProperty1
 
-@OptIn(UnsafeCastFunction::class)
-fun KspAnnotation.getKspClassArgumentOrNull(name: String): KspClass? =
+fun <A : Annotation> KspAnnotation.findClassArgument(property: KProperty1<A, KClass<*>>): KspClassDeclaration? =
     arguments
-        .firstOrNull { it.requireName() == name }
+        .find { it.name?.asString() == property.name }
         ?.value
-        ?.safeAs<KspType>()
+        ?.castOrNull<KspType>()
         ?.declaration
-        ?.safeAs<KspClass>()
+        ?.castOrNull<KspClassDeclaration>()
 
-fun KspAnnotation.getKspClassArgument(name: String): KspClass =
-    requireNotNull(getKspClassArgumentOrNull(name)) {
-        "Class declaration argument '$name' not found"
-    }
+inline fun <reified A : Annotation> KspAnnotation.isInstance(): Boolean =
+    shortName.getShortName() == A::class.simpleName && annotationType.resolve().declaration.isInstance<A>()

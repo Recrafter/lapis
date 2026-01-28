@@ -1,8 +1,9 @@
 package io.github.recrafter.lapis.utils
 
+import io.github.recrafter.lapis.extensions.common.castOrNull
+import io.github.recrafter.lapis.extensions.common.unsafeLazy
 import io.github.recrafter.lapis.extensions.ksp.KspFileLocation
-import io.github.recrafter.lapis.extensions.ksp.KspLogger
-import io.github.recrafter.lapis.extensions.ksp.KspNode
+import io.github.recrafter.lapis.extensions.ksp.KspSymbol
 import io.github.recrafter.lapis.extensions.ksp.file
 import io.github.recrafter.lapis.extensions.psi.PsiFactory
 import io.github.recrafter.lapis.extensions.psi.PsiFile
@@ -11,12 +12,10 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction
-import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
-class PsiCompanion(val logger: KspLogger) {
+class PsiCompanion {
 
-    private val factory: PsiFactory by lazy {
+    private val factory: PsiFactory by unsafeLazy {
         val environment = KotlinCoreEnvironment.createForTests(
             disposable,
             CompilerConfiguration(),
@@ -24,33 +23,31 @@ class PsiCompanion(val logger: KspLogger) {
         )
         PsiFactory(environment.project)
     }
-
-    private val disposable: Disposable = Disposer.newDisposable()
+    private val disposable: Disposable by unsafeLazy { Disposer.newDisposable() }
     private val cache: MutableMap<String, PsiFile> = mutableMapOf()
 
-    @OptIn(UnsafeCastFunction::class)
-    fun loadPsiFile(logger: KspLogger, node: KspNode): PsiFile {
-        val file = node.location.safeAs<KspFileLocation>()?.file ?: resolvingError(logger, node)
-        if (!file.exists()) {
-            resolvingError(logger, node)
+    private var isInitialized: Boolean = false
+
+    fun findPsiFile(symbol: KspSymbol?): PsiFile? {
+        val file = symbol?.location?.castOrNull<KspFileLocation>()?.file ?: return null
+        if (!file.isFile) {
+            return null
         }
         return cache.getOrPut(file.canonicalPath) {
-            val contents = file.readText()
-            if (contents.trim().isEmpty()) {
-                resolvingError(logger, node)
+            val contents = file.readText().trim()
+            if (contents.isEmpty()) {
+                return null
             }
+            isInitialized = true
             factory.createFile(file.name, contents)
         }
     }
 
     fun destroy() {
+        if (!isInitialized) {
+            return
+        }
         Disposer.dispose(disposable)
         cache.clear()
-    }
-
-    fun resolvingError(logger: KspLogger, node: KspNode): Nothing {
-        val message = "Unable to resolve KSP node in PSI model."
-        logger.error(message, node)
-        throw IllegalStateException(message)
     }
 }

@@ -1,17 +1,15 @@
 package io.github.recrafter.lapis.extensions.ksp
 
-typealias KspNode = com.google.devtools.ksp.symbol.KSNode
+typealias KspSymbol = com.google.devtools.ksp.symbol.KSNode
 typealias KspType = com.google.devtools.ksp.symbol.KSType
-typealias KspModifierListOwner = com.google.devtools.ksp.symbol.KSModifierListOwner
+typealias KspModifier = com.google.devtools.ksp.symbol.Modifier
 typealias KspAnnotation = com.google.devtools.ksp.symbol.KSAnnotation
 typealias KspAnnotated = com.google.devtools.ksp.symbol.KSAnnotated
 typealias KspDeclaration = com.google.devtools.ksp.symbol.KSDeclaration
-typealias KspClass = com.google.devtools.ksp.symbol.KSClassDeclaration
-typealias KspProperty = com.google.devtools.ksp.symbol.KSPropertyDeclaration
-typealias KspFunction = com.google.devtools.ksp.symbol.KSFunctionDeclaration
-typealias KspValueArgument = com.google.devtools.ksp.symbol.KSValueArgument
+typealias KspClassDeclaration = com.google.devtools.ksp.symbol.KSClassDeclaration
+typealias KspPropertyDeclaration = com.google.devtools.ksp.symbol.KSPropertyDeclaration
+typealias KspFunctionDeclaration = com.google.devtools.ksp.symbol.KSFunctionDeclaration
 typealias KspValueParameter = com.google.devtools.ksp.symbol.KSValueParameter
-typealias KspTypeReference = com.google.devtools.ksp.symbol.KSTypeReference
 
 typealias KspFileLocation = com.google.devtools.ksp.symbol.FileLocation
 typealias KspLogger = com.google.devtools.ksp.processing.KSPLogger

@@ -3,16 +3,16 @@ package io.github.recrafter.lapis.extensions.psi
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiRecursiveElementWalkingVisitor
 
-fun PsiFile.findPsiFunction(action: (PsiFunction) -> Boolean): PsiFunction? {
-    var found: PsiFunction? = null
+inline fun <reified T : PsiElement> PsiFile.findPsiElement(crossinline action: (T) -> Boolean): T? {
+    var found: T? = null
     accept(object : PsiRecursiveElementWalkingVisitor() {
-        override fun visitElement(psiElement: PsiElement) {
-            if (psiElement is PsiFunction && action(psiElement)) {
-                found = psiElement
+        override fun visitElement(element: PsiElement) {
+            if (element is T && action(element)) {
+                found = element
                 stopWalking()
                 return
             }
-            super.visitElement(psiElement)
+            super.visitElement(element)
         }
     })
     return found

@@ -1,11 +1,10 @@
 package io.github.recrafter.lapis.extensions.ksp
 
-import com.squareup.kotlinpoet.ksp.toTypeName
-import io.github.recrafter.lapis.extensions.kp.asKJTypeName
-import io.github.recrafter.lapis.kj.KJTypeName
+val KspType.genericTypes: List<KspType>
+    get() = arguments.mapNotNull { it.type?.resolve() }
 
-fun KspType.genericTypes(): List<KspType> =
-    arguments.map { requireNotNull(it.type).resolve() }
+fun KspType.getGenericTypeOrNull(): KspType? =
+    genericTypes.firstOrNull()
 
-fun KspType.asKJTypeName(): KJTypeName =
-    toTypeName().asKJTypeName()
+fun KspType.takeNotUnit(): KspType? =
+    takeUnless { it.declaration.isInstance<Unit>() }

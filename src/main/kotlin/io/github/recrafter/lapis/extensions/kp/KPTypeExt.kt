@@ -1,27 +1,28 @@
 package io.github.recrafter.lapis.extensions.kp
 
-import io.github.recrafter.lapis.kj.KJTypeName
-
-fun KPType.requireName(): String =
-    requireNotNull(name) {
-        "Unnamed type is not supported in this context: $this."
-    }
+import io.github.recrafter.lapis.layers.lowering.IrClassName
+import io.github.recrafter.lapis.layers.lowering.IrParameter
 
 fun KPType.toKotlinFile(packageName: String, builder: KPFileBuilder.() -> Unit = {}): KPFile =
     buildKotlinFile(
         packageName,
-        requireName()
-    ) fileBuilder@{
+        requireNotNull(name) { "Cannot generate Kotlin file for anonymous TypeSpec." }
+    ) {
         builder()
         addType(this@toKotlinFile)
     }
 
-fun KPTypeBuilder.setConstructor(vararg parameters: Pair<String, KJTypeName>) {
+fun KPTypeBuilder.setConstructor(parameters: List<IrParameter>) {
     primaryConstructor(buildKotlinConstructor {
-        addParameters(*parameters)
+        addParameters(parameters)
     })
+    parameters.forEach { parameter ->
+        addProperty(buildKotlinProperty(parameter.name, parameter.type) {
+          initializer(parameter.name)
+        })
+    }
 }
 
-fun KPTypeBuilder.setSuperClassType(type: KJTypeName) {
-    superclass(type.kotlinVersion)
+fun KPTypeBuilder.setSuperClassType(type: IrClassName) {
+    superclass(type.kotlin)
 }

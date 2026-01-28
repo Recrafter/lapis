@@ -10,8 +10,8 @@ fun KspCodeGenerator.createResourceFile(
     val file = File(path)
     createNewFile(
         dependencies = KspDependencies(aggregating),
-        packageName = file.parentFile?.invariantSeparatorsPath?.replace(File.separatorChar, '.').orEmpty(),
+        packageName = file.parent?.replace(File.separator, ".").orEmpty(),
         fileName = file.nameWithoutExtension,
         extensionName = file.extension
-    ).writer().use { it.write(contents) }
+    ).bufferedWriter().use { it.write(contents) }
 }

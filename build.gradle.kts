@@ -14,10 +14,12 @@ dependencies {
 
     implementation(libs.mixin)
     implementation(libs.mixin.extras)
-    implementation(libs.lapis.api)
 
+    implementation(libs.lapis.api)
+    implementation(libs.lapis.annotations)
+
+    implementation(libs.kotlin.poet)
     implementation(libs.java.poet)
-    implementation(libs.kotlin.poet.ksp)
 
     implementation(libs.kotlin.serialization.json)
 
