@@ -7,6 +7,7 @@ import io.github.recrafter.lapis.extensions.ksp.KspSymbol
 import io.github.recrafter.lapis.extensions.ksp.file
 import io.github.recrafter.lapis.extensions.psi.PsiFactory
 import io.github.recrafter.lapis.extensions.psi.PsiFile
+import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
@@ -15,6 +16,7 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 
 class PsiCompanion {
 
+    @OptIn(K1Deprecation::class)
     private val factory: PsiFactory by unsafeLazy {
         val environment = KotlinCoreEnvironment.createForTests(
             disposable,

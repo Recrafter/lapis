@@ -5,13 +5,16 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation
+import com.llamalad7.mixinextras.sugar.Cancellable
+import com.llamalad7.mixinextras.sugar.Local
+import com.squareup.kotlinpoet.KModifier
+import io.github.recrafter.lapis.api.LapisReturnSignal
 import io.github.recrafter.lapis.extensions.capitalizeWithPrefix
 import io.github.recrafter.lapis.extensions.common.asIr
 import io.github.recrafter.lapis.extensions.common.unsafeLazy
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ksp.KspDependencies
-import io.github.recrafter.lapis.extensions.ksp.KspLogger
 import io.github.recrafter.lapis.extensions.ksp.createResourceFile
 import io.github.recrafter.lapis.extensions.ksp.flatten
 import io.github.recrafter.lapis.layers.lowering.*
@@ -25,225 +28,343 @@ import org.spongepowered.asm.mixin.gen.Accessor
 import org.spongepowered.asm.mixin.gen.Invoker
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 import kotlin.reflect.KClass
 
-class MixinGenerator(
-    val options: Options,
-    val codeGenerator: CodeGenerator,
-    val logger: KspLogger,
-) {
+class MixinGenerator(private val options: Options, private val codeGenerator: CodeGenerator) {
+
     private val configJson: Json by unsafeLazy {
         Json { prettyPrint = true }
     }
     private val extensionProperties: MutableList<KPProperty> = mutableListOf()
     private val extensionFunctions: MutableList<KPFunction> = mutableListOf()
 
-    fun generate(descriptorImpls: List<IrDescriptorImpl>, rootMixins: List<IrMixin>) {
-        generateDescriptorImpls(descriptorImpls)
-        rootMixins.forEach { generateRootMixin(it) }
+    fun generate(descriptors: List<IrDescriptor>, mixins: List<IrMixin>) {
+        generateDescriptorImpls(descriptors)
+        mixins.forEach { generateRootMixin(it) }
 
-        generateExtensions(rootMixins.map { it.dependencies }.flatten())
-        generateMixinConfig(rootMixins)
+        generateExtensions(mixins.map { it.dependencies }.flatten())
+        generateMixinConfig(mixins)
     }
 
-    private fun generateDescriptorImpls(descriptorImpls: List<IrDescriptorImpl>) {
-        val operationParameterName = "_operation"
-        val receiverParameterName = "_receiver"
-        val receiverExtensionName = "getReceiver"
+    private fun generateDescriptorImpls(descriptors: List<IrDescriptor>) {
+        val callbackParameterName = "_callback"
         buildKotlinFile(options.generatedPackageName, "DescriptorImpls") {
-            descriptorImpls.forEach { impl ->
-                addType(buildKotlinClass(impl.type.simpleName) {
+            descriptors.forEach { descriptor ->
+                val contextImpl = descriptor.contextImpl
+                addType(buildKotlinClass(contextImpl.type.simpleName) {
                     setConstructor(
                         buildList {
-                            impl.receiverType?.let { add(IrParameter(receiverParameterName, it)) }
-                            addAll(impl.parameters.map { parameter ->
+                            addAll(contextImpl.parameters.map { parameter ->
+                                IrParameter(parameter.name, parameter.type)
+                            })
+                            add(
+                                IrParameter(
+                                    callbackParameterName,
+                                    contextImpl.returnType
+                                        ?.let { CallbackInfoReturnable::class.asIr().parameterizedBy(it) }
+                                        ?: CallbackInfo::class.asIr()
+                                )
+                            )
+                        }
+                    )
+                    addSuperInterface(contextImpl.superType)
+                })
+                val contextImplUniqueName = contextImpl.type.uniqueJvmName
+                addProperties(contextImpl.parameters.map { parameter ->
+                    buildKotlinProperty(parameter.name, parameter.type) {
+                        setReceiverType(contextImpl.superType)
+                        setGetter {
+                            addAnnotation<JvmName> {
+                                setStringMember(
+                                    JvmName::name,
+                                    contextImplUniqueName.capitalizeWithPrefix("get") + "_" + parameter.name
+                                )
+                            }
+                            setBody {
+                                line("return (this as %T).%L") {
+                                    arg(contextImpl.type)
+                                    arg(parameter.name)
+                                }
+                            }
+                        }
+                    }
+                })
+                addFunction(buildKotlinFunction("yield") {
+                    addAnnotation<JvmName> {
+                        setStringMember(
+                            JvmName::name,
+                            contextImplUniqueName.capitalizeWithPrefix("yield")
+                        )
+                    }
+                    setReceiverType(contextImpl.superType)
+                    setReturnType(KPNothing.asIr())
+                    val returnValueParameter = contextImpl.returnType?.let {
+                        addParameter(IrParameter("returnValue", it))
+                    }
+                    setBody {
+                        line("(this as %T)") {
+                            arg(contextImpl.type)
+                        }
+                        line(buildString {
+                            append("%L.%L(")
+                            if (returnValueParameter != null) {
+                                append("%N")
+                            }
+                            append(")")
+                        }) {
+                            arg(callbackParameterName)
+                            arg(
+                                if (returnValueParameter != null) CallbackInfoReturnable<*>::setReturnValue.name
+                                else CallbackInfo::cancel.name
+                            )
+                            returnValueParameter?.let { arg(it) }
+                        }
+                        line("throw %T") {
+                            arg(LapisReturnSignal::class.asIr())
+                        }
+                    }
+                })
+
+                val targetImpl = descriptor.targetImpl
+                val operationParameterName = "_operation"
+                val receiverParameterName = "_receiver"
+                val invokeWithReceiverName = "_invokeWithReceiver"
+                addType(buildKotlinClass(targetImpl.type.simpleName) {
+                    setConstructor(
+                        buildList {
+                            targetImpl.receiverType?.let {
+                                add(IrParameter(receiverParameterName, it))
+                                add(IrParameter(invokeWithReceiverName, Boolean::class.asIr()))
+                            }
+                            addAll(targetImpl.parameters.map { parameter ->
                                 IrParameter(parameter.name, parameter.type)
                             })
                             add(
                                 IrParameter(
                                     operationParameterName,
-                                    Operation::class.asIr().parameterizedBy(impl.returnType.orVoid())
+                                    Operation::class.asIr().parameterizedBy(targetImpl.returnType.orVoid())
                                 )
                             )
                         }
                     )
-                    setSuperClassType(impl.superType)
+                    setSuperClass(targetImpl.superType)
                 })
-                addProperties(impl.parameters.map { parameter ->
+                addProperties(targetImpl.parameters.map { parameter ->
                     buildKotlinProperty(parameter.name, parameter.type) {
-                        setReceiverType(impl.superType)
-                        getter(buildKotlinGetter {
-                            addStatement(
-                                "return (this as %T).%L",
-                                impl.type.kotlin,
-                                parameter.name,
-                            )
-                        })
+                        setReceiverType(targetImpl.superType)
+                        setGetter {
+                            setBody {
+                                line("return (this as %T).%L") {
+                                    arg(targetImpl.type)
+                                    arg(parameter.name)
+                                }
+                            }
+                        }
                     }
                 })
-                impl.receiverType?.let { returnType ->
-                    addFunction(buildKotlinFunction(receiverExtensionName) {
-                        setReceiverType(impl.superType)
+                targetImpl.receiverType?.let { returnType ->
+                    addFunction(buildKotlinFunction("getReceiver") {
+                        setReceiverType(targetImpl.superType)
                         setReturnType(returnType)
-                        addStatement(
-                            "return (this as %T).%L",
-                            impl.type.kotlin,
-                            receiverParameterName,
-                        )
+                        setBody {
+                            line("return (this as %T).%L") {
+                                arg(targetImpl.type)
+                                arg(receiverParameterName)
+                            }
+                        }
                     })
                 }
                 addFunction(buildKotlinFunction("invoke") {
-                    setReceiverType(impl.superType)
-                    val parameters = mutableListOf<String>()
-                    impl.receiverType?.let {
-                        parameters += receiverParameterName
-                        addParameter(buildKotlinParameter(receiverParameterName, it) {
-                            defaultValue("this.%L()", receiverExtensionName)
-                        })
-                    }
-                    impl.parameters.forEach { parameter ->
-                        parameters += parameter.name
+                    setReceiverType(targetImpl.superType)
+                    targetImpl.parameters.forEach { parameter ->
                         addParameter(buildKotlinParameter(parameter.name, parameter.type) {
                             defaultValue("this.%L", parameter.name)
                         })
                     }
-                    setReturnType(impl.returnType)
-                    addStatement(
-                        buildString {
-                            if (impl.returnType != null) {
-                                append("return ")
+                    setReturnType(targetImpl.returnType)
+                    setBody {
+                        line("this as %T") {
+                            arg(targetImpl.type)
+                        }
+
+                        fun callOperation(parameters: List<String>) {
+                            line(buildString {
+                                if (targetImpl.returnType != null) {
+                                    append("return ")
+                                }
+                                append("%L.%L(%L)")
+                            }) {
+                                arg(operationParameterName)
+                                arg(Operation<*>::call.name)
+                                arg(parameters.joinToString())
                             }
-                            append("(this as %T).%L.call(%L)")
-                        },
-                        impl.type.kotlin,
-                        operationParameterName,
-                        parameters.joinToString(),
-                    )
+                        }
+
+                        val parameters = targetImpl.parameters.map { it.name }
+                        if (targetImpl.receiverType != null) {
+                            if_(buildKotlinCodeBlock(invokeWithReceiverName)) {
+                                callOperation(listOf(receiverParameterName) + parameters)
+                                if (targetImpl.returnType == null) {
+                                    line("return")
+                                }
+                            }
+                        }
+                        callOperation(parameters)
+                    }
                 })
             }
-        }.writeTo(codeGenerator, descriptorImpls.map { it.dependencies }.flatten())
+        }.writeTo(codeGenerator, descriptors.map { it.dependencies }.flatten())
     }
 
     private fun generateRootMixin(mixin: IrMixin) {
-        buildPatchImplType(mixin)
-            .toKotlinFile(mixin.patchImplType.packageName)
-            .writeTo(codeGenerator, mixin.dependencies)
-        buildMixinClassType(null, mixin)
-            .toJavaFile(mixin.type.packageName)
-            .writeTo(codeGenerator, mixin.dependencies)
+        mixin.flattenTree().forEach { mixin ->
+            buildKotlinFile(mixin.patchImplType) {
+                addType(buildPatchImplType(mixin))
+            }.writeTo(codeGenerator, mixin.dependencies)
+
+            buildJavaFile(mixin.type) {
+                buildMixinClassType(mixin)
+            }.writeTo(codeGenerator, mixin.dependencies)
+        }
     }
 
     private fun buildPatchImplType(mixin: IrMixin): KPType =
         buildKotlinClass(mixin.patchImplType.simpleName) {
-            setSuperClassType(mixin.patchType)
-            primaryConstructor(buildKotlinConstructor {
-                addParameter("instance", mixin.targetType.kotlin)
-            })
-            addProperty(buildKotlinProperty("instance", mixin.targetType) {
-                addModifiers(KPModifier.OVERRIDE)
-                initializer("instance")
-            })
+            setSuperClass(mixin.patchType)
+            val instanceProperty = setConstructor(
+                listOf(IrParameter("instance", mixin.targetType)),
+                KModifier.OVERRIDE
+            ).single()
             addProperties(mixin.accessor?.kinds?.filterIsInstance<IrFieldGetterAccessor>()?.map { getter ->
                 buildKotlinProperty(getter.name, getter.type) {
                     addModifiers(KPModifier.OVERRIDE)
-                    getter(buildKotlinGetter {
-                        addStatement(
-                            when {
-                                getter.isStatic -> "return %T.%L()"
-                                else -> "return (instance as %T).%L()"
-                            },
-                            mixin.accessor.type.kotlin,
-                            getter.internalName,
-                        )
-                    })
+                    setGetter {
+                        setBody {
+                            line(buildString {
+                                append("return ")
+                                append(
+                                    if (getter.isStatic) "%T"
+                                    else "(%N as %T)"
+                                )
+                                append(".%L()")
+                            }) {
+                                if (!getter.isStatic) {
+                                    arg(instanceProperty)
+                                }
+                                arg(mixin.accessor.type)
+                                arg(getter.internalName)
+                            }
+                        }
+                    }
                     mixin.accessor.kinds.find { it is IrFieldSetterAccessor && it.name == getter.name }?.let { setter ->
-                        mutable(true)
-                        setter(buildKotlinSetter {
-                            addParameters(setter.parameters)
-                            addStatement(
-                                when {
-                                    setter.isStatic -> "%T.%L(%L)"
-                                    else -> "(instance as %T).%L(%L)"
-                                },
-                                mixin.accessor.type.kotlin,
-                                setter.internalName,
-                                setter.parameters.joinToString { it.name },
-                            )
-                        })
+                        setSetter {
+                            setParameters(setter.parameters)
+                            setBody {
+                                line(buildString {
+                                    append(
+                                        if (getter.isStatic) "%T"
+                                        else "(%N as %T)"
+                                    )
+                                    append(".%L(%L)")
+                                }) {
+                                    if (!getter.isStatic) {
+                                        arg(instanceProperty)
+                                    }
+                                    arg(mixin.accessor.type)
+                                    arg(setter.internalName)
+                                    arg(setter.parameters.joinToString { it.name })
+                                }
+                            }
+                        }
                     }
                 }
             }.orEmpty())
             addFunctions(mixin.accessor?.kinds?.filterIsInstance<IrMethodAccessor>()?.map { method ->
                 buildKotlinFunction(method.name) {
                     addModifiers(KPModifier.OVERRIDE)
-                    addParameters(method.parameters)
+                    setParameters(method.parameters)
                     setReturnType(method.returnType)
-                    addStatement(
-                        buildString {
+                    setBody {
+                        line(buildString {
                             if (method.returnType != null) {
                                 append("return ")
                             }
                             append(
                                 if (method.isStatic) "%T.%L(%L)"
-                                else "(instance as %T).%L(%L)"
+                                else "(%N as %T).%L(%L)"
                             )
-                        },
-                        mixin.accessor.type.kotlin,
-                        method.internalName,
-                        method.parameters.joinToString { it.name },
-                    )
+                        }) {
+                            if (!method.isStatic) {
+                                arg(instanceProperty)
+                            }
+                            arg(mixin.accessor.type)
+                            arg(method.internalName)
+                            arg(method.parameters.joinToString { it.name })
+                        }
+                    }
                 }
             }.orEmpty())
             addTypes(mixin.innerMixins.map { buildPatchImplType(it) })
         }
 
-    private fun buildMixinClassType(parentMixin: IrMixin?, mixin: IrMixin): JPType {
+    private fun buildMixinClassType(mixin: IrMixin): JPType {
         mixin.accessor?.let { generateMixinAccessor(mixin, it) }
         mixin.extension?.let { generateMixinExtension(mixin, it) }
         return buildJavaClass(mixin.type.simpleName) {
             addModifiers(JPModifier.PUBLIC)
-            if (parentMixin != null) {
-                addModifiers(JPModifier.STATIC)
-            }
             addAnnotation<Mixin> {
-                addClassMember("value", mixin.targetType)
+                setClassMember(Mixin::value, mixin.targetType)
             }
-            addField(buildJavaField("patch", mixin.patchType) {
+            val patchField = buildJavaField("patch", mixin.patchType) {
                 addModifiers(JPModifier.PRIVATE)
                 addAnnotation<Unique>()
-            })
-            addMethod(buildJavaMethod("getOrInitPatch") {
+            }
+            val getThisMethod = buildJavaMethod("getThis") {
                 addModifiers(JPModifier.PRIVATE)
                 addAnnotation<Unique>()
-                setReturnType(mixin.patchType)
-                addIfStatement(buildJavaCodeBlock("patch == null")) {
-                    add(
-                        "patch = new %T((%T) (%T) this)"
-                    ) {
-                        arg(mixin.patchImplType)
+                setReturnType(mixin.targetType)
+                setBody {
+                    line("return (%T) (%T) this") {
                         arg(mixin.targetType)
                         arg(Object::class.asIr())
                     }
                 }
-                addStatement("return patch")
-            })
+            }
+            val getOrInitPatchMethod = buildJavaMethod("getOrInitPatch") {
+                addModifiers(JPModifier.PRIVATE)
+                addAnnotation<Unique>()
+                setReturnType(mixin.patchType)
+                setBody {
+                    if_(buildJavaCodeBlock("%N == null") { arg(patchField) }) {
+                        line("%N = new %T(%N())") {
+                            arg(patchField)
+                            arg(mixin.patchImplType)
+                            arg(getThisMethod)
+                        }
+                    }
+                    line("return %N") { arg(patchField) }
+                }
+            }
+            addField(patchField)
+            addMethod(getThisMethod)
+            addMethod(getOrInitPatchMethod)
             mixin.extension?.let { extension ->
-                addSuperinterface(extension.type.java)
+                addSuperInterface(extension.type)
                 addMethods(extension.kinds.map { method ->
                     buildJavaMethod(method.internalName) {
                         addModifiers(JPModifier.PUBLIC)
                         addAnnotation<Override>()
-                        addParameters(method.parameters)
+                        setParameters(method.parameters)
                         setReturnType(method.returnType)
-                        addStatement(
-                            buildJavaCodeBlock(
-                                buildString {
-                                    if (method.returnType != null) {
-                                        append("return ")
-                                    }
-                                    append("getOrInitPatch().%L(%L)")
+                        setBody {
+                            line(buildString {
+                                if (method.returnType != null) {
+                                    append("return ")
                                 }
-                            ) {
+                                append("%N().%L(%L)")
+                            }) {
+                                arg(getOrInitPatchMethod)
                                 arg(
                                     when (method) {
                                         is IrFieldGetterExtension -> method.name.capitalizeWithPrefix("get")
@@ -253,51 +374,61 @@ class MixinGenerator(
                                 )
                                 arg(method.parameters.joinToString { it.name })
                             }
-                        )
+                        }
                     }
                 })
             }
             addMethods(mixin.injections.map { buildMixinInjectionMethod(it) })
-            addTypes(mixin.innerMixins.map { buildMixinClassType(mixin, it) })
         }
     }
 
     private fun buildMixinInjectionMethod(injection: IrInjection): JPMethod =
         buildJavaMethod(injection.name) {
+            val callbackParameterName = "_callback"
+            val originalParameterName = "_original"
+            val receiverParameterName = "_receiver"
             addModifiers(JPModifier.PRIVATE)
             when (injection) {
                 is IrWrapMethodInjection -> {
                     addAnnotation<WrapMethod> {
-                        addStringMember("method", injection.method)
+                        setStringArrayMember(WrapMethod::method, injection.method)
                     }
                 }
 
                 is IrWrapOperationInjection -> {
                     addAnnotation<WrapOperation> {
-                        addStringMember("method", injection.method)
-                        addAnnotationMember<At>("at") {
-                            addStringMember("value", "INVOKE")
-                            addStringMember("target", injection.target)
-                            injection.ordinal?.let { addIntMember("ordinal", it) }
+                        setStringArrayMember(WrapOperation::method, injection.method)
+                        addAnnotationMember<At>(WrapOperation::at) {
+                            setStringMember(At::value, "INVOKE")
+                            setStringMember(At::target, injection.target)
+                            injection.ordinal?.let { setIntMember(At::ordinal, it) }
                         }
                     }
                 }
 
                 is IrModifyConstantValueInjection -> {
                     addAnnotation<ModifyExpressionValue> {
-                        addStringMember("method", injection.method)
-                        addAnnotationMember<At>("at") {
-                            addStringMember("value", "CONSTANT")
-                            addStringMember("args", "${injection.literalTypeName}Value=${injection.literalValue}")
-                            injection.ordinal?.let { addIntMember("ordinal", it) }
+                        setStringArrayMember(ModifyExpressionValue::method, injection.method)
+                        addAnnotationMember<At>(ModifyExpressionValue::at) {
+                            setStringMember(At::value, "CONSTANT")
+                            setStringArrayMember(
+                                At::args,
+                                "${injection.literalTypeName}Value=${injection.literalValue}"
+                            )
+                            injection.ordinal?.let { setIntMember(At::ordinal, it) }
                         }
                     }
                 }
             }
-            addParameters(injection.parameters.map { parameter ->
+            val sortedParameters = injection.parameters.sortedWith(
+                compareBy<IrInjectionParameter> { it.priority }.thenBy { it.subPriority }
+            )
+            val hasCallback = sortedParameters.find { it is IrInjectionCallbackParameter } != null
+            val signatureLocalPrefix = "local$"
+            addParameters(sortedParameters.map { parameter ->
                 when (parameter) {
                     is IrInjectionReceiverParameter -> {
-                        buildJavaParameter("_receiver", parameter.type)
+                        buildJavaParameter(receiverParameterName, parameter.type)
                     }
 
                     is IrInjectionArgumentParameter -> {
@@ -306,85 +437,153 @@ class MixinGenerator(
 
                     is IrInjectionOperationParameter -> {
                         buildJavaParameter(
-                            "_original", Operation::class.asIr().parameterizedBy(parameter.returnType.orVoid())
+                            originalParameterName,
+                            Operation::class.asIr().parameterizedBy(parameter.returnType.orVoid())
                         )
                     }
 
                     is IrInjectionLiteralParameter -> {
-                        buildJavaParameter("_original", parameter.type)
+                        buildJavaParameter(originalParameterName, parameter.type)
                     }
 
-                    is IrInjectionLocalParameter -> {
-                        buildJavaParameter(parameter.name, parameter.type)
+                    is IrInjectionBodyLocalParameter -> {
+                        buildJavaParameter(parameter.name, parameter.type) {
+                            addAnnotation<Local> {
+                                setIntMember(Local::ordinal, parameter.ordinal)
+                            }
+                        }
+                    }
+
+                    is IrInjectionSignatureLocalParameter -> {
+                        buildJavaParameter(signatureLocalPrefix + parameter.name, parameter.type) {
+                            addAnnotation<Local> {
+                                setIntMember(Local::index, parameter.index)
+                                setBooleanMember(Local::argsOnly, true)
+                            }
+                        }
                     }
 
                     is IrInjectionCallbackParameter -> {
-                        buildJavaParameter("_callback", CallbackInfo::class.asIr())
+                        buildJavaParameter(
+                            callbackParameterName,
+                            parameter.returnType
+                                ?.let { CallbackInfoReturnable::class.asIr().parameterizedBy(it) }
+                                ?: CallbackInfo::class.asIr()
+                        ) {
+                            addAnnotation<Cancellable>()
+                        }
                     }
                 }
             })
             setReturnType(injection.returnType)
             val hookArgumentCodeBlocks = injection.hookArguments.map { argument ->
                 when (argument) {
-                    is IrHookCancelerArgument -> buildJavaCodeBlock("null")
-                    is IrHookLiteralArgument -> buildJavaCodeBlock("_original")
-                    is IrHookNamedLocalArgument -> buildJavaCodeBlock("null")
+                    is IrHookContextArgument -> buildJavaCodeBlock("new %T(%L)") {
+                        arg(argument.descriptor.type)
+                        arg(buildList {
+                            addAll(argument.descriptor.parameters.map { signatureLocalPrefix + it.name })
+                            add(callbackParameterName)
+                        }.joinToString())
+                    }
+
+                    is IrHookTargetArgument -> buildJavaCodeBlock("new %T(%L)") {
+                        arg(argument.descriptor.type)
+                        arg(buildList {
+                            if (injection is IrWrapMethodInjection && !injection.isStatic) {
+                                add("getThis()")
+                                add("false")
+                            } else if (injection is IrWrapOperationInjection && !injection.isStatic) {
+                                add(receiverParameterName)
+                                add("true")
+                            }
+                            addAll(argument.descriptor.parameters.map { it.name })
+                            add(originalParameterName)
+                        }.joinToString())
+                    }
+
+                    is IrHookLiteralArgument -> buildJavaCodeBlock("%L") { arg(originalParameterName) }
                     is IrHookOrdinalArgument -> buildJavaCodeBlock("%L") { arg(argument.ordinal) }
-                    is IrHookParameterArgument -> buildJavaCodeBlock("null")
-                    is IrHookPositionalLocalArgument -> buildJavaCodeBlock("null")
-                    is IrHookReturnerArgument -> buildJavaCodeBlock("null")
-                    is IrHookTargetArgument -> buildJavaCodeBlock("null")
+                    is IrHookLocalArgument -> buildJavaCodeBlock("%L") { arg(argument.parameterName) }
                 }
             }
-            addStatement(
-                buildJavaCodeBlock(
-                    buildString {
+            setBody {
+                val invokeHook: IrJavaCodeBlockBuilder.() -> Unit = {
+                    line(buildString {
                         if (injection.returnType != null) {
                             append("return ")
                         }
                         append("getOrInitPatch().%L(")
                         append(hookArgumentCodeBlocks.joinToString { "%L" })
                         append(")")
+                    }) {
+                        arg(injection.hookName)
+                        hookArgumentCodeBlocks.forEach { arg(it) }
                     }
-                ) {
-                    arg(injection.hookName)
-                    hookArgumentCodeBlocks.forEach { arg(it) }
                 }
-            )
+                if (hasCallback) {
+                    try_(
+                        tryBody = invokeHook,
+                        exceptionType = LapisReturnSignal::class,
+                        catchBody = if (injection.returnType != null) {
+                            {
+                                line(
+                                    "return " + when (injection.returnType.javaPrimitiveType) {
+                                        JPBoolean -> "false"
+                                        JPByte, JPShort, JPInt -> "0"
+                                        JPLong -> "0L"
+                                        JPChar -> "'\\0'"
+                                        JPFloat -> "0F"
+                                        JPDouble -> "0D"
+                                        else -> "null"
+                                    }
+                                )
+                            }
+                        } else null
+                    )
+                } else {
+                    buildJavaCodeBlock(invokeHook)
+                }
+            }
         }
 
     private fun generateMixinAccessor(mixin: IrMixin, accessor: IrAccessor) {
-        buildJavaInterface(accessor.type.simpleName) {
-            addAnnotation<Mixin> {
-                addClassMember("value", mixin.targetType)
-            }
-            addModifiers(JPModifier.PUBLIC)
-            addMethods(accessor.kinds.map { method ->
-                buildJavaMethod(method.internalName) {
-                    addModifiers(
-                        JPModifier.PUBLIC,
-                        if (method.isStatic) JPModifier.STATIC else JPModifier.ABSTRACT,
-                    )
-                    if (method is IrMethodAccessor) {
-                        addAnnotation<Invoker> {
-                            addStringMember("value", method.vanillaName)
-                        }
-                    } else {
-                        addAnnotation<Accessor> {
-                            addStringMember("value", method.vanillaName)
-                        }
-                        if (method is IrFieldSetterAccessor) {
-                            addAnnotation<Mutable>()
-                        }
-                    }
-                    addParameters(method.parameters)
-                    setReturnType(method.returnType)
-                    if (method.isStatic) {
-                        addStatement("throw new ${IllegalStateException::class.simpleName}()")
-                    }
+        buildJavaFile(accessor.type) {
+            buildJavaInterface(accessor.type.simpleName) {
+                addAnnotation<Mixin> {
+                    setClassMember(Mixin::value, mixin.targetType)
                 }
-            })
-        }.toJavaFile(accessor.type.packageName).writeTo(codeGenerator, mixin.dependencies)
+                addModifiers(JPModifier.PUBLIC)
+                addMethods(accessor.kinds.map { method ->
+                    buildJavaMethod(method.internalName) {
+                        addModifiers(
+                            JPModifier.PUBLIC,
+                            if (method.isStatic) JPModifier.STATIC else JPModifier.ABSTRACT,
+                        )
+                        if (method is IrMethodAccessor) {
+                            addAnnotation<Invoker> {
+                                setStringMember(Invoker::value, method.vanillaName)
+                            }
+                        } else {
+                            addAnnotation<Accessor> {
+                                setStringMember(Accessor::value, method.vanillaName)
+                            }
+                            if (method is IrFieldSetterAccessor) {
+                                addAnnotation<Mutable>()
+                            }
+                        }
+                        setParameters(method.parameters)
+                        setReturnType(method.returnType)
+                        if (method.isStatic) {
+                            setBody {
+                                line("throw new %T()") {
+                                    arg(IllegalStateException::class.asIr())
+                                }
+                            }
+                        }
+                    }
+                })
+            }
+        }.writeTo(codeGenerator, mixin.dependencies)
 
         extensionProperties += accessor.kinds.filterIsInstance<IrFieldGetterAccessor>().map { getter ->
             buildKotlinProperty(getter.name, getter.type) {
@@ -393,30 +592,46 @@ class MixinGenerator(
                 } else {
                     setReceiverType(mixin.targetType)
                 }
-                getter(buildKotlinGetter {
-                    addStatement(
-                        when {
-                            getter.isStatic -> "return %T.%L()"
-                            else -> "return (this as %T).%L()"
-                        },
-                        accessor.type.kotlin,
-                        getter.internalName,
-                    )
-                })
+                setGetter {
+                    if (getter.isStatic) {
+                        addAnnotation<JvmName> {
+                            setStringMember(
+                                JvmName::name,
+                                mixin.type.uniqueJvmName.capitalizeWithPrefix("get") + "_" + getter.name
+                            )
+                        }
+                    }
+                    setBody {
+                        line(buildString {
+                            append("return ")
+                            append(
+                                if (getter.isStatic) "%T"
+                                else "(this as %T)"
+                            )
+                            append(".%L()")
+                        }) {
+                            arg(accessor.type)
+                            arg(getter.internalName)
+                        }
+                    }
+                }
                 accessor.kinds.find { it is IrFieldSetterAccessor && it.name == getter.name }?.let { setter ->
-                    mutable(true)
-                    setter(buildKotlinSetter {
-                        addParameters(setter.parameters)
-                        addStatement(
-                            when {
-                                setter.isStatic -> "%T.%L(%L)"
-                                else -> "(this as %T).%L(%L)"
-                            },
-                            accessor.type.kotlin,
-                            setter.internalName,
-                            setter.parameters.joinToString { it.name },
-                        )
-                    })
+                    setSetter {
+                        setParameters(setter.parameters)
+                        setBody {
+                            line(buildString {
+                                append(
+                                    if (getter.isStatic) "%T"
+                                    else "(this as %T)"
+                                )
+                                append(".%L(%L)")
+                            }) {
+                                arg(accessor.type)
+                                arg(setter.internalName)
+                                arg(setter.parameters.joinToString { it.name })
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -428,10 +643,10 @@ class MixinGenerator(
                 } else {
                     setReceiverType(mixin.targetType)
                 }
-                addParameters(method.parameters)
+                setParameters(method.parameters)
                 setReturnType(method.returnType)
-                addStatement(
-                    buildString {
+                setBody {
+                    line(buildString {
                         if (method.returnType != null) {
                             append("return ")
                         }
@@ -439,61 +654,66 @@ class MixinGenerator(
                             if (method.isStatic) "%T.%L(%L)"
                             else "(this as %T).%L(%L)"
                         )
-                    },
-                    accessor.type.kotlin,
-                    method.internalName,
-                    method.parameters.joinToString { it.name },
-                )
+                    }) {
+                        arg(accessor.type)
+                        arg(method.internalName)
+                        arg(method.parameters.joinToString { it.name })
+                    }
+                }
             }
         }
     }
 
     private fun generateMixinExtension(mixin: IrMixin, extension: IrExtension) {
-        buildKotlinInterface(extension.type.simpleName) {
-            addFunctions(extension.kinds.map { method ->
-                buildKotlinFunction(method.internalName) {
-                    addModifiers(KPModifier.ABSTRACT)
-                    addParameters(method.parameters)
-                    setReturnType(method.returnType)
-                }
+        buildKotlinFile(extension.type) {
+            addType(buildKotlinInterface(extension.type.simpleName) {
+                addFunctions(extension.kinds.map { method ->
+                    buildKotlinFunction(method.internalName) {
+                        addModifiers(KPModifier.ABSTRACT)
+                        setParameters(method.parameters)
+                        setReturnType(method.returnType)
+                    }
+                })
             })
-        }.toKotlinFile(extension.type.packageName).writeTo(codeGenerator, mixin.dependencies)
+        }.writeTo(codeGenerator, mixin.dependencies)
 
         extensionProperties += extension.kinds.filterIsInstance<IrFieldGetterExtension>().map { getter ->
             buildKotlinProperty(getter.name, getter.type) {
                 setReceiverType(mixin.targetType)
-                getter(buildKotlinGetter {
-                    addStatement(
-                        "return (this as %T).%L()",
-                        extension.type.kotlin,
-                        getter.internalName,
-                    )
-                })
+                setGetter {
+                    setBody {
+                        line("return (this as %T).%L()") {
+                            arg(extension.type)
+                            arg(getter.internalName)
+                        }
+                    }
+                }
                 extension.kinds.find { it is IrFieldSetterExtension && it.name == getter.name }?.let { setter ->
-                    mutable(true)
-                    setter(buildKotlinSetter {
-                        addParameters(setter.parameters)
-                        addStatement(
-                            "(this as %T).%L(%L)",
-                            extension.type.kotlin,
-                            setter.internalName,
-                            setter.parameters.joinToString { it.name },
-                        )
-                    })
+                    setSetter {
+                        setParameters(setter.parameters)
+                        setBody {
+                            line("(this as %T).%L(%L)") {
+                                arg(extension.type)
+                                arg(setter.internalName)
+                                arg(setter.parameters.joinToString { it.name })
+                            }
+                        }
+                    }
                 }
             }
         }
         extensionFunctions += extension.kinds.filterIsInstance<IrMethodExtension>().map { method ->
             buildKotlinFunction(method.name) {
                 setReceiverType(mixin.targetType)
-                addParameters(method.parameters)
+                setParameters(method.parameters)
                 setReturnType(method.returnType)
-                addStatement(
-                    "return (this as %T).%L(%L)",
-                    extension.type.kotlin,
-                    method.internalName,
-                    method.parameters.joinToString { it.name },
-                )
+                setBody {
+                    line("return (this as %T).%L(%L)") {
+                        arg(extension.type)
+                        arg(method.internalName)
+                        arg(method.parameters.joinToString { it.name })
+                    }
+                }
             }
         }
     }
@@ -508,17 +728,21 @@ class MixinGenerator(
         }.writeTo(codeGenerator, dependencies)
     }
 
-    private fun generateMixinConfig(rootMixins: List<IrMixin>) {
+    private fun generateMixinConfig(mixins: List<IrMixin>) {
         codeGenerator.createResourceFile(
             path = "${options.modId}.mixins.json",
             contents = configJson.encodeToString(
                 MixinConfig.of(
                     mixinPackage = options.mixinPackageName,
                     refmapFileName = options.refmapFileName,
-                    qualifiedNames = rootMixins.flatMap { it.flattenTree() }.groupBy { it.side }
-                        .mapValues { (_, mixins) ->
-                            mixins.map { it.type.qualifiedName }
-                        },
+                    qualifiedNames = mixins.flatMap { it.flattenTree() }.groupBy { it.side }.mapValues {
+                        it.value.flatMap { mixin ->
+                            buildList {
+                                add(mixin.type.qualifiedName)
+                                mixin.accessor?.let { accessor -> add(accessor.type.qualifiedName) }
+                            }
+                        }
+                    },
                 ),
             ),
             aggregating = true,

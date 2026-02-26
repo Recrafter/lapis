@@ -15,12 +15,9 @@ import io.github.recrafter.lapis.utils.MemberKind
 import io.github.recrafter.lapis.utils.PsiCompanion
 import org.jetbrains.kotlin.psi.psiUtil.getChildOfType
 
-class SymbolParser(
-    private val resolver: Resolver,
-    private val psiCompanion: PsiCompanion,
-    private val logger: KspLogger,
-) {
-    fun parse(): ParserResult =
+class SymbolParser(private val psiCompanion: PsiCompanion) {
+
+    fun parse(resolver: Resolver): ParserResult =
         ParserResult(
             descriptorContainers = resolver.getSymbolsAnnotatedWith<LaDescriptors>().map { symbol ->
                 val classDeclaration = symbol.castOrNull<KspClassDeclaration>()
@@ -134,7 +131,7 @@ class SymbolParser(
             outerClassDeclaration = outerClass,
 
             superClassDeclaration = superClass?.declaration?.castOrNull<KspClassDeclaration>(),
-            superClassGenericDeclaration = superClass
+            superGenericClassDeclaration = superClass
                 ?.getGenericTypeOrNull()
                 ?.declaration
                 ?.castOrNull<KspClassDeclaration>(),
@@ -163,7 +160,7 @@ class SymbolParser(
             isExtension = propertyDeclaration.isExtension(),
 
             hasAccessAnnotation = accessAnnotation != null,
-            accessVanillaName = accessAnnotation?.vanillaName?.ifEmpty { propertyDeclaration.name },
+            accessName = accessAnnotation?.name?.ifEmpty { propertyDeclaration.name },
             hasFieldAnnotation = propertyDeclaration.hasAnnotation<LaField>(),
 
             hasStaticAnnotation = propertyDeclaration.hasAnnotation<LaStatic>(),
@@ -184,7 +181,7 @@ class SymbolParser(
             isExtension = functionDeclaration.isExtension(),
 
             hasAccessAnnotation = accessAnnotation != null,
-            accessVanillaName = accessAnnotation?.vanillaName?.ifEmpty { functionDeclaration.name },
+            accessName = accessAnnotation?.name?.ifEmpty { functionDeclaration.name },
             accessMemberKinds = MemberKind.entries.filter {
                 functionDeclaration.hasAnnotation(it.annotationClass)
             },
@@ -205,7 +202,19 @@ class SymbolParser(
     ): ParsedPatchFunctionParameter {
         val name = parameter.name?.asString()
         val type = parameter.type.resolve()
-        val targetDescriptorClass = type.declaration.castOrNull<KspClassDeclaration>()
+
+        val contextAnnotation = parameter.getAnnotationOrNull<LaContext>()
+        val contextDescriptorClassDeclaration = if (contextAnnotation != null) {
+            type.declaration.castOrNull<KspClassDeclaration>()
+        } else null
+        val contextDescriptorGenericClassDeclaration = if (contextAnnotation != null) {
+            type.getGenericTypeOrNull()?.declaration?.castOrNull<KspClassDeclaration>()
+        } else null
+
+        val targetAnnotation = parameter.getAnnotationOrNull<LaTarget>()
+        val targetDescriptorClass = if (targetAnnotation != null) {
+            type.declaration.castOrNull<KspClassDeclaration>()
+        } else null
 
         val literalAnnotation = parameter.getAnnotationOrNull<LaLiteral>()
         val literalType = if (literalAnnotation != null) {
@@ -233,7 +242,6 @@ class SymbolParser(
         } else null
 
         val ordinalAnnotation = parameter.getAnnotationOrNull<LaOrdinal>()
-        val parameterAnnotation = parameter.getAnnotationOrNull<LaParameter>()
         val localAnnotation = parameter.getAnnotationOrNull<LaLocal>()
 
         return ParsedPatchFunctionParameter(
@@ -242,7 +250,11 @@ class SymbolParser(
             name = name,
             type = type,
 
-            hasTargetAnnotation = parameter.hasAnnotation<LaTarget>(),
+            hasContextAnnotation = contextAnnotation != null,
+            contextDescriptorClassDeclaration = contextDescriptorClassDeclaration,
+            contextDescriptorGenericClassDeclaration = contextDescriptorGenericClassDeclaration,
+
+            hasTargetAnnotation = targetAnnotation != null,
             targetDescriptorClassDeclaration = targetDescriptorClass,
 
             hasLiteralAnnotation = literalAnnotation != null,
@@ -251,19 +263,10 @@ class SymbolParser(
             literalValue = literalValue,
 
             hasOrdinalAnnotation = ordinalAnnotation != null,
-            ordinals = ordinalAnnotation?.indices?.toList().orEmpty(),
-
-            hasReturnAnnotation = parameter.hasAnnotation<LaReturn>(),
-            returnKind = ParsedReturnKind.entries.firstOrNull {
-                type.declaration.isInstance(it.typeClass)
-            },
-
-            hasParameterAnnotation = parameterAnnotation != null,
-            parameterName = parameterAnnotation?.name?.ifEmpty { name },
+            ordinalIndices = ordinalAnnotation?.indices?.toList().orEmpty(),
 
             hasLocalAnnotation = localAnnotation != null,
-            localName = localAnnotation?.name?.ifEmpty { null },
-            localIndex = localAnnotation?.index.takeIf { it != null && it >= 0 },
+            localOrdinal = localAnnotation?.ordinal,
         )
     }
 }

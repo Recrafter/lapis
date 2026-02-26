@@ -2,18 +2,21 @@ package io.github.recrafter.lapis.layers.lowering
 
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import io.github.recrafter.lapis.api.LapisContext
 import io.github.recrafter.lapis.extensions.capitalizeWithPrefix
+import io.github.recrafter.lapis.extensions.common.asIr
+import io.github.recrafter.lapis.extensions.common.getAnnotationDefaultIntValue
 import io.github.recrafter.lapis.extensions.jvm.JvmVoid
 import io.github.recrafter.lapis.extensions.kp.KPClassName
 import io.github.recrafter.lapis.extensions.kp.KPParameterizedTypeName
 import io.github.recrafter.lapis.extensions.kp.KPTypeName
 import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
-import io.github.recrafter.lapis.extensions.ksp.KspLogger
 import io.github.recrafter.lapis.extensions.ksp.KspType
 import io.github.recrafter.lapis.layers.validator.*
 import io.github.recrafter.lapis.options.Options
+import org.spongepowered.asm.mixin.injection.At
 
-class IrLowering(val options: Options, val logger: KspLogger) {
+class MixinLowering(private val options: Options) {
 
     fun lower(validatorResult: ValidatorResult): IrResult {
         val descriptorBindings = validatorResult.descriptors.mapNotNull { validated ->
@@ -24,63 +27,60 @@ class IrLowering(val options: Options, val logger: KspLogger) {
             )
         }
         return IrResult(
-            descriptorImpls = descriptorBindings.map { it.lowered },
-            rootMixins = validatorResult.rootPatches.map { lowerMixin(null, it, descriptorBindings) },
+            descriptors = descriptorBindings.map { it.lowered },
+            mixins = validatorResult.rootPatches.map { lowerMixin(it, descriptorBindings) },
         )
     }
 
-    private fun lowerDescriptor(descriptor: Descriptor): IrDescriptorImpl? {
+    private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor? {
         if (descriptor !is MethodDescriptor) {
             return null
         }
         val superType = descriptor.classDeclaration.asIr()
         val containerType = descriptor.containerClassDeclaration.asIr()
 
-        return IrDescriptorImpl(
+        val implNamePrefix = "${containerType.simpleName}_${superType.simpleName}"
+        return IrDescriptor(
             source = descriptor.source,
 
-            type = IrClassName.of(options.generatedPackageName, buildString {
-                append("_")
-                append(containerType.simpleName)
-                append("_")
-                append(superType.simpleName)
-                append("_Impl")
-            }),
-            superType = superType,
-            receiverType = when {
-                descriptor.isStatic -> null
-                else -> descriptor.receiverType.asIr()
-            },
-            parameters = descriptor.parameters.asIr(),
-            returnType = descriptor.returnType?.asIr(),
+            contextImpl = IrDescriptorContextImpl(
+                type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_ContextImpl"),
+                superType = LapisContext::class.asIr().parameterizedBy(superType),
+                parameters = descriptor.parameters.asIr(),
+                returnType = descriptor.returnType?.asIr(),
+            ),
+            targetImpl = IrDescriptorTargetImpl(
+                type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_TargetImpl"),
+                superType = superType,
+                receiverType = when {
+                    descriptor.isStatic -> null
+                    else -> descriptor.receiverType.asIr()
+                },
+                parameters = descriptor.parameters.asIr(),
+                returnType = descriptor.returnType?.asIr(),
+            ),
         )
     }
 
-    private fun lowerMixin(parentPatch: Patch?, patch: Patch, descriptorBindings: List<DescriptorBinding>): IrMixin =
+    private fun lowerMixin(patch: Patch, descriptorBindings: List<DescriptorBinding>): IrMixin =
         IrMixin(
             source = patch.source,
 
             type = IrClassName.of(
                 options.mixinPackageName,
-                *listOfNotNull(
-                    parentPatch?.let { "_" + it.name + "_Mixin" },
-                    "_" + patch.name + "_Mixin",
-                ).toTypedArray()
+                "_" + patch.name + "_Mixin"
             ),
             side = patch.side,
             patchType = patch.classDeclaration.asIr(),
             patchImplType = IrClassName.of(
                 options.generatedPackageName,
-                *listOfNotNull(
-                    parentPatch?.let { "_" + it.name + "_Impl" },
-                    "_" + patch.name + "_Impl",
-                ).toTypedArray()
+                "_" + patch.name + "_Impl"
             ),
             targetType = patch.targetClassDeclaration.asIr(),
             extension = lowerExtension(patch),
             accessor = lowerAccessor(patch),
             injections = patch.hooks.flatMap { lowerInjections(it, descriptorBindings) },
-            innerMixins = patch.innerPatches.map { lowerMixin(patch, it, descriptorBindings) },
+            innerMixins = patch.innerPatches.map { lowerMixin(it, descriptorBindings) },
         )
 
     private fun lowerAccessor(patch: Patch): IrAccessor? {
@@ -189,6 +189,7 @@ class IrLowering(val options: Options, val logger: KspLogger) {
                     name = hook.name,
                     hookName = hook.name,
                     method = hook.method.jvmDescriptor,
+                    isStatic = hook.method.isStatic,
                     returnType = hook.returnType?.asIr(),
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings) },
@@ -211,7 +212,8 @@ class IrLowering(val options: Options, val logger: KspLogger) {
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
                     target = hook.target.jvmDescriptor,
-                    ordinal = ordinal,
+                    isStatic = hook.target.isStatic,
+                    ordinal = ordinal.takeIf { it != getAnnotationDefaultIntValue(At::ordinal) },
                 )
             }
 
@@ -232,15 +234,23 @@ class IrLowering(val options: Options, val logger: KspLogger) {
                     literalType = hook.literalType.asIr(),
                     literalTypeName = hook.literalTypeName,
                     literalValue = hook.literalValue,
-                    ordinal = ordinal,
+                    ordinal = ordinal.takeIf { it != getAnnotationDefaultIntValue(At::ordinal) },
                 )
             }
         }
     }
 
-    private fun lowerInjectionParameter(hook: Hook, parameter: HookParameter): List<IrInjectionParameter> {
-        if (parameter is HookTargetParameter) {
-            return buildList {
+    private fun lowerInjectionParameter(hook: Hook, parameter: HookParameter): List<IrInjectionParameter> =
+        when (parameter) {
+            is HookContextParameter -> buildList {
+                val receiverShift = if (parameter.descriptor.isStatic) 0 else 1
+                addAll(parameter.descriptor.parameters.mapIndexed { index, parameter ->
+                    IrInjectionSignatureLocalParameter(parameter.name, parameter.type.asIr(), receiverShift + index)
+                })
+                add(IrInjectionCallbackParameter(parameter.descriptor.returnType?.asIr()))
+            }
+
+            is HookTargetParameter -> buildList {
                 if (hook is InvokeMethodHook && !parameter.descriptor.isStatic) {
                     add(IrInjectionReceiverParameter(parameter.descriptor.receiverType.asIr()))
                 }
@@ -249,40 +259,53 @@ class IrLowering(val options: Options, val logger: KspLogger) {
                 })
                 add(IrInjectionOperationParameter(parameter.descriptor.returnType?.asIr()))
             }
-        }
-        return listOfNotNull(
-            when (parameter) {
-                is HookTargetParameter -> null
-                is HookParameterParameter -> null
-                is HookLiteralParameter -> IrInjectionLiteralParameter(parameter.type.asIr())
-                is HookOrdinalParameter -> null
-                is HookCancelerParameter -> null
-                is HookReturnerParameter -> null
-                is HookNamedLocalParameter -> null
-                is HookPositionalLocalParameter -> null
+
+            is HookLiteralParameter -> listOf(
+                IrInjectionLiteralParameter(parameter.type.asIr())
+            )
+
+            is HookLocalParameter -> {
+                val signatureShift = buildList {
+                    if (!hook.method.isStatic) {
+                        add(hook.method.receiverType)
+                    }
+                    addAll(hook.method.parameters.map { it.type })
+                }.count { it == parameter.type }
+                listOf(
+                    IrInjectionBodyLocalParameter(
+                        parameter.name,
+                        parameter.type.asIr(),
+                        signatureShift + parameter.ordinal
+                    )
+                )
             }
-        )
-    }
+
+            is HookOrdinalParameter -> emptyList()
+        }
 
     private fun lowerHookArgument(
         parameter: HookParameter,
         descriptorBindings: List<DescriptorBinding>,
-        ordinal: Int = -1,
+        ordinal: Int = getAnnotationDefaultIntValue(At::ordinal),
     ): IrHookArgument =
         when (parameter) {
+            is HookContextParameter -> IrHookContextArgument(
+                descriptorBindings
+                    .first { it.validated.classDeclaration == parameter.descriptor.classDeclaration }
+                    .lowered
+                    .contextImpl
+            )
+
             is HookTargetParameter -> IrHookTargetArgument(
                 descriptorBindings
                     .first { it.validated.classDeclaration == parameter.descriptor.classDeclaration }
                     .lowered
+                    .targetImpl
             )
 
-            is HookParameterParameter -> IrHookParameterArgument()
-            is HookLiteralParameter -> IrHookLiteralArgument()
+            is HookLiteralParameter -> IrHookLiteralArgument
             is HookOrdinalParameter -> IrHookOrdinalArgument(ordinal)
-            is HookCancelerParameter -> IrHookCancelerArgument()
-            is HookReturnerParameter -> IrHookReturnerArgument()
-            is HookNamedLocalParameter -> IrHookNamedLocalArgument()
-            is HookPositionalLocalParameter -> IrHookPositionalLocalArgument()
+            is HookLocalParameter -> IrHookLocalArgument(parameter.name)
         }
 
     private fun String.withModId(): String =
@@ -290,7 +313,7 @@ class IrLowering(val options: Options, val logger: KspLogger) {
 
     private class DescriptorBinding(
         val validated: Descriptor,
-        val lowered: IrDescriptorImpl,
+        val lowered: IrDescriptor,
     )
 }
 
@@ -332,5 +355,5 @@ val Descriptor.jvmDescriptor: String
             append(JvmVoid)
         }
 
-        is FieldDescriptor -> TODO()
+        is FieldDescriptor -> TODO("GETFIELD / PUTFIELD hooks")
     }

@@ -2,14 +2,11 @@ package io.github.recrafter.lapis.layers.parser
 
 import io.github.recrafter.lapis.annotations.enums.LapisHookKind
 import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
-import io.github.recrafter.lapis.api.LapisCanceler
-import io.github.recrafter.lapis.api.LapisReturner
 import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
 import io.github.recrafter.lapis.extensions.ksp.KspSymbol
 import io.github.recrafter.lapis.extensions.ksp.KspType
 import io.github.recrafter.lapis.layers.validator.KspSourceHolder
 import io.github.recrafter.lapis.utils.MemberKind
-import kotlin.reflect.KClass
 
 class ParserResult(
     val descriptorContainers: List<ParsedDescriptorContainer>,
@@ -65,7 +62,7 @@ class ParsedPatch(
     val outerClassDeclaration: KspClassDeclaration?,
 
     val superClassDeclaration: KspClassDeclaration?,
-    val superClassGenericDeclaration: KspClassDeclaration?,
+    val superGenericClassDeclaration: KspClassDeclaration?,
 
     val targetClassDeclaration: KspClassDeclaration?,
 
@@ -83,7 +80,7 @@ class ParsedPatchProperty(
     val isExtension: Boolean,
 
     val hasAccessAnnotation: Boolean,
-    val accessVanillaName: String?,
+    val accessName: String?,
     val hasFieldAnnotation: Boolean,
 
     val hasStaticAnnotation: Boolean,
@@ -102,7 +99,7 @@ class ParsedPatchFunction(
     val isExtension: Boolean,
 
     val hasAccessAnnotation: Boolean,
-    val accessVanillaName: String?,
+    val accessName: String?,
     val accessMemberKinds: List<MemberKind>,
 
     val hasStaticAnnotation: Boolean,
@@ -118,6 +115,10 @@ class ParsedPatchFunctionParameter(
     val name: String?,
     val type: KspType?,
 
+    val hasContextAnnotation: Boolean,
+    val contextDescriptorClassDeclaration: KspClassDeclaration?,
+    val contextDescriptorGenericClassDeclaration: KspClassDeclaration?,
+
     val hasTargetAnnotation: Boolean,
     val targetDescriptorClassDeclaration: KspClassDeclaration?,
 
@@ -127,20 +128,8 @@ class ParsedPatchFunctionParameter(
     val literalValue: String?,
 
     val hasOrdinalAnnotation: Boolean,
-    val ordinals: List<Int>,
-
-    val hasReturnAnnotation: Boolean,
-    val returnKind: ParsedReturnKind?,
-
-    val hasParameterAnnotation: Boolean,
-    val parameterName: String?,
+    val ordinalIndices: List<Int>,
 
     val hasLocalAnnotation: Boolean,
-    val localName: String?,
-    val localIndex: Int?,
+    val localOrdinal: Int?,
 ) : KspSourceHolder()
-
-enum class ParsedReturnKind(val typeClass: KClass<*>) {
-    CANCELER(LapisCanceler::class),
-    RETURNER(LapisReturner::class),
-}

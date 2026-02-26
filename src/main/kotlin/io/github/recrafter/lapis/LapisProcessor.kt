@@ -6,8 +6,8 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import io.github.recrafter.lapis.extensions.ksp.KspAnnotated
 import io.github.recrafter.lapis.extensions.ksp.KspLogger
 import io.github.recrafter.lapis.layers.generator.MixinGenerator
-import io.github.recrafter.lapis.layers.lowering.IrLowering
 import io.github.recrafter.lapis.layers.lowering.IrResult
+import io.github.recrafter.lapis.layers.lowering.MixinLowering
 import io.github.recrafter.lapis.layers.parser.SymbolParser
 import io.github.recrafter.lapis.layers.validator.BackendValidator
 import io.github.recrafter.lapis.layers.validator.FrontendValidator
@@ -21,20 +21,24 @@ class LapisProcessor(
 ) : SymbolProcessor {
 
     private val psiCompanion: PsiCompanion = PsiCompanion()
+    private val symbolParser: SymbolParser = SymbolParser(psiCompanion)
+    private val frontendValidator: FrontendValidator = FrontendValidator(logger)
+    private val mixinLowering: MixinLowering = MixinLowering(options)
+
     private val results: MutableList<IrResult> = mutableListOf()
 
     override fun process(resolver: Resolver): List<KspAnnotated> {
-        val parsedData = SymbolParser(resolver, psiCompanion, logger).parse()
-        val validatedData = FrontendValidator(logger).validate(parsedData)
-        results += IrLowering(options, logger).lower(validatedData)
+        val parsedData = symbolParser.parse(resolver)
+        val validatedData = frontendValidator.validate(parsedData)
+        results += mixinLowering.lower(validatedData)
         return emptyList()
     }
 
     override fun finish() {
-        val descriptorImpls = results.flatMap { it.descriptorImpls }
-        val rootMixins = results.flatMap { it.rootMixins }
-        BackendValidator(options.minecraftJars, logger).validate(descriptorImpls, rootMixins)
-        MixinGenerator(options, codeGenerator, logger).generate(descriptorImpls, rootMixins)
+        val descriptors = results.flatMap { it.descriptors }
+        val mixins = results.flatMap { it.mixins }
+        BackendValidator(options.minecraftJars, logger).validate(descriptors, mixins)
+        MixinGenerator(options, codeGenerator).generate(descriptors, mixins)
         reset()
     }
 

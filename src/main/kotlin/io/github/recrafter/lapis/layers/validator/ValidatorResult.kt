@@ -125,7 +125,7 @@ sealed class Hook(
     override val source: KspSymbol,
 
     val name: String,
-    val method: Descriptor,
+    val method: MethodDescriptor,
     val returnType: KspType?,
     val parameters: List<HookParameter>,
 ) : KspSourceHolder()
@@ -143,7 +143,7 @@ class InvokeMethodHook(
     override val source: KspSymbol,
 
     name: String,
-    method: Descriptor,
+    method: MethodDescriptor,
     returnType: KspType?,
     parameters: List<HookParameter>,
     val target: MethodDescriptor,
@@ -154,7 +154,7 @@ class LiteralHook(
     override val source: KspSymbol,
 
     name: String,
-    method: Descriptor,
+    method: MethodDescriptor,
     parameters: List<HookParameter>,
     val literalType: KspType,
     val literalTypeName: String,
@@ -163,11 +163,8 @@ class LiteralHook(
 ) : Hook(source, name, method, literalType, parameters)
 
 sealed interface HookParameter
+class HookContextParameter(val descriptor: MethodDescriptor) : HookParameter
 class HookTargetParameter(val descriptor: MethodDescriptor) : HookParameter
-class HookParameterParameter(val name: String) : HookParameter
 class HookLiteralParameter(val type: KspType, val typeName: String, val value: String) : HookParameter
 class HookOrdinalParameter(val indices: List<Int>) : HookParameter
-object HookCancelerParameter : HookParameter
-object HookReturnerParameter : HookParameter
-class HookNamedLocalParameter(val type: KspType, val name: String) : HookParameter
-class HookPositionalLocalParameter(val type: KspType, val index: Int) : HookParameter
+class HookLocalParameter(val name: String, val type: KspType, val ordinal: Int) : HookParameter

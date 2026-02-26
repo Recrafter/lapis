@@ -1,28 +1,24 @@
 package io.github.recrafter.lapis.extensions.kp
 
-import io.github.recrafter.lapis.layers.lowering.IrClassName
 import io.github.recrafter.lapis.layers.lowering.IrParameter
+import io.github.recrafter.lapis.layers.lowering.IrTypeName
 
-fun KPType.toKotlinFile(packageName: String, builder: KPFileBuilder.() -> Unit = {}): KPFile =
-    buildKotlinFile(
-        packageName,
-        requireNotNull(name) { "Cannot generate Kotlin file for anonymous TypeSpec." }
-    ) {
-        builder()
-        addType(this@toKotlinFile)
-    }
-
-fun KPTypeBuilder.setConstructor(parameters: List<IrParameter>) {
+fun KPTypeBuilder.setConstructor(parameters: List<IrParameter>, vararg modifiers: KPModifier): List<KPProperty> {
     primaryConstructor(buildKotlinConstructor {
-        addParameters(parameters)
+        setParameters(parameters)
     })
-    parameters.forEach { parameter ->
-        addProperty(buildKotlinProperty(parameter.name, parameter.type) {
-          initializer(parameter.name)
-        })
+    return parameters.map { parameter ->
+        buildKotlinProperty(parameter.name, parameter.type) {
+            initializer(parameter.name)
+            addModifiers(*modifiers)
+        }.also { addProperty(it) }
     }
 }
 
-fun KPTypeBuilder.setSuperClassType(type: IrClassName) {
+fun KPTypeBuilder.setSuperClass(type: IrTypeName) {
     superclass(type.kotlin)
+}
+
+fun KPTypeBuilder.addSuperInterface(type: IrTypeName) {
+    addSuperinterface(type.kotlin)
 }

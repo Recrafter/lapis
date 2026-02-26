@@ -1,26 +1,24 @@
 [versions]
-projektor = "4.+"
+projektor = "5.+"
 
-kotlin = "2.0.21"
-ksp = "2.0.21-1.0.25"
+kotlin = "2.2.21"
+ksp = "2.2.21-2.0.5"
 
-mixin = "0.8.7"
-mixin-extras = "0.5.3"
+mixin = "0.6-SNAPSHOT"
+mixin-extras = "0.4.0"
 
-lapis = "0.5.4"
+lapis = "0.6.1"
 
 java-poet = "0.11.0"
 kotlin-poet = "2.2.0"
 
-kotlin-serialization-json = "1.7.3"
+kotlin-serialization-json = "1.10.0"
 
 auto-service = "1.2.0"
 auto-service-annotations = "1.1.1"
 
 [plugins]
 projektor = { id = "io.github.diskria.projektor", version.ref = "projektor" }
-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [libraries]

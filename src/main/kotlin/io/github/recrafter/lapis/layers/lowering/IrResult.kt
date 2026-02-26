@@ -5,19 +5,31 @@ import io.github.recrafter.lapis.extensions.ksp.KspSymbol
 import io.github.recrafter.lapis.layers.validator.KspSourceHolder
 
 class IrResult(
-    val descriptorImpls: List<IrDescriptorImpl>,
-    val rootMixins: List<IrMixin>,
+    val descriptors: List<IrDescriptor>,
+    val mixins: List<IrMixin>,
 )
 
-class IrDescriptorImpl(
+class IrDescriptor(
     override val source: KspSymbol,
 
+    val contextImpl: IrDescriptorContextImpl,
+    val targetImpl: IrDescriptorTargetImpl,
+) : KspSourceHolder()
+
+class IrDescriptorContextImpl(
+    val type: IrClassName,
+    val superType: IrParameterizedTypeName,
+    val parameters: List<IrParameter>,
+    val returnType: IrTypeName?,
+)
+
+class IrDescriptorTargetImpl(
     val type: IrClassName,
     val superType: IrClassName,
     val receiverType: IrTypeName?,
     val parameters: List<IrParameter>,
     val returnType: IrTypeName?,
-) : KspSourceHolder()
+)
 
 class IrMixin(
     override val source: KspSymbol,
@@ -105,7 +117,7 @@ class IrFieldSetterAccessor(
     internalName: String,
     vanillaName: String,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, vanillaName, listOf(IrParameter("newValue", type)), type, isStatic)
+) : IrAccessorKind(source, name, internalName, vanillaName, listOf(IrParameter("newValue", type)), null, isStatic)
 
 open class IrMethodAccessor(
     override val source: KspSymbol,
@@ -144,6 +156,7 @@ class IrWrapMethodInjection(
     name: String,
     hookName: String,
     method: String,
+    val isStatic: Boolean,
     returnType: IrTypeName?,
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
@@ -159,6 +172,7 @@ class IrWrapOperationInjection(
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
     val target: String,
+    val isStatic: Boolean,
     val ordinal: Int?,
 ) : IrInjection(source, name, hookName, method, returnType, parameters, hookArguments)
 
@@ -176,20 +190,52 @@ class IrModifyConstantValueInjection(
     val ordinal: Int?,
 ) : IrInjection(source, name, hookName, method, literalType, parameters, hookArguments)
 
-sealed interface IrInjectionParameter
-class IrInjectionReceiverParameter(val type: IrTypeName) : IrInjectionParameter
-class IrInjectionArgumentParameter(val name: String, val type: IrTypeName) : IrInjectionParameter
-class IrInjectionOperationParameter(val returnType: IrTypeName?) : IrInjectionParameter
-class IrInjectionLiteralParameter(val type: IrTypeName) : IrInjectionParameter
-class IrInjectionLocalParameter(val name: String, val type: IrTypeName) : IrInjectionParameter
-class IrInjectionCallbackParameter : IrInjectionParameter
+sealed interface IrInjectionParameter {
+    val priority: Int
+    val subPriority: Int get() = 0
+}
+
+class IrInjectionReceiverParameter(val type: IrTypeName) : IrInjectionParameter {
+    override val priority: Int = 0
+}
+
+class IrInjectionArgumentParameter(val name: String, val type: IrTypeName) : IrInjectionParameter {
+    override val priority: Int = 1
+}
+
+class IrInjectionOperationParameter(val returnType: IrTypeName?) : IrInjectionParameter {
+    override val priority: Int = 2
+}
+
+class IrInjectionLiteralParameter(val type: IrTypeName) : IrInjectionParameter {
+    override val priority: Int = 3
+}
+
+class IrInjectionCallbackParameter(val returnType: IrTypeName?) : IrInjectionParameter {
+    override val priority: Int = 4
+}
+
+class IrInjectionSignatureLocalParameter(
+    val name: String,
+    val type: IrTypeName,
+    val index: Int
+) : IrInjectionParameter {
+    override val priority: Int = 5
+    override val subPriority: Int = index
+}
+
+class IrInjectionBodyLocalParameter(
+    val name: String,
+    val type: IrTypeName,
+    val ordinal: Int
+) : IrInjectionParameter {
+    override val priority: Int = 6
+    override val subPriority: Int = ordinal
+}
 
 sealed interface IrHookArgument
-class IrHookTargetArgument(val descriptor: IrDescriptorImpl) : IrHookArgument
-class IrHookParameterArgument() : IrHookArgument
-class IrHookLiteralArgument() : IrHookArgument
+class IrHookContextArgument(val descriptor: IrDescriptorContextImpl) : IrHookArgument
+class IrHookTargetArgument(val descriptor: IrDescriptorTargetImpl) : IrHookArgument
+object IrHookLiteralArgument : IrHookArgument
 class IrHookOrdinalArgument(val ordinal: Int) : IrHookArgument
-class IrHookCancelerArgument() : IrHookArgument
-class IrHookReturnerArgument() : IrHookArgument
-class IrHookNamedLocalArgument() : IrHookArgument
-class IrHookPositionalLocalArgument() : IrHookArgument
+class IrHookLocalArgument(val parameterName: String) : IrHookArgument

@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.extensions.jp
 
-import io.github.recrafter.lapis.layers.lowering.IrJavaCodeBlockBuilder
-import io.github.recrafter.lapis.layers.lowering.IrJavaCodeBlockBuilder.Arguments
+import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
+import io.github.recrafter.lapis.layers.lowering.IrClassName
 import io.github.recrafter.lapis.layers.lowering.IrTypeName
 
 typealias JPCodeBlockBuilder = com.palantir.javapoet.CodeBlock.Builder
@@ -53,21 +53,18 @@ inline fun <reified A : Annotation> buildJavaAnnotation(builder: JPAnnotationBui
 fun buildJavaCodeBlock(builder: IrJavaCodeBlockBuilder.() -> Unit = {}): JPCodeBlock =
     IrJavaCodeBlockBuilder(JPCodeBlock.builder()).apply(builder).build()
 
-fun buildJavaCodeBlock(format: String, arguments: Arguments.() -> Unit = {}): JPCodeBlock =
+fun buildJavaCodeBlock(
+    format: String,
+    arguments: IrJavaCodeBlockBuilder.JavaCodeBlockArguments.() -> Unit = {}
+): JPCodeBlock =
     buildJavaCodeBlock {
         add(format, arguments)
     }
 
-fun buildJavaCast(from: JPCodeBlock, to: IrTypeName, chained: Boolean = false): JPCodeBlock =
-    buildJavaCodeBlock {
-        if (chained) {
-            add("(")
-        }
-        add("(%T) ") { arg(to) }
-        add(from)
-        if (chained) {
-            add(")")
-        }
+fun buildJavaCast(from: JPCodeBlock, to: IrTypeName): JPCodeBlock =
+    buildJavaCodeBlock("(%T) %L") {
+        arg(to)
+        arg(from)
     }
 
 fun buildJavaField(name: String, type: IrTypeName, builder: JPFieldBuilder.() -> Unit = {}): JPField =
@@ -84,3 +81,6 @@ fun buildJavaInterface(name: String, builder: JPTypeBuilder.() -> Unit = {}): JP
 
 fun buildJavaClass(name: String, builder: JPTypeBuilder.() -> Unit = {}): JPType =
     JPType.classBuilder(name).apply(builder).build()
+
+fun buildJavaFile(className: IrClassName, builder: () -> JPType): JPFile =
+    JPFile.builder(className.packageName, builder()).indent("    ").skipJavaLangImports(true).build()

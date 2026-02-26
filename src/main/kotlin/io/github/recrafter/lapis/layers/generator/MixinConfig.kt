@@ -9,6 +9,11 @@ data class MixinConfig(
     @SerialName("required")
     val isRequired: Boolean,
 
+    val minVersion: String,
+
+    @SerialName("mixinextras")
+    val extrasConfig: ExtrasConfig,
+
     @SerialName("package")
     val mixinPackage: String,
 
@@ -34,6 +39,9 @@ data class MixinConfig(
     val dedicatedServerOnlyMixins: List<String>? = null,
 ) {
     @Serializable
+    class ExtrasConfig(val minVersion: String)
+
+    @Serializable
     data class InjectorConfig(val defaultRequire: Int)
 
     @Serializable
@@ -47,6 +55,10 @@ data class MixinConfig(
         ): MixinConfig =
             MixinConfig(
                 isRequired = true,
+                minVersion = "0.6", // Accessor/Invoker
+                extrasConfig = ExtrasConfig(
+                    minVersion = "0.4.0" // WrapMethod
+                ),
                 mixinPackage = mixinPackage,
                 javaVersion = "JAVA_8",
                 injectorConfig = InjectorConfig(

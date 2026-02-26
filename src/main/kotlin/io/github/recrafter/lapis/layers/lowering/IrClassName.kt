@@ -18,6 +18,9 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
     val qualifiedName: String
         get() = "$packageName.$name"
 
+    val uniqueJvmName: String
+        get() = qualifiedName.replace(".", "_")
+
     override val java: JPClassName
         get() = box().javaPrimitiveType as? JPClassName ?: when (kotlin) {
             KPAny -> JPObject

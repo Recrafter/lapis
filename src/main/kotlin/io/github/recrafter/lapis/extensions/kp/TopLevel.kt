@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.extensions.kp
 
+import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
 import io.github.recrafter.lapis.layers.lowering.IrClassName
 import io.github.recrafter.lapis.layers.lowering.IrTypeName
 
@@ -33,6 +34,8 @@ typealias KPParameterizedTypeName = com.squareup.kotlinpoet.ParameterizedTypeNam
 
 typealias KPModifier = com.squareup.kotlinpoet.KModifier
 
+val KPNothing: KPClassName = KPClassName("kotlin", "Nothing")
+
 val KPUnit: KPClassName = com.squareup.kotlinpoet.UNIT
 val KPBoolean: KPClassName = com.squareup.kotlinpoet.BOOLEAN
 val KPByte: KPClassName = com.squareup.kotlinpoet.BYTE
@@ -52,11 +55,22 @@ val KPMap: KPClassName = com.squareup.kotlinpoet.MAP
 inline fun <reified A : Annotation> buildKotlinAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}): KPAnnotation =
     KPAnnotation.builder(A::class).apply(builder).build()
 
-fun buildKotlinCodeBlock(builder: KPCodeBlockBuilder.() -> Unit = {}): KPCodeBlock =
-    KPCodeBlock.builder().apply(builder).build()
+fun buildKotlinCodeBlock(builder: IrKotlinCodeBlockBuilder.() -> Unit = {}): KPCodeBlock =
+    IrKotlinCodeBlockBuilder(KPCodeBlock.builder()).apply(builder).build()
+
+fun buildKotlinCodeBlock(
+    format: String,
+    arguments: IrKotlinCodeBlockBuilder.KotlinCodeBlockArguments.() -> Unit = {}
+): KPCodeBlock =
+    buildKotlinCodeBlock {
+        add(format, arguments)
+    }
 
 fun buildKotlinCast(from: KPCodeBlock, to: IrClassName): KPCodeBlock =
-    KPCodeBlock.of("(%L as %T)", from, to.kotlin)
+    buildKotlinCodeBlock("%L as %T") {
+        arg(from)
+        arg(to)
+    }
 
 fun buildKotlinProperty(name: String, type: IrTypeName, builder: KPPropertyBuilder.() -> Unit = {}): KPProperty =
     KPProperty.builder(name, type.kotlin).apply(builder).build()
@@ -98,3 +112,6 @@ fun buildKotlinClass(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPTy
 
 fun buildKotlinFile(packageName: String, name: String, builder: KPFileBuilder.() -> Unit = {}): KPFile =
     KPFile.builder(packageName, name).apply(builder).indent("    ").build()
+
+fun buildKotlinFile(className: IrClassName, builder: KPFileBuilder.() -> Unit = {}): KPFile =
+    buildKotlinFile(className.packageName, className.name, builder)
