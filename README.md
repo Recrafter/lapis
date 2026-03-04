@@ -72,8 +72,8 @@ object GuiGraphics_ {
 
 - A `@LaDescriptors(GuiGraphics::class)` container.
 - An abstract nested class `blit`:
-    - Extends `LapisDescriptor<GuiGraphics.(...) -> Unit>`.
-    - References the real method via `(GuiGraphics::blit)` in the super‑constructor call.
+  - Extends `LapisDescriptor<GuiGraphics.(...) -> Unit>`.
+  - References the real method via `(GuiGraphics::blit)` in the super‑constructor call.
 
 **What Lapis generates (descriptor impl + extensions)**  
 Kotlin (in your generated package):
