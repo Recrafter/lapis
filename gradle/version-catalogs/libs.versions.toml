@@ -4,7 +4,7 @@ projektor = "5.+"
 kotlin = "2.2.21"
 ksp = "2.2.21-2.0.5"
 
-mixin = "0.6-SNAPSHOT"
+mixin = "0.8"
 mixin-extras = "0.4.0"
 
 lapis = "0.6.1"
