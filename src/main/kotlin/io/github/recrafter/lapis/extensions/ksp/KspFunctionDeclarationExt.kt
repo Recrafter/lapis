@@ -16,10 +16,9 @@ fun KspFunctionDeclaration.findPsi(psiCompanion: PsiCompanion): PsiFunction? {
     val kspParametersCount = parameters.size
     val kspClassQualifiedName = parentDeclaration?.qualifiedName?.asString()
     return file.collectDescendantsOfType<PsiFunction>().firstOrNull { psiFunction ->
-        val psiName = psiFunction.name
-        val psiParametersCount = psiFunction.valueParameters.size
-        val psiClassQualifiedName = psiFunction.getStrictParentOfType<KtClass>()?.qualifiedName
-        psiName == kspName && psiParametersCount == kspParametersCount && psiClassQualifiedName == kspClassQualifiedName
+        psiFunction.name == kspName &&
+            psiFunction.valueParameters.size == kspParametersCount &&
+            psiFunction.getStrictParentOfType<KtClass>()?.qualifiedName == kspClassQualifiedName
     }
 }
 

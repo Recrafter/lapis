@@ -10,7 +10,6 @@ import io.github.recrafter.lapis.extensions.psi.PsiFile
 import org.jetbrains.kotlin.K1Deprecation
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
-import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
@@ -19,13 +18,13 @@ class PsiCompanion {
     @OptIn(K1Deprecation::class)
     private val factory: PsiFactory by unsafeLazy {
         val environment = KotlinCoreEnvironment.createForTests(
-            disposable,
+            Disposer.newDisposable(),
             CompilerConfiguration(),
             EnvironmentConfigFiles.JVM_CONFIG_FILES
         )
         PsiFactory(environment.project)
     }
-    private val disposable: Disposable by unsafeLazy { Disposer.newDisposable() }
+
     private val cache: MutableMap<String, PsiFile> = mutableMapOf()
 
     private var isInitialized: Boolean = false
@@ -49,7 +48,6 @@ class PsiCompanion {
         if (!isInitialized) {
             return
         }
-        Disposer.dispose(disposable)
         cache.clear()
     }
 }

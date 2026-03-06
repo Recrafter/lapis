@@ -26,42 +26,42 @@ class LapisProcessorProvider : SymbolProcessorProvider {
         )
 
     private fun parseOptions(options: Map<String, String>): Options {
-        val generatorOptions = options
-            .filterKeys { it.startsWith(LAPIS_ARGUMENT_PREFIX) }
-            .mapKeys { it.key.removeLapisArgumentPrefix() }
+        val processorOptions = options
+            .filterKeys { it.startsWith(ARGUMENT_PREFIX) }
+            .mapKeys { it.key.removeArgumentPrefix() }
 
         val descriptorElements = serialDescriptor<Options>().elements
         val existingOptions = descriptorElements.map { it.name }.toSet()
 
-        val unknownOptions = generatorOptions.keys - existingOptions
+        val unknownOptions = processorOptions.keys - existingOptions
         require(unknownOptions.isEmpty()) {
-            "Unknown Lapis options: ${unknownOptions.joinToString { it.withLapisArgumentPrefix().singleQuoted() }}. " +
-                "Existing options: ${existingOptions.joinToString { it.withLapisArgumentPrefix().singleQuoted() }}."
+            "Unknown Lapis options: ${unknownOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}. " +
+                "Existing options: ${existingOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}."
         }
 
         val requiredOptions = descriptorElements.filter { !it.isOptional }.map { it.name }.toSet()
-        val missingOptions = requiredOptions - generatorOptions.keys
+        val missingOptions = requiredOptions - processorOptions.keys
         require(missingOptions.isEmpty()) {
-            "Missing Lapis options: ${missingOptions.joinToString { it.withLapisArgumentPrefix().singleQuoted() }}. " +
-                "Required options: ${requiredOptions.joinToString { it.withLapisArgumentPrefix().singleQuoted() }}."
+            "Missing Lapis options: ${missingOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}. " +
+                "Required options: ${requiredOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}."
         }
 
         return Json.decodeFromJsonElement(
             buildJsonObject {
-                generatorOptions.forEach { (key, value) ->
+                processorOptions.forEach { (key, value) ->
                     put(key, JsonPrimitive(value))
                 }
             }
         )
     }
 
-    private fun String.withLapisArgumentPrefix(): String =
-        LAPIS_ARGUMENT_PREFIX + this
+    private fun String.withArgumentPrefix(): String =
+        ARGUMENT_PREFIX + this
 
-    private fun String.removeLapisArgumentPrefix(): String =
-        removePrefix(LAPIS_ARGUMENT_PREFIX)
+    private fun String.removeArgumentPrefix(): String =
+        removePrefix(ARGUMENT_PREFIX)
 
     companion object {
-        private const val LAPIS_ARGUMENT_PREFIX: String = "lapis."
+        private const val ARGUMENT_PREFIX: String = "lapis."
     }
 }

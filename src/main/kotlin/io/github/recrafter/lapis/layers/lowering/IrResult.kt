@@ -48,6 +48,9 @@ class IrMixin(
     val innerMixins: List<IrMixin>,
 ) : KspSourceHolder() {
 
+    fun isNotEmpty(): Boolean =
+        extension != null || injections.isNotEmpty()
+
     fun flattenTree(): List<IrMixin> =
         listOf(this) + innerMixins.flatMap { it.flattenTree() }
 }
@@ -74,7 +77,7 @@ class IrFieldSetterExtension(
     name: String,
     internalName: String,
     val type: IrTypeName,
-) : IrExtensionKind(name, internalName, listOf(IrParameter("newValue", type)), null)
+) : IrExtensionKind(name, internalName, listOf(IrSetterParameter(type)), null)
 
 class IrMethodExtension(
     name: String,
@@ -117,7 +120,7 @@ class IrFieldSetterAccessor(
     internalName: String,
     vanillaName: String,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, vanillaName, listOf(IrParameter("newValue", type)), null, isStatic)
+) : IrAccessorKind(source, name, internalName, vanillaName, listOf(IrSetterParameter(type)), null, isStatic)
 
 open class IrMethodAccessor(
     override val source: KspSymbol,
@@ -137,7 +140,7 @@ class IrConstructorAccessor(
     internalName: String,
     parameters: List<IrParameter>,
     val classType: IrTypeName,
-) : IrMethodAccessor(source, name, internalName, "<init>", parameters, classType, true)
+) : IrMethodAccessor(source, name, internalName, IrJvmType.CONSTRUCTOR_NAME, parameters, classType, true)
 
 sealed class IrInjection(
     override val source: KspSymbol,
@@ -195,43 +198,47 @@ sealed interface IrInjectionParameter {
     val subPriority: Int get() = 0
 }
 
-class IrInjectionReceiverParameter(val type: IrTypeName) : IrInjectionParameter {
+class IrInjectionReceiverParameter(
+    val type: IrTypeName,
     override val priority: Int = 0
-}
+) : IrInjectionParameter
 
-class IrInjectionArgumentParameter(val name: String, val type: IrTypeName) : IrInjectionParameter {
+class IrInjectionArgumentParameter(
+    val name: String,
+    val type: IrTypeName,
     override val priority: Int = 1
-}
+) : IrInjectionParameter
 
-class IrInjectionOperationParameter(val returnType: IrTypeName?) : IrInjectionParameter {
+class IrInjectionOperationParameter(
+    val returnType: IrTypeName?,
     override val priority: Int = 2
-}
+) : IrInjectionParameter
 
-class IrInjectionLiteralParameter(val type: IrTypeName) : IrInjectionParameter {
+class IrInjectionLiteralParameter(
+    val type: IrTypeName,
     override val priority: Int = 3
-}
+) : IrInjectionParameter
 
-class IrInjectionCallbackParameter(val returnType: IrTypeName?) : IrInjectionParameter {
+class IrInjectionCallbackParameter(
+    val returnType: IrTypeName?,
     override val priority: Int = 4
-}
+) : IrInjectionParameter
 
 class IrInjectionSignatureLocalParameter(
     val name: String,
     val type: IrTypeName,
-    val index: Int
-) : IrInjectionParameter {
-    override val priority: Int = 5
+    val index: Int,
+    override val priority: Int = 5,
     override val subPriority: Int = index
-}
+) : IrInjectionParameter
 
 class IrInjectionBodyLocalParameter(
     val name: String,
     val type: IrTypeName,
-    val ordinal: Int
-) : IrInjectionParameter {
-    override val priority: Int = 6
+    val ordinal: Int,
+    override val priority: Int = 6,
     override val subPriority: Int = ordinal
-}
+) : IrInjectionParameter
 
 sealed interface IrHookArgument
 class IrHookContextArgument(val descriptor: IrDescriptorContextImpl) : IrHookArgument

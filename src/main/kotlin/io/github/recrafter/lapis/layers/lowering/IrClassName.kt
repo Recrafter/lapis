@@ -21,8 +21,8 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
     val uniqueJvmName: String
         get() = qualifiedName.replace(".", "_")
 
-    override val java: JPClassName
-        get() = box().javaPrimitiveType as? JPClassName ?: when (kotlin) {
+    override val java: JPClassName by lazy {
+        box().javaPrimitiveType as? JPClassName ?: when (kotlin) {
             KPAny -> JPObject
             KPString -> JPString
             KPList -> JPList
@@ -34,6 +34,7 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
                 *kotlin.simpleNames.drop(1).toTypedArray()
             )
         }
+    }
 
     fun parameterizedBy(vararg genericTypes: IrTypeName?): IrParameterizedTypeName =
         IrParameterizedTypeName(kotlin.parameterizedBy(genericTypes.map { it?.kotlin.orUnit() }))

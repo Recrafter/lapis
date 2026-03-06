@@ -4,6 +4,7 @@ import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
 import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
 import io.github.recrafter.lapis.extensions.ksp.KspSymbol
 import io.github.recrafter.lapis.extensions.ksp.KspType
+import io.github.recrafter.lapis.layers.lowering.IrJvmType
 
 class ValidatorResult(
     val descriptors: List<Descriptor>,
@@ -18,23 +19,12 @@ class FunctionParameter(
 sealed class Descriptor(
     override val source: KspSymbol,
 
+    val name: String,
     val containerClassDeclaration: KspClassDeclaration,
     val classDeclaration: KspClassDeclaration,
     val receiverType: KspType,
     val returnType: KspType?,
 ) : KspSourceHolder()
-
-class MethodDescriptor(
-    override val source: KspSymbol,
-
-    containerClassDeclaration: KspClassDeclaration,
-    classDeclaration: KspClassDeclaration,
-    receiverType: KspType,
-    returnType: KspType?,
-    val name: String,
-    val parameters: List<FunctionParameter>,
-    val isStatic: Boolean,
-) : Descriptor(source, containerClassDeclaration, classDeclaration, receiverType, returnType)
 
 class ConstructorDescriptor(
     override val source: KspSymbol,
@@ -42,8 +32,29 @@ class ConstructorDescriptor(
     containerClassDeclaration: KspClassDeclaration,
     classDeclaration: KspClassDeclaration,
     val classType: KspType,
+    parameters: List<FunctionParameter>,
+) : MethodDescriptor(
+    source,
+    containerClassDeclaration,
+    classDeclaration,
+    classType,
+    classType,
+    IrJvmType.CONSTRUCTOR_NAME,
+    parameters,
+    true
+)
+
+open class MethodDescriptor(
+    override val source: KspSymbol,
+
+    containerClassDeclaration: KspClassDeclaration,
+    classDeclaration: KspClassDeclaration,
+    receiverType: KspType,
+    returnType: KspType?,
+    name: String,
     val parameters: List<FunctionParameter>,
-) : Descriptor(source, containerClassDeclaration, classDeclaration, classType, classType)
+    val isStatic: Boolean,
+) : Descriptor(source, name, containerClassDeclaration, classDeclaration, receiverType, returnType)
 
 class FieldDescriptor(
     override val source: KspSymbol,
@@ -51,9 +62,9 @@ class FieldDescriptor(
     containerClassDeclaration: KspClassDeclaration,
     classDeclaration: KspClassDeclaration,
     receiverType: KspType,
-    val name: String,
-    val fieldType: KspType,
-) : Descriptor(source, containerClassDeclaration, classDeclaration, receiverType, fieldType)
+    name: String,
+    val type: KspType,
+) : Descriptor(source, name, containerClassDeclaration, classDeclaration, receiverType, type)
 
 class Patch(
     override val source: KspSymbol,

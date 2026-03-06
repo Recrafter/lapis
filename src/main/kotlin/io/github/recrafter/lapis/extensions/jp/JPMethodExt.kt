@@ -3,6 +3,7 @@ package io.github.recrafter.lapis.extensions.jp
 import io.github.recrafter.lapis.extensions.common.asIr
 import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
 import io.github.recrafter.lapis.layers.generator.IrJavaMethodBodyBuilder
+import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
 import io.github.recrafter.lapis.layers.lowering.IrTypeName
 import kotlin.reflect.KClass
@@ -58,3 +59,15 @@ fun JPMethodBuilder.addParameter(parameter: IrParameter): JPParameter =
 
 fun JPMethodBuilder.setParameters(parameters: List<IrParameter>): List<JPParameter> =
     parameters.map { addParameter(it) }
+
+fun JPMethodBuilder.setModifiers(vararg modifiers: IrModifier) {
+    modifiers.forEach {
+        when (it) {
+            IrModifier.PUBLIC -> addModifiers(JPModifier.PUBLIC)
+            IrModifier.PRIVATE -> addModifiers(JPModifier.PRIVATE)
+            IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
+            IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
+            IrModifier.OVERRIDE -> addAnnotation<Override>()
+        }
+    }
+}

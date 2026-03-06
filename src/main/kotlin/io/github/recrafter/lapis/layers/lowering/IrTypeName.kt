@@ -2,24 +2,24 @@ package io.github.recrafter.lapis.layers.lowering
 
 import io.github.recrafter.lapis.extensions.common.asIr
 import io.github.recrafter.lapis.extensions.jp.*
-import io.github.recrafter.lapis.extensions.jvm.*
 import io.github.recrafter.lapis.extensions.kp.*
 
 open class IrTypeName(
     open val kotlin: KPTypeName,
     val boxed: Boolean = kotlin.isNullable,
 ) {
-    open val java: JPTypeName
-        get() = javaPrimitiveType ?: when (kotlin) {
-            is KPClassName -> (kotlin as KPClassName).asIr().java
-            is KPParameterizedTypeName -> (kotlin as KPParameterizedTypeName).asIr().java
+    open val java: JPTypeName by lazy {
+        javaPrimitiveType ?: when (val kotlin = kotlin) {
+            is KPClassName -> kotlin.asIr().java
+            is KPParameterizedTypeName -> kotlin.asIr().java
+            is KPWildcardTypeName -> kotlin.asIr().java
             else -> error("Unsupported type: $kotlin")
         }
+    }
 
-    val javaPrimitiveType: JPTypeName?
-        get() = when (kotlin.copy(nullable = false)) {
+    val javaPrimitiveType: JPTypeName? by lazy {
+        when (kotlin.copy(nullable = false)) {
             KPUnit -> JPVoid
-
             KPBoolean -> JPBoolean
             KPByte -> JPByte
             KPShort -> JPShort
@@ -33,27 +33,13 @@ open class IrTypeName(
             if (boxed) box()
             else this
         }
+    }
 
-    val jvmDescriptor: String
-        get() = when (javaPrimitiveType) {
-            JPVoid -> JvmVoid
-            JPBoolean -> JvmBoolean
-            JPByte -> JvmByte
-            JPShort -> JvmShort
-            JPInt -> JvmInt
-            JPLong -> JvmLong
-            JPChar -> JvmChar
-            JPFloat -> JvmFloat
-            JPDouble -> JvmDouble
-            else -> {
-                val jpClassName = when (kotlin) {
-                    is KPClassName -> (kotlin as KPClassName).asIr().java
-                    is KPParameterizedTypeName -> (kotlin as KPParameterizedTypeName).asIr().java.rawType()
-                    else -> error("Unsupported type: $java")
-                }
-                "L" + jpClassName.qualifiedName.replace(".", "/") + ";"
-            }
-        }
+    val is64bit: Boolean
+        get() = javaPrimitiveType == JPLong || javaPrimitiveType == JPDouble
+
+    val jvmType: IrJvmType
+        get() = IrJvmType(this)
 
     fun box(): IrTypeName =
         if (boxed) this
@@ -78,7 +64,11 @@ open class IrTypeName(
 
     override fun hashCode(): Int =
         kotlin.hashCode()
+
+    companion object {
+        val VOID: IrTypeName = Void::class.asIr()
+    }
 }
 
 fun IrTypeName?.orVoid(): IrTypeName =
-    this ?: Void::class.asIr()
+    this ?: IrTypeName.VOID

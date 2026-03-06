@@ -22,15 +22,13 @@ typealias KPParameter = com.squareup.kotlinpoet.ParameterSpec
 typealias KPTypeBuilder = com.squareup.kotlinpoet.TypeSpec.Builder
 typealias KPType = com.squareup.kotlinpoet.TypeSpec
 
-typealias KPTypeAliasBuilder = com.squareup.kotlinpoet.TypeAliasSpec.Builder
-typealias KPTypeAlias = com.squareup.kotlinpoet.TypeAliasSpec
-
 typealias KPFileBuilder = com.squareup.kotlinpoet.FileSpec.Builder
 typealias KPFile = com.squareup.kotlinpoet.FileSpec
 
 typealias KPTypeName = com.squareup.kotlinpoet.TypeName
 typealias KPClassName = com.squareup.kotlinpoet.ClassName
 typealias KPParameterizedTypeName = com.squareup.kotlinpoet.ParameterizedTypeName
+typealias KPWildcardTypeName = com.squareup.kotlinpoet.WildcardTypeName
 
 typealias KPModifier = com.squareup.kotlinpoet.KModifier
 
@@ -66,12 +64,6 @@ fun buildKotlinCodeBlock(
         add(format, arguments)
     }
 
-fun buildKotlinCast(from: KPCodeBlock, to: IrClassName): KPCodeBlock =
-    buildKotlinCodeBlock("%L as %T") {
-        arg(from)
-        arg(to)
-    }
-
 fun buildKotlinProperty(name: String, type: IrTypeName, builder: KPPropertyBuilder.() -> Unit = {}): KPProperty =
     KPProperty.builder(name, type.kotlin).apply(builder).build()
 
@@ -91,18 +83,8 @@ fun buildKotlinParameter(
 ): KPParameter =
     KPParameter.builder(name, type.kotlin).apply(builder).build()
 
-fun buildKotlinTypeAlias(
-    name: String,
-    type: IrClassName,
-    builder: KPTypeAliasBuilder.() -> Unit = {}
-): KPTypeAlias =
-    KPTypeAlias.builder(name, type.kotlin).apply(builder).build()
-
 fun buildKotlinInterface(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPType =
     KPType.interfaceBuilder(name).apply(builder).build()
-
-fun buildKotlinObject(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPType =
-    KPType.objectBuilder(name).apply(builder).build()
 
 fun buildKotlinConstructor(builder: KPFunctionBuilder.() -> Unit = {}): KPFunction =
     KPFunction.constructorBuilder().apply(builder).build()

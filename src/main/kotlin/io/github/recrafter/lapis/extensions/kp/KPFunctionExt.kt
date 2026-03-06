@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.extensions.kp
 
 import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
 import io.github.recrafter.lapis.layers.generator.IrKotlinFunctionBodyBuilder
+import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
 import io.github.recrafter.lapis.layers.lowering.IrTypeName
 
@@ -43,3 +44,15 @@ fun KPFunctionBuilder.addParameter(parameter: IrParameter): KPParameter =
 
 fun KPFunctionBuilder.setParameters(parameters: List<IrParameter>): List<KPParameter> =
     parameters.map { addParameter(it) }
+
+fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
+    modifiers.forEach {
+        when (it) {
+            IrModifier.PUBLIC -> addModifiers(KPModifier.PUBLIC)
+            IrModifier.PRIVATE -> addModifiers(KPModifier.PRIVATE)
+            IrModifier.ABSTRACT -> addModifiers(KPModifier.PRIVATE)
+            IrModifier.STATIC -> addAnnotation<JvmStatic>()
+            IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
+        }
+    }
+}

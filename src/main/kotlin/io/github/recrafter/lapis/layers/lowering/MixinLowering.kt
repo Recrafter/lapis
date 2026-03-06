@@ -10,8 +10,10 @@ import io.github.recrafter.lapis.extensions.jvm.JvmVoid
 import io.github.recrafter.lapis.extensions.kp.KPClassName
 import io.github.recrafter.lapis.extensions.kp.KPParameterizedTypeName
 import io.github.recrafter.lapis.extensions.kp.KPTypeName
+import io.github.recrafter.lapis.extensions.kp.KPWildcardTypeName
 import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
 import io.github.recrafter.lapis.extensions.ksp.KspType
+import io.github.recrafter.lapis.extensions.withJavaInternalPrefix
 import io.github.recrafter.lapis.layers.validator.*
 import io.github.recrafter.lapis.options.Options
 import org.spongepowered.asm.mixin.injection.At
@@ -19,11 +21,10 @@ import org.spongepowered.asm.mixin.injection.At
 class MixinLowering(private val options: Options) {
 
     fun lower(validatorResult: ValidatorResult): IrResult {
-        val descriptorBindings = validatorResult.descriptors.mapNotNull { validated ->
-            val lowered = lowerDescriptor(validated) ?: return@mapNotNull null
+        val descriptorBindings = validatorResult.descriptors.map { validated ->
             DescriptorBinding(
                 validated = validated,
-                lowered = lowered,
+                lowered = lowerDescriptor(validated),
             )
         }
         return IrResult(
@@ -32,34 +33,39 @@ class MixinLowering(private val options: Options) {
         )
     }
 
-    private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor? {
-        if (descriptor !is MethodDescriptor) {
-            return null
+    private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor {
+        when (descriptor) {
+            is MethodDescriptor -> {
+                val superType = descriptor.classDeclaration.asIr()
+                val containerType = descriptor.containerClassDeclaration.asIr()
+
+                val implNamePrefix = "${containerType.simpleName}_${superType.simpleName}"
+                return IrDescriptor(
+                    source = descriptor.source,
+
+                    contextImpl = IrDescriptorContextImpl(
+                        type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_ContextImpl"),
+                        superType = LapisContext::class.asIr().parameterizedBy(superType),
+                        parameters = descriptor.parameters.asIr(),
+                        returnType = descriptor.returnType?.asIr(),
+                    ),
+                    targetImpl = IrDescriptorTargetImpl(
+                        type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_TargetImpl"),
+                        superType = superType,
+                        receiverType = when {
+                            descriptor.isStatic -> null
+                            else -> descriptor.receiverType.asIr()
+                        },
+                        parameters = descriptor.parameters.asIr(),
+                        returnType = descriptor.returnType?.asIr(),
+                    ),
+                )
+            }
+
+            is FieldDescriptor -> {
+                TODO()
+            }
         }
-        val superType = descriptor.classDeclaration.asIr()
-        val containerType = descriptor.containerClassDeclaration.asIr()
-
-        val implNamePrefix = "${containerType.simpleName}_${superType.simpleName}"
-        return IrDescriptor(
-            source = descriptor.source,
-
-            contextImpl = IrDescriptorContextImpl(
-                type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_ContextImpl"),
-                superType = LapisContext::class.asIr().parameterizedBy(superType),
-                parameters = descriptor.parameters.asIr(),
-                returnType = descriptor.returnType?.asIr(),
-            ),
-            targetImpl = IrDescriptorTargetImpl(
-                type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_TargetImpl"),
-                superType = superType,
-                receiverType = when {
-                    descriptor.isStatic -> null
-                    else -> descriptor.receiverType.asIr()
-                },
-                parameters = descriptor.parameters.asIr(),
-                returnType = descriptor.returnType?.asIr(),
-            ),
-        )
     }
 
     private fun lowerMixin(patch: Patch, descriptorBindings: List<DescriptorBinding>): IrMixin =
@@ -188,7 +194,7 @@ class MixinLowering(private val options: Options) {
 
                     name = hook.name,
                     hookName = hook.name,
-                    method = hook.method.jvmDescriptor,
+                    method = hook.method.getJvmDescriptor(),
                     isStatic = hook.method.isStatic,
                     returnType = hook.returnType?.asIr(),
                     parameters = parameters,
@@ -207,11 +213,11 @@ class MixinLowering(private val options: Options) {
                         }
                     },
                     hookName = hook.name,
-                    method = hook.method.jvmDescriptor,
+                    method = hook.method.getJvmDescriptor(),
                     returnType = hook.returnType?.asIr(),
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
-                    target = hook.target.jvmDescriptor,
+                    target = hook.target.getJvmDescriptor(withReceiver = true),
                     isStatic = hook.target.isStatic,
                     ordinal = ordinal.takeIf { it != getAnnotationDefaultIntValue(At::ordinal) },
                 )
@@ -228,7 +234,7 @@ class MixinLowering(private val options: Options) {
                         }
                     },
                     hookName = hook.name,
-                    method = hook.method.jvmDescriptor,
+                    method = hook.method.getJvmDescriptor(),
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
                     literalType = hook.literalType.asIr(),
@@ -243,9 +249,12 @@ class MixinLowering(private val options: Options) {
     private fun lowerInjectionParameter(hook: Hook, parameter: HookParameter): List<IrInjectionParameter> =
         when (parameter) {
             is HookContextParameter -> buildList {
-                val receiverShift = if (parameter.descriptor.isStatic) 0 else 1
-                addAll(parameter.descriptor.parameters.mapIndexed { index, parameter ->
-                    IrInjectionSignatureLocalParameter(parameter.name, parameter.type.asIr(), receiverShift + index)
+                var currentSlot = if (parameter.descriptor.isStatic) 0 else 1
+                addAll(parameter.descriptor.parameters.map { parameter ->
+                    val irType = parameter.type.asIr()
+                    val irParameter = IrInjectionSignatureLocalParameter(parameter.name, irType, currentSlot)
+                    currentSlot += if (irType.is64bit) 2 else 1
+                    return@map irParameter
                 })
                 add(IrInjectionCallbackParameter(parameter.descriptor.returnType?.asIr()))
             }
@@ -265,7 +274,7 @@ class MixinLowering(private val options: Options) {
             )
 
             is HookLocalParameter -> {
-                val signatureShift = buildList {
+                val signatureOffset = buildList {
                     if (!hook.method.isStatic) {
                         add(hook.method.receiverType)
                     }
@@ -275,7 +284,7 @@ class MixinLowering(private val options: Options) {
                     IrInjectionBodyLocalParameter(
                         parameter.name,
                         parameter.type.asIr(),
-                        signatureShift + parameter.ordinal
+                        signatureOffset + parameter.ordinal
                     )
                 )
             }
@@ -309,7 +318,7 @@ class MixinLowering(private val options: Options) {
         }
 
     private fun String.withModId(): String =
-        "${options.modId}__$this"
+        withJavaInternalPrefix(options.modId)
 
     private class DescriptorBinding(
         val validated: Descriptor,
@@ -335,25 +344,27 @@ fun KPClassName.asIr(): IrClassName =
 fun KPParameterizedTypeName.asIr(): IrParameterizedTypeName =
     IrParameterizedTypeName(this)
 
-val Descriptor.jvmDescriptor: String
-    get() = when (this) {
+fun KPWildcardTypeName.asIr(): IrWildcardTypeName =
+    IrWildcardTypeName(this)
+
+fun Descriptor.getJvmDescriptor(withReceiver: Boolean = false): String =
+    when (val descriptor = this) {
         is MethodDescriptor -> buildString {
-            append(receiverType.asIr().jvmDescriptor)
+            if (withReceiver) {
+                append(receiverType.asIr().jvmType.mixinDescriptor)
+            }
             append(name)
             append("(")
-            append(parameters.joinToString("") { it.type.asIr().jvmDescriptor })
+            parameters.forEach {
+                append(it.type.asIr().jvmType.mixinDescriptor)
+            }
             append(")")
-            append(returnType?.asIr()?.jvmDescriptor ?: JvmVoid)
+            if (descriptor is ConstructorDescriptor) {
+                append(JvmVoid)
+            } else {
+                append(returnType?.asIr()?.jvmType?.mixinDescriptor ?: JvmVoid)
+            }
         }
 
-        is ConstructorDescriptor -> buildString {
-            append(receiverType.asIr().jvmDescriptor)
-            append("<init>")
-            append("(")
-            append(parameters.joinToString("") { it.type.asIr().jvmDescriptor })
-            append(")")
-            append(JvmVoid)
-        }
-
-        is FieldDescriptor -> TODO("GETFIELD / PUTFIELD hooks")
+        is FieldDescriptor -> TODO()
     }

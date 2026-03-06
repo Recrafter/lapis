@@ -22,12 +22,12 @@ typealias JPParameter = com.palantir.javapoet.ParameterSpec
 typealias JPTypeBuilder = com.palantir.javapoet.TypeSpec.Builder
 typealias JPType = com.palantir.javapoet.TypeSpec
 
-typealias JPFileBuilder = com.palantir.javapoet.JavaFile.Builder
 typealias JPFile = com.palantir.javapoet.JavaFile
 
 typealias JPTypeName = com.palantir.javapoet.TypeName
 typealias JPClassName = com.palantir.javapoet.ClassName
 typealias JPParameterizedTypeName = com.palantir.javapoet.ParameterizedTypeName
+typealias JPWildcardTypeName = com.palantir.javapoet.WildcardTypeName
 
 typealias JPModifier = javax.lang.model.element.Modifier
 
@@ -59,12 +59,6 @@ fun buildJavaCodeBlock(
 ): JPCodeBlock =
     buildJavaCodeBlock {
         add(format, arguments)
-    }
-
-fun buildJavaCast(from: JPCodeBlock, to: IrTypeName): JPCodeBlock =
-    buildJavaCodeBlock("(%T) %L") {
-        arg(to)
-        arg(from)
     }
 
 fun buildJavaField(name: String, type: IrTypeName, builder: JPFieldBuilder.() -> Unit = {}): JPField =

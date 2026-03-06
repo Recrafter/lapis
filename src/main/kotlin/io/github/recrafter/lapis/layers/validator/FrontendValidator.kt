@@ -69,6 +69,18 @@ class FrontendValidator(private val logger: KspLogger) {
 
         val memberKind = kspRequireNotNull(memberKinds.singleOrNull()) { "9" }
         when (memberKind) {
+            MemberKind.CONSTRUCTOR -> {
+                kspRequire(!hasStaticAnnotation) { "13" }
+                ConstructorDescriptor(
+                    source = source,
+
+                    containerClassDeclaration = container.classDeclaration,
+                    classDeclaration = classDeclaration,
+                    classType = kspRequireNotNull(returnType) { "13.5" },
+                    parameters = parameters,
+                )
+            }
+
             MemberKind.METHOD -> {
                 if (hasStaticAnnotation) {
                     kspRequire(!hasReceiver) { "10" }
@@ -89,18 +101,6 @@ class FrontendValidator(private val logger: KspLogger) {
                 )
             }
 
-            MemberKind.CONSTRUCTOR -> {
-                kspRequire(!hasStaticAnnotation) { "13" }
-                ConstructorDescriptor(
-                    source = source,
-
-                    containerClassDeclaration = container.classDeclaration,
-                    classDeclaration = classDeclaration,
-                    classType = kspRequireNotNull(returnType) { "13.5" },
-                    parameters = parameters,
-                )
-            }
-
             MemberKind.FIELD -> {
                 if (hasStaticAnnotation) {
                     kspRequire(!hasReceiver) { "14" }
@@ -115,7 +115,7 @@ class FrontendValidator(private val logger: KspLogger) {
                     classDeclaration = classDeclaration,
                     receiverType = receiverType,
                     name = kspRequireNotNull(callableName) { "16" },
-                    fieldType = kspRequireNotNull(returnType) { "16.5" },
+                    type = kspRequireNotNull(returnType) { "16.5" },
                 )
             }
         }
@@ -210,12 +210,17 @@ class FrontendValidator(private val logger: KspLogger) {
                         .find { it.parsed.classDeclaration == hookMethodDescriptorClassDeclaration }
                         ?.validated
                     kspRequire(method is MethodDescriptor) { "35" }
-                    val parameters = parameters.map { validateHookParameter(method, it, descriptorBindings) }
-
+                    val parameters = parameters.map {
+                        validateHookParameter(hookKind, method, it, descriptorBindings)
+                    }
+                    val ordinalParameters = parameters.filterIsInstance<HookOrdinalParameter>()
+                    kspRequire(ordinalParameters.size < 2) { "35.1" }
+                    val ordinals = ordinalParameters.singleOrNull()?.indices.orEmpty().ifEmpty {
+                        listOf(getAnnotationDefaultIntValue(At::ordinal))
+                    }
                     hooks += when (hookKind) {
-                        LapisHookKind.MethodBody -> {
-                            val contextParameter = parameters.filterIsInstance<HookContextParameter>().firstOrNull()
-                            kspRequire(contextParameter == null) { "36" }
+                        LapisHookKind.Body -> {
+                            kspRequire(returnType == method.returnType) { "35.2" }
                             MethodBodyHook(
                                 source = source,
 
@@ -226,21 +231,25 @@ class FrontendValidator(private val logger: KspLogger) {
                             )
                         }
 
-                        LapisHookKind.InvokeMethod -> {
+                        LapisHookKind.Call -> {
+                            val target = parameters.filterIsInstance<HookTargetParameter>().singleOrNull()?.descriptor
+                            kspRequireNotNull(target) { "36" }
+                            kspRequire(returnType?.makeNotNullable() == target.returnType) { "37" }
                             InvokeMethodHook(
                                 source = source,
 
                                 name = name,
                                 method = method,
                                 returnType = returnType,
-                                target = parameters.filterIsInstance<HookTargetParameter>().first().descriptor,
-                                ordinals = parameters.filterIsInstance<HookOrdinalParameter>().first().indices,
+                                target = target,
+                                ordinals = ordinals,
                                 parameters = parameters,
                             )
                         }
 
                         LapisHookKind.Literal -> {
-                            val literalParameter = parameters.filterIsInstance<HookLiteralParameter>().first()
+                            val literalParameter = parameters.filterIsInstance<HookLiteralParameter>().singleOrNull()
+                            kspRequireNotNull(literalParameter) { "38" }
                             val literalType = literalParameter.type
                             kspRequire(literalType == returnType) { "38.1" }
                             kspRequire(!literalType.isMarkedNullable) { "38.2" }
@@ -262,12 +271,7 @@ class FrontendValidator(private val logger: KspLogger) {
                                 literalType = literalType,
                                 literalTypeName = literalTypeName,
                                 literalValue = literalParameter.value,
-                                ordinals = parameters
-                                    .filterIsInstance<HookOrdinalParameter>()
-                                    .firstOrNull()
-                                    ?.indices
-                                    .orEmpty()
-                                    .ifEmpty { listOf(getAnnotationDefaultIntValue(At::ordinal)) },
+                                ordinals = ordinals,
                                 parameters = parameters,
                             )
                         }
@@ -307,6 +311,7 @@ class FrontendValidator(private val logger: KspLogger) {
     }
 
     private fun validateHookParameter(
+        hookKind: LapisHookKind,
         method: MethodDescriptor,
         parameter: ParsedPatchFunctionParameter,
         descriptors: List<DescriptorBinding>,
@@ -315,25 +320,28 @@ class FrontendValidator(private val logger: KspLogger) {
         kspRequireNotNull(type) { "42" }
         when {
             hasContextAnnotation -> {
-                kspRequire(contextDescriptorClassDeclaration?.isInstance<LapisContext<*>>() == true) { "42.1" }
-                kspRequireNotNull(contextDescriptorGenericClassDeclaration) { "42.2" }
+                kspRequire(hookKind != LapisHookKind.Body) { "42.1" }
+                kspRequire(contextDescriptorClassDeclaration?.isInstance<LapisContext<*>>() == true) { "42.2" }
+                kspRequireNotNull(contextDescriptorGenericClassDeclaration) { "42.3" }
                 val descriptor = descriptors
                     .find { it.parsed.classDeclaration == contextDescriptorGenericClassDeclaration }
                     ?.validated
-                kspRequire(descriptor is MethodDescriptor && descriptor == method) { "42.3" }
+                kspRequire(descriptor is MethodDescriptor && descriptor == method) { "42.4" }
                 HookContextParameter(descriptor)
             }
 
             hasTargetAnnotation -> {
-                kspRequireNotNull(targetDescriptorClassDeclaration) { "43" }
+                kspRequire(hookKind != LapisHookKind.Literal) { "43" }
+                kspRequireNotNull(targetDescriptorClassDeclaration) { "43.1" }
                 val descriptor = descriptors
                     .find { it.parsed.classDeclaration == targetDescriptorClassDeclaration }
                     ?.validated
-                kspRequire(descriptor is MethodDescriptor) { "44" }
+                kspRequire(descriptor is MethodDescriptor) { "43.2" }
                 HookTargetParameter(descriptor)
             }
 
             hasLiteralAnnotation -> {
+                kspRequire(hookKind == LapisHookKind.Literal) { "44" }
                 HookLiteralParameter(
                     type = kspRequireNotNull(literalType) { "45" },
                     typeName = kspRequireNotNull(literalTypeName) { "45.5" },
@@ -342,6 +350,7 @@ class FrontendValidator(private val logger: KspLogger) {
             }
 
             hasOrdinalAnnotation -> {
+                kspRequire(hookKind != LapisHookKind.Body) { "47" }
                 kspRequire(ordinalIndices.isNotEmpty()) { "49" }
                 ordinalIndices.forEach {
                     kspRequire(it >= 0) { "49.1" }
@@ -350,7 +359,8 @@ class FrontendValidator(private val logger: KspLogger) {
             }
 
             hasLocalAnnotation -> {
-                kspRequireNotNull(type) { "50" }
+                kspRequire(hookKind != LapisHookKind.Body) { "50" }
+                kspRequireNotNull(type) { "50.1" }
                 kspRequireNotNull(localOrdinal) { "51" }
                 kspRequire(localOrdinal >= 0) { "51.1" }
                 HookLocalParameter(name, type, localOrdinal)

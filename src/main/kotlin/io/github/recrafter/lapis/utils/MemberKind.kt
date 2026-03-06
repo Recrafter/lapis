@@ -6,7 +6,7 @@ import io.github.recrafter.lapis.annotations.LaMethod
 import kotlin.reflect.KClass
 
 enum class MemberKind(val annotationClass: KClass<out Annotation>) {
-    METHOD(LaMethod::class),
     CONSTRUCTOR(LaConstructor::class),
+    METHOD(LaMethod::class),
     FIELD(LaField::class);
 }
