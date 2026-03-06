@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.extensions.jp
 
 import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
-import io.github.recrafter.lapis.layers.lowering.IrClassName
-import io.github.recrafter.lapis.layers.lowering.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 typealias JPCodeBlockBuilder = com.palantir.javapoet.CodeBlock.Builder
 typealias JPCodeBlock = com.palantir.javapoet.CodeBlock
@@ -28,6 +28,8 @@ typealias JPTypeName = com.palantir.javapoet.TypeName
 typealias JPClassName = com.palantir.javapoet.ClassName
 typealias JPParameterizedTypeName = com.palantir.javapoet.ParameterizedTypeName
 typealias JPWildcardTypeName = com.palantir.javapoet.WildcardTypeName
+typealias JPTypeVariableName = com.palantir.javapoet.TypeVariableName
+typealias JPArrayTypeName = com.palantir.javapoet.ArrayTypeName
 
 typealias JPModifier = javax.lang.model.element.Modifier
 
@@ -42,10 +44,12 @@ val JPFloat: JPTypeName = JPTypeName.FLOAT
 val JPDouble: JPTypeName = JPTypeName.DOUBLE
 
 val JPObject: JPClassName = JPClassName.OBJECT
-val JPString: JPClassName = JPClassName.get("java.lang", "String")
-val JPList: JPClassName = JPClassName.get("java.util", "List")
-val JPSet: JPClassName = JPClassName.get("java.util", "Set")
-val JPMap: JPClassName = JPClassName.get("java.util", "Map")
+val JPString: JPClassName = JPClassName.get(String::class.java)
+val JPList: JPClassName = JPClassName.get(List::class.java)
+val JPSet: JPClassName = JPClassName.get(Set::class.java)
+val JPMap: JPClassName = JPClassName.get(Map::class.java)
+
+val JPStar: JPWildcardTypeName = JPWildcardTypeName.subtypeOf(JPObject)
 
 inline fun <reified A : Annotation> buildJavaAnnotation(builder: JPAnnotationBuilder.() -> Unit = {}): JPAnnotation =
     JPAnnotation.builder(JPClassName.get(A::class.java)).apply(builder).build()
@@ -55,7 +59,7 @@ fun buildJavaCodeBlock(builder: IrJavaCodeBlockBuilder.() -> Unit = {}): JPCodeB
 
 fun buildJavaCodeBlock(
     format: String,
-    arguments: IrJavaCodeBlockBuilder.JavaCodeBlockArguments.() -> Unit = {}
+    arguments: IrJavaCodeBlockBuilder.Arguments.() -> Unit = {}
 ): JPCodeBlock =
     buildJavaCodeBlock {
         add(format, arguments)

@@ -1,45 +1,50 @@
 package io.github.recrafter.lapis.layers.validator
 
 import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
+import io.github.recrafter.lapis.extensions.ksp.KspAnnotated
 import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
 import io.github.recrafter.lapis.extensions.ksp.KspSymbol
 import io.github.recrafter.lapis.extensions.ksp.KspType
-import io.github.recrafter.lapis.layers.lowering.IrJvmType
+import io.github.recrafter.lapis.layers.lowering.asIr
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 class ValidatorResult(
     val descriptors: List<Descriptor>,
-    val rootPatches: List<Patch>,
+    val patches: List<Patch>,
+    val unresolvedSymbols: List<KspAnnotated>,
 )
 
 class FunctionParameter(
     val name: String,
-    val type: KspType,
-)
+    type: KspType,
+) {
+    val type: IrTypeName = type.asIr()
+}
 
 sealed class Descriptor(
     override val source: KspSymbol,
 
-    val name: String,
-    val containerClassDeclaration: KspClassDeclaration,
+    val targetName: String,
     val classDeclaration: KspClassDeclaration,
-    val receiverType: KspType,
-    val returnType: KspType?,
-) : KspSourceHolder()
+    receiverType: KspType,
+    val kspReturnType: KspType?,
+) : KspSourceHolder() {
+    val receiverType: IrTypeName = receiverType.asIr()
+    val returnType: IrTypeName? = kspReturnType?.asIr()
+}
 
 class ConstructorDescriptor(
     override val source: KspSymbol,
 
-    containerClassDeclaration: KspClassDeclaration,
     classDeclaration: KspClassDeclaration,
     val classType: KspType,
     parameters: List<FunctionParameter>,
 ) : MethodDescriptor(
     source,
-    containerClassDeclaration,
     classDeclaration,
     classType,
     classType,
-    IrJvmType.CONSTRUCTOR_NAME,
+    "",
     parameters,
     true
 )
@@ -47,24 +52,22 @@ class ConstructorDescriptor(
 open class MethodDescriptor(
     override val source: KspSymbol,
 
-    containerClassDeclaration: KspClassDeclaration,
     classDeclaration: KspClassDeclaration,
     receiverType: KspType,
     returnType: KspType?,
-    name: String,
+    targetName: String,
     val parameters: List<FunctionParameter>,
     val isStatic: Boolean,
-) : Descriptor(source, name, containerClassDeclaration, classDeclaration, receiverType, returnType)
+) : Descriptor(source, targetName, classDeclaration, receiverType, returnType)
 
 class FieldDescriptor(
     override val source: KspSymbol,
 
-    containerClassDeclaration: KspClassDeclaration,
     classDeclaration: KspClassDeclaration,
     receiverType: KspType,
-    name: String,
+    targetName: String,
     val type: KspType,
-) : Descriptor(source, name, containerClassDeclaration, classDeclaration, receiverType, type)
+) : Descriptor(source, targetName, classDeclaration, receiverType, type)
 
 class Patch(
     override val source: KspSymbol,
@@ -122,6 +125,7 @@ class SharedProperty(
     val name: String,
     val type: KspType,
     val isMutable: Boolean,
+    val isSetterPublic: Boolean,
 ) : KspSourceHolder()
 
 class SharedFunction(
@@ -136,7 +140,7 @@ sealed class Hook(
     override val source: KspSymbol,
 
     val name: String,
-    val method: MethodDescriptor,
+    val descriptor: MethodDescriptor,
     val returnType: KspType?,
     val parameters: List<HookParameter>,
 ) : KspSourceHolder()
@@ -145,33 +149,33 @@ class MethodBodyHook(
     override val source: KspSymbol,
 
     name: String,
-    method: MethodDescriptor,
+    descriptor: MethodDescriptor,
     returnType: KspType?,
     parameters: List<HookParameter>,
-) : Hook(source, name, method, returnType, parameters)
+) : Hook(source, name, descriptor, returnType, parameters)
 
 class InvokeMethodHook(
     override val source: KspSymbol,
 
     name: String,
-    method: MethodDescriptor,
+    descriptor: MethodDescriptor,
     returnType: KspType?,
     parameters: List<HookParameter>,
-    val target: MethodDescriptor,
+    val targetDescriptor: MethodDescriptor,
     val ordinals: List<Int>,
-) : Hook(source, name, method, returnType, parameters)
+) : Hook(source, name, descriptor, returnType, parameters)
 
 class LiteralHook(
     override val source: KspSymbol,
 
     name: String,
-    method: MethodDescriptor,
+    descriptor: MethodDescriptor,
     parameters: List<HookParameter>,
     val literalType: KspType,
     val literalTypeName: String,
     val literalValue: String,
     val ordinals: List<Int>,
-) : Hook(source, name, method, literalType, parameters)
+) : Hook(source, name, descriptor, literalType, parameters)
 
 sealed interface HookParameter
 class HookContextParameter(val descriptor: MethodDescriptor) : HookParameter

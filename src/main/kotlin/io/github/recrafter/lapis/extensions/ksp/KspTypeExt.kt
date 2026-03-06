@@ -8,3 +8,9 @@ fun KspType.getGenericTypeOrNull(): KspType? =
 
 fun KspType.takeNotUnit(): KspType? =
     takeUnless { it.declaration.isInstance<Unit>() }
+
+fun KspType?.isSame(other: KspType?): Boolean {
+    val thisName = this?.declaration?.qualifiedName?.asString()
+    val otherName = other?.declaration?.qualifiedName?.asString()
+    return thisName == otherName
+}

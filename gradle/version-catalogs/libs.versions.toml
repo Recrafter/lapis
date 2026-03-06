@@ -7,7 +7,7 @@ ksp = "2.2.21-2.0.5"
 mixin = "0.8"
 mixin-extras = "0.4.0"
 
-lapis = "0.6.2"
+lapis = "0.6.4"
 
 java-poet = "0.11.0"
 kotlin-poet = "2.2.0"
@@ -28,7 +28,6 @@ psi-api = { group = "org.jetbrains.kotlin", name = "kotlin-compiler-embeddable",
 mixin = { group = "org.spongepowered", name = "mixin", version.ref = "mixin" }
 mixin-extras = { group = "io.github.llamalad7", name = "mixinextras-common", version.ref = "mixin-extras" }
 
-lapis-api = { group = "io.github.recrafter", name = "lapis-api", version.ref = "lapis" }
 lapis-annotations = { group = "io.github.recrafter", name = "lapis-annotations", version.ref = "lapis" }
 
 java-poet = { group = "com.palantir.javapoet", name = "javapoet", version.ref = "java-poet" }

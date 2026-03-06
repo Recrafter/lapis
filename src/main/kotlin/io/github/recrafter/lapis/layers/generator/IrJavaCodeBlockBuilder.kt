@@ -1,15 +1,15 @@
 package io.github.recrafter.lapis.layers.generator
 
 import io.github.recrafter.lapis.extensions.jp.*
-import io.github.recrafter.lapis.layers.lowering.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 @JvmInline
 value class IrJavaCodeBlockBuilder(private val builder: JPCodeBlockBuilder) {
 
-    fun add(format: String, arguments: JavaCodeBlockArguments.() -> Unit = {}) {
+    fun add(format: String, arguments: Arguments.() -> Unit = {}) {
         builder.add(
-            format.replace("%", "$"),
-            *JavaCodeBlockArguments().apply(arguments).build().toTypedArray()
+            format.replace('%', '$'),
+            *Arguments().apply(arguments).build().toTypedArray()
         )
     }
 
@@ -21,7 +21,7 @@ value class IrJavaCodeBlockBuilder(private val builder: JPCodeBlockBuilder) {
         builder.build()
 
     @JvmInline
-    value class JavaCodeBlockArguments(private val arguments: MutableList<Any> = mutableListOf()) {
+    value class Arguments(private val arguments: MutableList<Any> = mutableListOf()) {
 
         fun arg(string: String) {
             arguments += string

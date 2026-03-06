@@ -1,12 +1,11 @@
 package io.github.recrafter.lapis.extensions.jp
 
-import io.github.recrafter.lapis.extensions.common.asIr
 import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
 import io.github.recrafter.lapis.layers.generator.IrJavaMethodBodyBuilder
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.IrTypeName
-import kotlin.reflect.KClass
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> JPMethodBuilder.addAnnotation(builder: JPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildJavaAnnotation<A>(builder))
@@ -21,21 +20,21 @@ fun JPMethodBuilder.if_(condition: JPCodeBlock, body: IrJavaCodeBlockBuilder.() 
 }
 
 fun JPMethodBuilder.try_(
-    exceptionType: KClass<out Exception>,
+    exceptionType: IrClassName,
     catchBody: (IrJavaCodeBlockBuilder.() -> Unit)? = null,
     exceptedName: String = if (catchBody == null) "ignored" else "e",
     finallyBody: (IrJavaCodeBlockBuilder.() -> Unit)? = null,
     tryBody: IrJavaCodeBlockBuilder.() -> Unit,
 ) {
-    beginControlFlow("try")
+    beginControlFlow(buildJavaCodeBlock("try"))
     buildJavaCodeBlock(tryBody)
     nextControlFlow(buildJavaCodeBlock("catch (%T %L)") {
-        arg(exceptionType.asIr())
+        arg(exceptionType)
         arg(exceptedName)
     })
     catchBody?.let { buildJavaCodeBlock(it) }
     finallyBody?.let {
-        nextControlFlow("finally")
+        nextControlFlow(buildJavaCodeBlock("finally"))
         buildJavaCodeBlock(it)
     }
     endControlFlow()

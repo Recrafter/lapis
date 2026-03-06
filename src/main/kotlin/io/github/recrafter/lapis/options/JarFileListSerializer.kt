@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.options
 
+import io.github.recrafter.lapis.extensions.common.unsafeLazy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -10,7 +11,7 @@ import java.io.File
 
 object JarFileListSerializer : KSerializer<List<File>> {
 
-    override val descriptor: SerialDescriptor by lazy {
+    override val descriptor: SerialDescriptor by unsafeLazy {
         PrimitiveSerialDescriptor(
             requireNotNull(JarFileListSerializer::class.qualifiedName),
             PrimitiveKind.STRING

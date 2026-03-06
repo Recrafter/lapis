@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.extensions.ksp
 
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
 import kotlin.reflect.KClass
 
 val KspDeclaration.name: String
@@ -13,3 +14,6 @@ fun KspDeclaration.isInstance(typeClass: KClass<*>): Boolean =
 
 inline fun <reified T> KspDeclaration.isInstance(): Boolean =
     isInstance(T::class)
+
+fun KspDeclaration.isInstance(type: IrClassName): Boolean =
+    qualifiedName?.asString() == type.qualifiedName

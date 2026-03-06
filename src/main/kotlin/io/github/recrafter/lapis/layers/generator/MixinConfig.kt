@@ -86,6 +86,8 @@ data class MixinConfig(
             side: LapisPatchSide,
             packageName: String,
         ): List<String>? =
-            get(side)?.ifEmpty { null }?.map { it.removePrefix("$packageName.").replace(".", "$") }
+            get(side)
+                ?.ifEmpty { null }
+                ?.map { it.removePrefix("$packageName.") }
     }
 }

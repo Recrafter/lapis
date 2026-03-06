@@ -4,6 +4,7 @@ import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.Modifier
 import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ksp.*
@@ -11,11 +12,10 @@ import io.github.recrafter.lapis.extensions.psi.PsiCallableReferenceExpression
 import io.github.recrafter.lapis.extensions.psi.PsiFunctionType
 import io.github.recrafter.lapis.extensions.psi.PsiSuperTypeCallEntry
 import io.github.recrafter.lapis.extensions.psi.PsiValueArgumentList
-import io.github.recrafter.lapis.utils.MemberKind
-import io.github.recrafter.lapis.utils.PsiCompanion
+import io.github.recrafter.lapis.layers.MemberKind
 import org.jetbrains.kotlin.psi.psiUtil.getChildOfType
 
-class SymbolParser(private val psiCompanion: PsiCompanion) {
+class SymbolParser(val logger: KspLogger) {
 
     fun parse(resolver: Resolver): ParserResult =
         ParserResult(
@@ -50,7 +50,7 @@ class SymbolParser(private val psiCompanion: PsiCompanion) {
         val superClassDeclaration = superClass?.declaration?.castOrNull<KspClassDeclaration>()
         val functionType = superClass?.genericTypes?.firstOrNull()
         val functionGenericTypes = functionType?.genericTypes
-        val psiDescriptorSuperType = classDeclaration?.findPsi(psiCompanion)
+        val psiDescriptorSuperType = classDeclaration?.findPsi()
             ?.superTypeListEntries
             ?.filterIsInstance<PsiSuperTypeCallEntry>()
             ?.firstOrNull()
@@ -165,6 +165,7 @@ class SymbolParser(private val psiCompanion: PsiCompanion) {
 
             hasStaticAnnotation = propertyDeclaration.hasAnnotation<LaStatic>(),
             isMutable = propertyDeclaration.isMutable,
+            isSetterPublic = propertyDeclaration.setter?.modifiers?.contains(Modifier.PUBLIC) == true,
         )
     }
 
@@ -189,9 +190,9 @@ class SymbolParser(private val psiCompanion: PsiCompanion) {
             hasStaticAnnotation = functionDeclaration.hasAnnotation<LaStatic>(),
 
             hasHookAnnotation = functionDeclaration.hasAnnotation<LaHook>(),
-            hookMethodDescriptorClassDeclaration = functionDeclaration.annotations
+            hookDescriptorClassDeclaration = functionDeclaration.annotations
                 .firstOrNull { it.isInstance<LaHook>() }
-                ?.findClassArgument(LaHook::method),
+                ?.findClassArgument(LaHook::descriptor),
             hookKind = functionDeclaration.getAnnotationOrNull<LaHook>()?.kind,
         )
     }
@@ -221,7 +222,7 @@ class SymbolParser(private val psiCompanion: PsiCompanion) {
             type
         } else null
         val literalTypeName = if (literalAnnotation != null) {
-            functionDeclaration.findPsi(psiCompanion)
+            functionDeclaration.findPsi()
                 ?.valueParameters
                 ?.firstOrNull { it.name == name }
                 ?.annotationEntries

@@ -14,7 +14,6 @@ dependencies {
     implementation(libs.mixin)
     implementation(libs.mixin.extras)
 
-    implementation(libs.lapis.api)
     implementation(libs.lapis.annotations)
 
     implementation(libs.kotlin.poet)

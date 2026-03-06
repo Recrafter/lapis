@@ -11,6 +11,7 @@ typealias KspPropertyDeclaration = com.google.devtools.ksp.symbol.KSPropertyDecl
 typealias KspFunctionDeclaration = com.google.devtools.ksp.symbol.KSFunctionDeclaration
 typealias KspValueParameter = com.google.devtools.ksp.symbol.KSValueParameter
 
+typealias KspFile = com.google.devtools.ksp.symbol.KSFile
 typealias KspFileLocation = com.google.devtools.ksp.symbol.FileLocation
 typealias KspLogger = com.google.devtools.ksp.processing.KSPLogger
 typealias KspResolver = com.google.devtools.ksp.processing.Resolver

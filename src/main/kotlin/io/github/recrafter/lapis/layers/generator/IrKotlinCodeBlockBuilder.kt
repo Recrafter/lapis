@@ -1,15 +1,15 @@
 package io.github.recrafter.lapis.layers.generator
 
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.layers.lowering.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 @JvmInline
 value class IrKotlinCodeBlockBuilder(private val builder: KPCodeBlockBuilder) {
 
-    fun add(format: String, arguments: KotlinCodeBlockArguments.() -> Unit = {}) {
+    fun add(format: String, arguments: Arguments.() -> Unit = {}) {
         builder.add(
             format,
-            *KotlinCodeBlockArguments().apply(arguments).build().toTypedArray()
+            *Arguments().apply(arguments).build().toTypedArray()
         )
     }
 
@@ -21,7 +21,7 @@ value class IrKotlinCodeBlockBuilder(private val builder: KPCodeBlockBuilder) {
         builder.build()
 
     @JvmInline
-    value class KotlinCodeBlockArguments(private val arguments: MutableList<Any> = mutableListOf()) {
+    value class Arguments(private val arguments: MutableList<Any> = mutableListOf()) {
 
         fun arg(string: String) {
             arguments += string

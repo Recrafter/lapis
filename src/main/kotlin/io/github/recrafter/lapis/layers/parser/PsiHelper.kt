@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.utils
+package io.github.recrafter.lapis.layers.parser
 
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.common.unsafeLazy
@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
-class PsiCompanion {
+object PsiHelper {
 
     @OptIn(K1Deprecation::class)
     private val factory: PsiFactory by unsafeLazy {
@@ -27,8 +27,6 @@ class PsiCompanion {
 
     private val cache: MutableMap<String, PsiFile> = mutableMapOf()
 
-    private var isInitialized: Boolean = false
-
     fun findPsiFile(symbol: KspSymbol?): PsiFile? {
         val file = symbol?.location?.castOrNull<KspFileLocation>()?.file ?: return null
         if (!file.isFile) {
@@ -39,15 +37,7 @@ class PsiCompanion {
             if (contents.isEmpty()) {
                 return null
             }
-            isInitialized = true
             factory.createFile(file.name, contents)
         }
-    }
-
-    fun destroy() {
-        if (!isInitialized) {
-            return
-        }
-        cache.clear()
     }
 }

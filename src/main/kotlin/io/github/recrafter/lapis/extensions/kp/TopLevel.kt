@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.extensions.kp
 
 import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
-import io.github.recrafter.lapis.layers.lowering.IrClassName
-import io.github.recrafter.lapis.layers.lowering.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 typealias KPAnnotationBuilder = com.squareup.kotlinpoet.AnnotationSpec.Builder
 typealias KPAnnotation = com.squareup.kotlinpoet.AnnotationSpec
@@ -29,6 +29,7 @@ typealias KPTypeName = com.squareup.kotlinpoet.TypeName
 typealias KPClassName = com.squareup.kotlinpoet.ClassName
 typealias KPParameterizedTypeName = com.squareup.kotlinpoet.ParameterizedTypeName
 typealias KPWildcardTypeName = com.squareup.kotlinpoet.WildcardTypeName
+typealias KPTypeVariableName = com.squareup.kotlinpoet.TypeVariableName
 
 typealias KPModifier = com.squareup.kotlinpoet.KModifier
 
@@ -50,6 +51,18 @@ val KPList: KPClassName = com.squareup.kotlinpoet.LIST
 val KPSet: KPClassName = com.squareup.kotlinpoet.SET
 val KPMap: KPClassName = com.squareup.kotlinpoet.MAP
 
+val KPArray: KPClassName = com.squareup.kotlinpoet.ARRAY
+val KPBooleanArray: KPClassName = com.squareup.kotlinpoet.BOOLEAN_ARRAY
+val KPByteArray: KPClassName = com.squareup.kotlinpoet.BYTE_ARRAY
+val KPShortArray: KPClassName = com.squareup.kotlinpoet.SHORT_ARRAY
+val KPIntArray: KPClassName = com.squareup.kotlinpoet.INT_ARRAY
+val KPLongArray: KPClassName = com.squareup.kotlinpoet.LONG_ARRAY
+val KPCharArray: KPClassName = com.squareup.kotlinpoet.CHAR_ARRAY
+val KPFloatArray: KPClassName = com.squareup.kotlinpoet.FLOAT_ARRAY
+val KPDoubleArray: KPClassName = com.squareup.kotlinpoet.DOUBLE_ARRAY
+
+val KPStar: KPWildcardTypeName = com.squareup.kotlinpoet.STAR
+
 inline fun <reified A : Annotation> buildKotlinAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}): KPAnnotation =
     KPAnnotation.builder(A::class).apply(builder).build()
 
@@ -58,7 +71,7 @@ fun buildKotlinCodeBlock(builder: IrKotlinCodeBlockBuilder.() -> Unit = {}): KPC
 
 fun buildKotlinCodeBlock(
     format: String,
-    arguments: IrKotlinCodeBlockBuilder.KotlinCodeBlockArguments.() -> Unit = {}
+    arguments: IrKotlinCodeBlockBuilder.Arguments.() -> Unit = {}
 ): KPCodeBlock =
     buildKotlinCodeBlock {
         add(format, arguments)
@@ -91,6 +104,9 @@ fun buildKotlinConstructor(builder: KPFunctionBuilder.() -> Unit = {}): KPFuncti
 
 fun buildKotlinClass(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPType =
     KPType.classBuilder(name).apply(builder).build()
+
+fun buildKotlinObject(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPType =
+    KPType.objectBuilder(name).apply(builder).build()
 
 fun buildKotlinFile(packageName: String, name: String, builder: KPFileBuilder.() -> Unit = {}): KPFile =
     KPFile.builder(packageName, name).apply(builder).indent("    ").build()

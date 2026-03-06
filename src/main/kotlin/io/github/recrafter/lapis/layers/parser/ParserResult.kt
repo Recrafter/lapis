@@ -2,11 +2,12 @@ package io.github.recrafter.lapis.layers.parser
 
 import io.github.recrafter.lapis.annotations.enums.LapisHookKind
 import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
+import io.github.recrafter.lapis.extensions.ksp.KspAnnotated
 import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
 import io.github.recrafter.lapis.extensions.ksp.KspSymbol
 import io.github.recrafter.lapis.extensions.ksp.KspType
+import io.github.recrafter.lapis.layers.MemberKind
 import io.github.recrafter.lapis.layers.validator.KspSourceHolder
-import io.github.recrafter.lapis.utils.MemberKind
 
 class ParserResult(
     val descriptorContainers: List<ParsedDescriptorContainer>,
@@ -14,7 +15,7 @@ class ParserResult(
 )
 
 class ParsedDescriptorContainer(
-    override val source: KspSymbol,
+    override val source: KspAnnotated,
 
     val classDeclaration: KspClassDeclaration?,
     val targetClassDeclaration: KspClassDeclaration?,
@@ -49,7 +50,7 @@ class ParsedDescriptor(
 ) : KspSourceHolder()
 
 class ParsedPatch(
-    override val source: KspSymbol,
+    override val source: KspAnnotated,
 
     val name: String?,
     val side: LapisPatchSide?,
@@ -85,6 +86,7 @@ class ParsedPatchProperty(
 
     val hasStaticAnnotation: Boolean,
     val isMutable: Boolean,
+    val isSetterPublic: Boolean,
 ) : KspSourceHolder()
 
 class ParsedPatchFunction(
@@ -105,7 +107,7 @@ class ParsedPatchFunction(
     val hasStaticAnnotation: Boolean,
 
     val hasHookAnnotation: Boolean,
-    val hookMethodDescriptorClassDeclaration: KspClassDeclaration?,
+    val hookDescriptorClassDeclaration: KspClassDeclaration?,
     val hookKind: LapisHookKind?,
 ) : KspSourceHolder()
 

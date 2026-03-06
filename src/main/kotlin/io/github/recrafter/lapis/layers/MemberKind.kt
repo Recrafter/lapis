@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.utils
+package io.github.recrafter.lapis.layers
 
 import io.github.recrafter.lapis.annotations.LaConstructor
 import io.github.recrafter.lapis.annotations.LaField

@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.layers.generator
 
 import io.github.recrafter.lapis.extensions.kp.KPFunctionBuilder
+import io.github.recrafter.lapis.extensions.kp.addReturnStatement
 import io.github.recrafter.lapis.extensions.kp.addStatement
 import io.github.recrafter.lapis.extensions.kp.buildKotlinCodeBlock
 
@@ -9,8 +10,15 @@ value class IrKotlinFunctionBodyBuilder(private val functionBuilder: KPFunctionB
 
     fun IrKotlinFunctionBodyBuilder.line(
         format: String,
-        arguments: IrKotlinCodeBlockBuilder.KotlinCodeBlockArguments.() -> Unit = {}
+        arguments: IrKotlinCodeBlockBuilder.Arguments.() -> Unit = {}
     ) {
         functionBuilder.addStatement(buildKotlinCodeBlock(format, arguments))
+    }
+
+    fun IrKotlinFunctionBodyBuilder.return_(
+        format: String? = null,
+        arguments: IrKotlinCodeBlockBuilder.Arguments.() -> Unit = {}
+    ) {
+        functionBuilder.addReturnStatement(format?.let { buildKotlinCodeBlock(it, arguments) })
     }
 }

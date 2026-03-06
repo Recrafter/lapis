@@ -1,63 +1,76 @@
 package io.github.recrafter.lapis.layers.lowering
 
+import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import io.github.recrafter.lapis.api.LapisContext
-import io.github.recrafter.lapis.extensions.capitalizeWithPrefix
-import io.github.recrafter.lapis.extensions.common.asIr
+import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.extensions.common.getAnnotationDefaultIntValue
-import io.github.recrafter.lapis.extensions.jvm.JvmVoid
-import io.github.recrafter.lapis.extensions.kp.KPClassName
-import io.github.recrafter.lapis.extensions.kp.KPParameterizedTypeName
-import io.github.recrafter.lapis.extensions.kp.KPTypeName
-import io.github.recrafter.lapis.extensions.kp.KPWildcardTypeName
+import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
 import io.github.recrafter.lapis.extensions.ksp.KspType
-import io.github.recrafter.lapis.extensions.withJavaInternalPrefix
+import io.github.recrafter.lapis.layers.ApiContext
+import io.github.recrafter.lapis.layers.RuntimeApi
+import io.github.recrafter.lapis.layers.generator.withInternalPrefix
+import io.github.recrafter.lapis.layers.lowering.types.*
 import io.github.recrafter.lapis.layers.validator.*
 import io.github.recrafter.lapis.options.Options
 import org.spongepowered.asm.mixin.injection.At
+import kotlin.reflect.KClass
 
-class MixinLowering(private val options: Options) {
-
+class MixinLowering(
+    private val options: Options,
+    private val runtimeApi: RuntimeApi,
+) {
     fun lower(validatorResult: ValidatorResult): IrResult {
         val descriptorBindings = validatorResult.descriptors.map { validated ->
             DescriptorBinding(
                 validated = validated,
-                lowered = lowerDescriptor(validated),
+                lowered = lowerDescriptor(validated, validatorResult.patches),
             )
         }
         return IrResult(
             descriptors = descriptorBindings.map { it.lowered },
-            mixins = validatorResult.rootPatches.map { lowerMixin(it, descriptorBindings) },
+            mixins = validatorResult.patches.map { lowerMixin(it, descriptorBindings) },
         )
     }
 
-    private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor {
+    private fun lowerDescriptor(descriptor: Descriptor, patches: List<Patch>): IrDescriptor =
         when (descriptor) {
             is MethodDescriptor -> {
-                val superType = descriptor.classDeclaration.asIr()
-                val containerType = descriptor.containerClassDeclaration.asIr()
-
-                val implNamePrefix = "${containerType.simpleName}_${superType.simpleName}"
-                return IrDescriptor(
+                val descriptorDeclarationType = descriptor.classDeclaration.asIr()
+                val isContextUsed = patches.any { patch ->
+                    patch.hooks.any { hook ->
+                        hook.parameters.any { parameter ->
+                            parameter is HookContextParameter && parameter.descriptor == descriptor
+                        }
+                    }
+                }
+                IrDescriptor(
                     source = descriptor.source,
 
-                    contextImpl = IrDescriptorContextImpl(
-                        type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_ContextImpl"),
-                        superType = LapisContext::class.asIr().parameterizedBy(superType),
-                        parameters = descriptor.parameters.asIr(),
-                        returnType = descriptor.returnType?.asIr(),
-                    ),
+                    contextImpl = if (isContextUsed) {
+                        IrDescriptorContextImpl(
+                            type = IrClassName.of(
+                                options.generatedPackageName,
+                                "ContextImpl".withQualifiedNamePrefix(descriptorDeclarationType)
+                            ),
+                            superType = runtimeApi[ApiContext].parameterizedBy(descriptorDeclarationType),
+                            parameters = descriptor.parameters.asIr(),
+                            returnType = descriptor.returnType,
+                        )
+                    } else null,
                     targetImpl = IrDescriptorTargetImpl(
-                        type = IrClassName.of(options.generatedPackageName, "_${implNamePrefix}_TargetImpl"),
-                        superType = superType,
+                        type = IrClassName.of(
+                            options.generatedPackageName,
+                            "TargetImpl".withQualifiedNamePrefix(descriptorDeclarationType)
+                        ),
+                        superType = descriptorDeclarationType,
                         receiverType = when {
                             descriptor.isStatic -> null
-                            else -> descriptor.receiverType.asIr()
+                            else -> descriptor.receiverType
                         },
                         parameters = descriptor.parameters.asIr(),
-                        returnType = descriptor.returnType?.asIr(),
+                        returnType = descriptor.returnType,
                     ),
                 )
             }
@@ -66,35 +79,39 @@ class MixinLowering(private val options: Options) {
                 TODO()
             }
         }
-    }
 
-    private fun lowerMixin(patch: Patch, descriptorBindings: List<DescriptorBinding>): IrMixin =
-        IrMixin(
+    private fun lowerMixin(patch: Patch, descriptorBindings: List<DescriptorBinding>): IrMixin {
+        val patchDeclarationType = patch.classDeclaration.asIr()
+        return IrMixin(
             source = patch.source,
 
             type = IrClassName.of(
                 options.mixinPackageName,
-                "_" + patch.name + "_Mixin"
+                "Mixin".withQualifiedNamePrefix(patchDeclarationType)
             ),
             side = patch.side,
-            patchType = patch.classDeclaration.asIr(),
+            patchDeclarationType = patchDeclarationType,
             patchImplType = IrClassName.of(
                 options.generatedPackageName,
-                "_" + patch.name + "_Impl"
+                "Impl".withQualifiedNamePrefix(patchDeclarationType)
             ),
             targetType = patch.targetClassDeclaration.asIr(),
-            extension = lowerExtension(patch),
-            accessor = lowerAccessor(patch),
+            extension = lowerExtension(patch, patchDeclarationType),
+            accessor = lowerAccessor(patch, patchDeclarationType),
             injections = patch.hooks.flatMap { lowerInjections(it, descriptorBindings) },
             innerMixins = patch.innerPatches.map { lowerMixin(it, descriptorBindings) },
         )
+    }
 
-    private fun lowerAccessor(patch: Patch): IrAccessor? {
+    private fun lowerAccessor(patch: Patch, patchDeclarationType: IrClassName): IrAccessor? {
         if (patch.accessProperties.isEmpty() && patch.accessFunctions.isEmpty() && patch.accessConstructors.isEmpty()) {
             return null
         }
         return IrAccessor(
-            type = IrClassName.of(options.mixinPackageName, "_" + patch.name + "_Accessor"),
+            type = IrClassName.of(
+                options.mixinPackageName,
+                "Accessor".withQualifiedNamePrefix(patchDeclarationType)
+            ),
             kinds = buildList {
                 patch.accessProperties.forEach { property ->
                     add(
@@ -102,8 +119,8 @@ class MixinLowering(private val options: Options) {
                             source = property.source,
 
                             name = property.name,
-                            internalName = property.name.capitalizeWithPrefix("get"),
-                            vanillaName = property.vanillaName,
+                            internalName = "get" + property.name.capitalize(),
+                            targetName = property.vanillaName,
                             type = property.type.asIr(),
                             isStatic = property.isStatic,
                         )
@@ -114,8 +131,8 @@ class MixinLowering(private val options: Options) {
                                 source = property.source,
 
                                 name = property.name,
-                                internalName = property.name.capitalizeWithPrefix("set"),
-                                vanillaName = property.vanillaName,
+                                internalName = "set" + property.name.capitalize(),
+                                targetName = property.vanillaName,
                                 type = property.type.asIr(),
                                 isStatic = property.isStatic,
                             )
@@ -127,7 +144,7 @@ class MixinLowering(private val options: Options) {
                         source = constructor.source,
 
                         name = constructor.name,
-                        internalName = constructor.name.capitalizeWithPrefix("invoke"),
+                        internalName = "invoke" + constructor.name.capitalize(),
                         parameters = constructor.parameters.asIr(),
                         classType = constructor.classType.asIr(),
                     )
@@ -137,8 +154,8 @@ class MixinLowering(private val options: Options) {
                         source = function.source,
 
                         name = function.name,
-                        internalName = function.name.capitalizeWithPrefix("invoke"),
-                        vanillaName = function.vanillaName,
+                        internalName = "invoke" + function.name.capitalize(),
+                        targetName = function.vanillaName,
                         parameters = function.parameters.asIr(),
                         returnType = function.returnType?.asIr(),
                         isStatic = function.isStatic,
@@ -148,26 +165,29 @@ class MixinLowering(private val options: Options) {
         )
     }
 
-    private fun lowerExtension(patch: Patch): IrExtension? {
+    private fun lowerExtension(patch: Patch, patchDeclarationType: IrClassName): IrExtension? {
         if (patch.sharedProperties.isEmpty() && patch.sharedFunctions.isEmpty()) {
             return null
         }
         return IrExtension(
-            type = IrClassName.of(options.generatedPackageName, "_" + patch.name + "_Extension"),
+            type = IrClassName.of(
+                options.generatedPackageName,
+                "Extension".withQualifiedNamePrefix(patchDeclarationType)
+            ),
             kinds = buildList {
                 patch.sharedProperties.forEach { property ->
                     add(
                         IrFieldGetterExtension(
                             name = property.name,
-                            internalName = property.name.capitalizeWithPrefix("get").withModId(),
+                            internalName = ("get" + property.name.capitalize()).withModId(),
                             type = property.type.asIr(),
                         )
                     )
-                    if (property.isMutable) {
+                    if (property.isMutable && property.isSetterPublic) {
                         add(
                             IrFieldSetterExtension(
                                 name = property.name,
-                                internalName = property.name.capitalizeWithPrefix("set").withModId(),
+                                internalName = ("set" + property.name.capitalize()).withModId(),
                                 type = property.type.asIr(),
                             )
                         )
@@ -194,8 +214,8 @@ class MixinLowering(private val options: Options) {
 
                     name = hook.name,
                     hookName = hook.name,
-                    method = hook.method.getJvmDescriptor(),
-                    isStatic = hook.method.isStatic,
+                    method = hook.descriptor.getMemberReference(),
+                    isStatic = hook.descriptor.isStatic,
                     returnType = hook.returnType?.asIr(),
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings) },
@@ -213,12 +233,12 @@ class MixinLowering(private val options: Options) {
                         }
                     },
                     hookName = hook.name,
-                    method = hook.method.getJvmDescriptor(),
+                    method = hook.descriptor.getMemberReference(),
                     returnType = hook.returnType?.asIr(),
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
-                    target = hook.target.getJvmDescriptor(withReceiver = true),
-                    isStatic = hook.target.isStatic,
+                    target = hook.targetDescriptor.getMemberReference(withReceiver = true),
+                    isStatic = hook.targetDescriptor.isStatic,
                     ordinal = ordinal.takeIf { it != getAnnotationDefaultIntValue(At::ordinal) },
                 )
             }
@@ -234,7 +254,7 @@ class MixinLowering(private val options: Options) {
                         }
                     },
                     hookName = hook.name,
-                    method = hook.method.getJvmDescriptor(),
+                    method = hook.descriptor.getMemberReference(),
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
                     literalType = hook.literalType.asIr(),
@@ -251,22 +271,22 @@ class MixinLowering(private val options: Options) {
             is HookContextParameter -> buildList {
                 var currentSlot = if (parameter.descriptor.isStatic) 0 else 1
                 addAll(parameter.descriptor.parameters.map { parameter ->
-                    val irType = parameter.type.asIr()
-                    val irParameter = IrInjectionSignatureLocalParameter(parameter.name, irType, currentSlot)
+                    val irType = parameter.type
+                    val irParameter = IrInjectionParameterParameter(parameter.name, irType, currentSlot)
                     currentSlot += if (irType.is64bit) 2 else 1
                     return@map irParameter
                 })
-                add(IrInjectionCallbackParameter(parameter.descriptor.returnType?.asIr()))
+                add(IrInjectionCallbackParameter(parameter.descriptor.returnType))
             }
 
             is HookTargetParameter -> buildList {
                 if (hook is InvokeMethodHook && !parameter.descriptor.isStatic) {
-                    add(IrInjectionReceiverParameter(parameter.descriptor.receiverType.asIr()))
+                    add(IrInjectionReceiverParameter(parameter.descriptor.receiverType))
                 }
                 addAll(parameter.descriptor.parameters.map { parameter ->
-                    IrInjectionArgumentParameter(parameter.name, parameter.type.asIr())
+                    IrInjectionArgumentParameter(parameter.name, parameter.type)
                 })
-                add(IrInjectionOperationParameter(parameter.descriptor.returnType?.asIr()))
+                add(IrInjectionOperationParameter(parameter.descriptor.returnType))
             }
 
             is HookLiteralParameter -> listOf(
@@ -275,13 +295,13 @@ class MixinLowering(private val options: Options) {
 
             is HookLocalParameter -> {
                 val signatureOffset = buildList {
-                    if (!hook.method.isStatic) {
-                        add(hook.method.receiverType)
+                    if (!hook.descriptor.isStatic) {
+                        add(hook.descriptor.receiverType)
                     }
-                    addAll(hook.method.parameters.map { it.type })
+                    addAll(hook.descriptor.parameters.map { it.type })
                 }.count { it == parameter.type }
                 listOf(
-                    IrInjectionBodyLocalParameter(
+                    IrInjectionLocalParameter(
                         parameter.name,
                         parameter.type.asIr(),
                         signatureOffset + parameter.ordinal
@@ -302,7 +322,7 @@ class MixinLowering(private val options: Options) {
                 descriptorBindings
                     .first { it.validated.classDeclaration == parameter.descriptor.classDeclaration }
                     .lowered
-                    .contextImpl
+                    .contextImpl!!
             )
 
             is HookTargetParameter -> IrHookTargetArgument(
@@ -318,13 +338,16 @@ class MixinLowering(private val options: Options) {
         }
 
     private fun String.withModId(): String =
-        withJavaInternalPrefix(options.modId)
+        withInternalPrefix(options.modId)
 
     private class DescriptorBinding(
         val validated: Descriptor,
         val lowered: IrDescriptor,
     )
 }
+
+fun KClass<*>.asIr(): IrClassName =
+    asClassName().asIr()
 
 fun KspType.asIr(): IrTypeName =
     toTypeName().asIr()
@@ -333,7 +356,7 @@ fun KspClassDeclaration.asIr(): IrClassName =
     toClassName().asIr()
 
 fun List<FunctionParameter>.asIr(): List<IrParameter> =
-    map { parameter -> IrParameter(parameter.name, parameter.type.asIr()) }
+    map { parameter -> IrParameter(parameter.name, parameter.type) }
 
 fun KPTypeName.asIr(): IrTypeName =
     IrTypeName(this)
@@ -347,24 +370,8 @@ fun KPParameterizedTypeName.asIr(): IrParameterizedTypeName =
 fun KPWildcardTypeName.asIr(): IrWildcardTypeName =
     IrWildcardTypeName(this)
 
-fun Descriptor.getJvmDescriptor(withReceiver: Boolean = false): String =
-    when (val descriptor = this) {
-        is MethodDescriptor -> buildString {
-            if (withReceiver) {
-                append(receiverType.asIr().jvmType.mixinDescriptor)
-            }
-            append(name)
-            append("(")
-            parameters.forEach {
-                append(it.type.asIr().jvmType.mixinDescriptor)
-            }
-            append(")")
-            if (descriptor is ConstructorDescriptor) {
-                append(JvmVoid)
-            } else {
-                append(returnType?.asIr()?.jvmType?.mixinDescriptor ?: JvmVoid)
-            }
-        }
+fun KPTypeVariableName.asIr(): IrTypeVariable =
+    IrTypeVariable(this)
 
-        is FieldDescriptor -> TODO()
-    }
+fun String.withQualifiedNamePrefix(className: IrClassName): String =
+    withInternalPrefix(className.qualifiedName.replace('.', '_'))

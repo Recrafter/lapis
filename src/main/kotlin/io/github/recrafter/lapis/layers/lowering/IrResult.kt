@@ -2,6 +2,9 @@ package io.github.recrafter.lapis.layers.lowering
 
 import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
 import io.github.recrafter.lapis.extensions.ksp.KspSymbol
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrParameterizedTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 import io.github.recrafter.lapis.layers.validator.KspSourceHolder
 
 class IrResult(
@@ -12,9 +15,12 @@ class IrResult(
 class IrDescriptor(
     override val source: KspSymbol,
 
-    val contextImpl: IrDescriptorContextImpl,
+    val contextImpl: IrDescriptorContextImpl?,
     val targetImpl: IrDescriptorTargetImpl,
 ) : KspSourceHolder()
+
+open class IrParameter(val name: String, val type: IrTypeName)
+class IrSetterParameter(type: IrTypeName) : IrParameter("newValue", type)
 
 class IrDescriptorContextImpl(
     val type: IrClassName,
@@ -37,7 +43,7 @@ class IrMixin(
     val type: IrClassName,
     val side: LapisPatchSide,
 
-    val patchType: IrClassName,
+    val patchDeclarationType: IrClassName,
     val patchImplType: IrClassName,
     val targetType: IrClassName,
 
@@ -96,7 +102,7 @@ sealed class IrAccessorKind(
 
     val name: String,
     val internalName: String,
-    val vanillaName: String,
+    val targetName: String,
     val parameters: List<IrParameter>,
     val returnType: IrTypeName?,
     val isStatic: Boolean,
@@ -108,9 +114,9 @@ class IrFieldGetterAccessor(
     val type: IrTypeName,
     name: String,
     internalName: String,
-    vanillaName: String,
+    targetName: String,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, vanillaName, emptyList(), type, isStatic)
+) : IrAccessorKind(source, name, internalName, targetName, emptyList(), type, isStatic)
 
 class IrFieldSetterAccessor(
     override val source: KspSymbol,
@@ -118,20 +124,20 @@ class IrFieldSetterAccessor(
     val type: IrTypeName,
     name: String,
     internalName: String,
-    vanillaName: String,
+    targetName: String,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, vanillaName, listOf(IrSetterParameter(type)), null, isStatic)
+) : IrAccessorKind(source, name, internalName, targetName, listOf(IrSetterParameter(type)), null, isStatic)
 
 open class IrMethodAccessor(
     override val source: KspSymbol,
 
     name: String,
     internalName: String,
-    vanillaName: String,
+    targetName: String,
     parameters: List<IrParameter>,
     returnType: IrTypeName?,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, vanillaName, parameters, returnType, isStatic)
+) : IrAccessorKind(source, name, internalName, targetName, parameters, returnType, isStatic)
 
 class IrConstructorAccessor(
     override val source: KspSymbol,
@@ -140,7 +146,7 @@ class IrConstructorAccessor(
     internalName: String,
     parameters: List<IrParameter>,
     val classType: IrTypeName,
-) : IrMethodAccessor(source, name, internalName, IrJvmType.CONSTRUCTOR_NAME, parameters, classType, true)
+) : IrMethodAccessor(source, name, internalName, "", parameters, classType, true)
 
 sealed class IrInjection(
     override val source: KspSymbol,
@@ -224,7 +230,7 @@ class IrInjectionCallbackParameter(
     override val priority: Int = 4
 ) : IrInjectionParameter
 
-class IrInjectionSignatureLocalParameter(
+class IrInjectionParameterParameter(
     val name: String,
     val type: IrTypeName,
     val index: Int,
@@ -232,7 +238,7 @@ class IrInjectionSignatureLocalParameter(
     override val subPriority: Int = index
 ) : IrInjectionParameter
 
-class IrInjectionBodyLocalParameter(
+class IrInjectionLocalParameter(
     val name: String,
     val type: IrTypeName,
     val ordinal: Int,

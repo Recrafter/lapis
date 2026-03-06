@@ -4,7 +4,7 @@ import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
 import io.github.recrafter.lapis.layers.generator.IrKotlinFunctionBodyBuilder
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> KPFunctionBuilder.addAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildKotlinAnnotation<A>(builder))
@@ -16,6 +16,14 @@ fun KPFunctionBuilder.setBody(builder: IrKotlinFunctionBodyBuilder.() -> Unit = 
 
 fun KPFunctionBuilder.addStatement(codeBlock: KPCodeBlock) {
     addStatement("%L", codeBlock)
+}
+
+fun KPFunctionBuilder.addReturnStatement(codeBlock: KPCodeBlock?) {
+    if (codeBlock != null) {
+        addStatement("return %L", codeBlock)
+    } else {
+        addStatement("return")
+    }
 }
 
 fun KPFunctionBuilder.if_(condition: KPCodeBlock, body: IrKotlinCodeBlockBuilder.() -> Unit) {
@@ -50,7 +58,7 @@ fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
         when (it) {
             IrModifier.PUBLIC -> addModifiers(KPModifier.PUBLIC)
             IrModifier.PRIVATE -> addModifiers(KPModifier.PRIVATE)
-            IrModifier.ABSTRACT -> addModifiers(KPModifier.PRIVATE)
+            IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
             IrModifier.STATIC -> addAnnotation<JvmStatic>()
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
         }

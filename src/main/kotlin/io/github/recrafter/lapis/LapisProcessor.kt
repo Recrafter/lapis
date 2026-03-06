@@ -5,14 +5,15 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import io.github.recrafter.lapis.extensions.ksp.KspAnnotated
 import io.github.recrafter.lapis.extensions.ksp.KspLogger
+import io.github.recrafter.lapis.layers.RuntimeApi
 import io.github.recrafter.lapis.layers.generator.MixinGenerator
-import io.github.recrafter.lapis.layers.lowering.IrResult
+import io.github.recrafter.lapis.layers.lowering.IrDescriptor
+import io.github.recrafter.lapis.layers.lowering.IrMixin
 import io.github.recrafter.lapis.layers.lowering.MixinLowering
 import io.github.recrafter.lapis.layers.parser.SymbolParser
 import io.github.recrafter.lapis.layers.validator.BackendValidator
 import io.github.recrafter.lapis.layers.validator.FrontendValidator
 import io.github.recrafter.lapis.options.Options
-import io.github.recrafter.lapis.utils.PsiCompanion
 
 class LapisProcessor(
     private val options: Options,
@@ -20,34 +21,43 @@ class LapisProcessor(
     private val codeGenerator: CodeGenerator,
 ) : SymbolProcessor {
 
-    private val psiCompanion: PsiCompanion = PsiCompanion()
-    private val symbolParser: SymbolParser = SymbolParser(psiCompanion)
-    private val frontendValidator: FrontendValidator = FrontendValidator(logger)
-    private val mixinLowering: MixinLowering = MixinLowering(options)
+    private val runtimeApi: RuntimeApi = RuntimeApi(options.generatedPackageName, codeGenerator)
+    private val symbolParser: SymbolParser = SymbolParser(logger)
+    private val frontendValidator: FrontendValidator = FrontendValidator(logger, runtimeApi)
+    private val mixinLowering: MixinLowering = MixinLowering(options, runtimeApi)
 
-    private val results: MutableList<IrResult> = mutableListOf()
+    private val descriptors = mutableMapOf<String, IrDescriptor>()
+    private val mixins = mutableMapOf<String, IrMixin>()
 
     override fun process(resolver: Resolver): List<KspAnnotated> {
         val parsedData = symbolParser.parse(resolver)
         val validatedData = frontendValidator.validate(parsedData)
-        results += mixinLowering.lower(validatedData)
-        return emptyList()
+
+        val irResult = mixinLowering.lower(validatedData)
+        irResult.descriptors.forEach { descriptors[it.targetImpl.type.qualifiedName] = it }
+        irResult.mixins.forEach { mixins[it.type.qualifiedName] = it }
+        if (validatedData.unresolvedSymbols.isNotEmpty()) {
+            runtimeApi.generate()
+        }
+        return validatedData.unresolvedSymbols
     }
 
     override fun finish() {
-        val descriptors = results.flatMap { it.descriptors }
-        val mixins = results.flatMap { it.mixins }
-        BackendValidator(options.minecraftJars, logger).validate(descriptors, mixins)
-        MixinGenerator(options, codeGenerator).generate(descriptors, mixins)
-        reset()
+        generate()
     }
 
     override fun onError() {
-        reset()
+        generate()
     }
 
-    private fun reset() {
-        results.clear()
-        psiCompanion.destroy()
+    private fun generate() {
+        val finalDescriptors = descriptors.values.toList()
+        val finalMixins = mixins.values.toList()
+        if (finalDescriptors.isEmpty() && finalMixins.isEmpty()) {
+            return
+        }
+        BackendValidator(options.minecraftJars, logger).validate(finalDescriptors, finalMixins)
+        MixinGenerator(options, runtimeApi, codeGenerator).generate(finalDescriptors, finalMixins)
+        runtimeApi.generate()
     }
 }
