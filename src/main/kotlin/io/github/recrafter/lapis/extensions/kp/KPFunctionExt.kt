@@ -4,7 +4,7 @@ import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
 import io.github.recrafter.lapis.layers.generator.IrKotlinFunctionBodyBuilder
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrType
 
 inline fun <reified A : Annotation> KPFunctionBuilder.addAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildKotlinAnnotation<A>(builder))
@@ -36,11 +36,11 @@ fun KPFunctionBuilder.withControlFlow(controlFlow: KPCodeBlock, body: IrKotlinCo
     endControlFlow()
 }
 
-fun KPFunctionBuilder.setReturnType(type: IrTypeName?) {
+fun KPFunctionBuilder.setReturnType(type: IrType?) {
     returns(type?.kotlin.orUnit())
 }
 
-fun KPFunctionBuilder.setReceiverType(type: IrTypeName) {
+fun KPFunctionBuilder.setReceiverType(type: IrType) {
     receiver(type.kotlin)
 }
 
@@ -61,6 +61,7 @@ fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
             IrModifier.STATIC -> addAnnotation<JvmStatic>()
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
+            IrModifier.INLINE -> addModifiers(KPModifier.INLINE)
         }
     }
 }

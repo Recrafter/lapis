@@ -3,51 +3,45 @@ package io.github.recrafter.lapis.layers.validator
 import com.google.devtools.ksp.isAbstract
 import io.github.recrafter.lapis.annotations.LaLiteral
 import io.github.recrafter.lapis.annotations.enums.LapisHookKind
-import io.github.recrafter.lapis.extensions.common.getAnnotationDefaultIntValue
+import io.github.recrafter.lapis.extensions.common.defaultValue
 import io.github.recrafter.lapis.extensions.ksp.*
-import io.github.recrafter.lapis.layers.*
+import io.github.recrafter.lapis.layers.Builtin
+import io.github.recrafter.lapis.layers.Builtins
+import io.github.recrafter.lapis.layers.JavaMemberKind
 import io.github.recrafter.lapis.layers.parser.*
-import io.github.recrafter.lapis.layers.validator.signals.InvalidStateSignal
 import org.spongepowered.asm.mixin.injection.At
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
 class FrontendValidator(
-    private val logger: KspLogger,
-    private val runtimeApi: RuntimeApi
+    private val logger: KSPLogger,
+    private val builtins: Builtins
 ) {
     private val descriptorBindings: MutableList<DescriptorBinding> = mutableListOf()
+    private val patchBindings: MutableList<PatchBinding> = mutableListOf()
 
     fun validate(parserResult: ParserResult): ValidatorResult {
-        val unresolvedSymbols = mutableListOf<KspAnnotated>()
         descriptorBindings += parserResult.descriptorContainers.flatMap { container ->
-            container.descriptors.mapNotNull { parsed ->
-                val validated = try {
-                    validateDescriptor(container, parsed)
-                } catch (signal: InvalidStateSignal) {
-                    if (signal.isUnresolved) {
-                        unresolvedSymbols += container.source
-                    }
+            container.descriptors.mapNotNull { parsedDescriptor ->
+                val validatedDescriptor = try {
+                    validateDescriptor(container, parsedDescriptor)
+                } catch (_: ValidationErrorSignal) {
                     return@mapNotNull null
                 }
-                DescriptorBinding(parsed, validated)
+                DescriptorBinding(parsedDescriptor, validatedDescriptor)
             }
         }
-        val patchBindings = parserResult.patches.mapNotNull { parsed ->
-            val validated = try {
-                validatePatch(parsed, descriptorBindings)
-            } catch (signal: InvalidStateSignal) {
-                if (signal.isUnresolved) {
-                    unresolvedSymbols += parsed.source
-                }
+        patchBindings += parserResult.patches.mapNotNull { parsedPatch ->
+            val validatedPatch = try {
+                validatePatch(parsedPatch, descriptorBindings)
+            } catch (_: ValidationErrorSignal) {
                 return@mapNotNull null
             }
-            PatchBinding(parsed, validated)
+            PatchBinding(parsedPatch, validatedPatch)
         }
         return ValidatorResult(
-            descriptors = descriptorBindings.map { it.validated },
-            patches = buildHierarchy(patchBindings),
-            unresolvedSymbols = unresolvedSymbols,
+            descriptors = descriptorBindings.map { it.validatedDescriptor },
+            patches = buildPatchHierarchy(patchBindings),
         )
     }
 
@@ -55,24 +49,21 @@ class FrontendValidator(
         container: ParsedDescriptorContainer,
         descriptor: ParsedDescriptor,
     ): Descriptor = with(descriptor) {
-        kspRequireNotNull(container.classDeclaration) { "0" }
-        kspRequire(container.classDeclaration.typeParameters.isEmpty()) { "0.25" }
-        kspRequireNotNull(classDeclaration) { "0.5" }
-        kspRequire(classDeclaration.typeParameters.isEmpty()) { "0.75" }
-        kspRequire(targetClassDeclaration.isSame(container.targetClassDeclaration)) { "1" }
-        if (superClassDeclaration?.isInstance(runtimeApi[ApiDescriptor]) == false) {
-            if (superClassDeclaration.isError) {
-                throw InvalidStateSignal(true)
-            }
-            kspError { "2" }
-        }
+        kspRequireNotNull(container.classType) { "0" }
+        kspRequire(container.classType.typeParameters.isEmpty()) { "0.25" }
+        kspRequireNotNull(classType) { "0.5" }
+        kspRequire(classType.typeParameters.isEmpty()) { "0.75" }
+        kspRequire(targetClassType.isSame(container.targetClassType)) { "1" }
+        kspRequire(superClassType?.isInstance(builtins[Builtin.Descriptor]) == true) { "2" }
         kspRequire(isFunctionType) { "3" }
         kspRequire(isCallable) { "4" }
 
         val receiverType = if (hasStaticAnnotation) {
-            kspRequireNotNull(targetClassDeclaration?.asStarProjectedType()) { "5" }
+            kspRequireNotNull(targetClassType?.asStarProjectedType()) { "5" }
         } else {
             kspRequireNotNull(receiverType) { "6" }
+            kspRequire(!receiverType.isFunctionType) { "6.5" }
+            receiverType
         }
         val parameters = parameters.map { parameter ->
             kspRequire(!parameter.type.isFunctionType) { "7" }
@@ -81,21 +72,22 @@ class FrontendValidator(
                 name = kspRequireNotNull(parameter.name) { "8" },
             )
         }
+        kspRequire(returnType == null || !returnType.isFunctionType) { "8.5" }
 
         val memberKind = kspRequireNotNull(memberKinds.singleOrNull()) { "9" }
         when (memberKind) {
-            MemberKind.CONSTRUCTOR -> {
+            JavaMemberKind.CONSTRUCTOR -> {
                 kspRequire(!hasStaticAnnotation) { "13" }
                 ConstructorDescriptor(
-                    source = source,
+                    symbol = symbol,
 
-                    classDeclaration = classDeclaration,
-                    classType = kspRequireNotNull(returnType) { "13.5" },
+                    classType = classType,
+                    returnType = kspRequireNotNull(returnType) { "13.5" },
                     parameters = parameters,
                 )
             }
 
-            MemberKind.METHOD -> {
+            JavaMemberKind.METHOD -> {
                 if (hasStaticAnnotation) {
                     kspRequire(!hasReceiver) { "10" }
                 } else {
@@ -103,9 +95,9 @@ class FrontendValidator(
                     kspRequire(functionTypeReceiverName == callableReceiverName) { "11.5" }
                 }
                 MethodDescriptor(
-                    source = source,
+                    symbol = symbol,
 
-                    classDeclaration = classDeclaration,
+                    classType = classType,
                     receiverType = receiverType,
                     returnType = returnType,
                     targetName = kspRequireNotNull(callableName) { "12" },
@@ -114,7 +106,7 @@ class FrontendValidator(
                 )
             }
 
-            MemberKind.FIELD -> {
+            JavaMemberKind.FIELD -> {
                 if (hasStaticAnnotation) {
                     kspRequire(!hasReceiver) { "14" }
                 } else {
@@ -122,12 +114,13 @@ class FrontendValidator(
                     kspRequire(functionTypeReceiverName == callableReceiverName) { "15.5" }
                 }
                 FieldDescriptor(
-                    source = source,
+                    symbol = symbol,
 
-                    classDeclaration = classDeclaration,
+                    classType = classType,
                     receiverType = receiverType,
                     targetName = kspRequireNotNull(callableName) { "16" },
                     type = kspRequireNotNull(returnType) { "16.5" },
+                    isStatic = hasStaticAnnotation,
                 )
             }
         }
@@ -139,23 +132,17 @@ class FrontendValidator(
     ): Patch = with(patch) {
         if (hasOuter) {
             kspRequire(hasOuterAnnotation) { "17" }
-            kspRequire(outerClassDeclaration != null) { "18" }
+            kspRequire(outerClassType != null) { "18" }
             if (widener != null) {
                 kspRequire(outerWidener?.isNotEmpty() == true) { "19" }
             }
         }
         kspRequireNotNull(name) { "20" }
-        kspRequireNotNull(targetClassDeclaration) { "20.5" }
+        kspRequireNotNull(targetClassType) { "20.5" }
         kspRequireNotNull(side) { "21" }
-        kspRequire(classDeclaration?.run { isAbstract() && !isInner() && isClass() } == true) { "22" }
-
-        if (superClassDeclaration?.isInstance(runtimeApi[ApiPatch]) == false) {
-            if (superClassDeclaration.isError) {
-                throw InvalidStateSignal(true)
-            }
-            kspError { "23" }
-        }
-        kspRequire(superGenericClassDeclaration.isSame(targetClassDeclaration)) { "24" }
+        kspRequire(classType?.run { isAbstract() && !isInner() && isClass() } == true) { "22" }
+        kspRequire(superClassType?.isInstance(builtins[Builtin.Patch]) == true) { "23" }
+        kspRequire(superGenericClassType.isSame(targetClassType)) { "24" }
 
         val accessProperties = mutableListOf<AccessProperty>()
         val sharedProperties = mutableListOf<SharedProperty>()
@@ -167,8 +154,6 @@ class FrontendValidator(
                     kspRequire(!isExtension) { "27" }
                     kspRequireNotNull(accessName) { "28" }
                     accessProperties += AccessProperty(
-                        source = source,
-
                         name = name,
                         type = type,
                         vanillaName = accessName,
@@ -177,8 +162,6 @@ class FrontendValidator(
                     )
                 } else if (isPublic && !isAbstract && !isExtension) {
                     sharedProperties += SharedProperty(
-                        source = source,
-
                         name = name,
                         type = type,
                         isMutable = isMutable,
@@ -203,18 +186,14 @@ class FrontendValidator(
                             type = kspRequireNotNull(it.type) { "32" },
                         )
                     }
-                    if (memberKind == MemberKind.CONSTRUCTOR) {
+                    if (memberKind == JavaMemberKind.CONSTRUCTOR) {
                         accessConstructors += AccessConstructor(
-                            source = source,
-
                             name = name,
                             parameters = parameters,
                             classType = kspRequireNotNull(returnType) { "33" },
                         )
                     } else {
                         accessFunctions += AccessFunction(
-                            source = source,
-
                             name = name,
                             vanillaName = accessName,
                             isStatic = hasStaticAnnotation,
@@ -225,9 +204,9 @@ class FrontendValidator(
                 } else if (hasHookAnnotation) {
                     kspRequireNotNull(hookKind) { "34" }
                     val descriptor = descriptors
-                        .find { it.parsed.classDeclaration.isSame(hookDescriptorClassDeclaration) }
-                        ?.validated
-                    kspRequire(descriptor is MethodDescriptor) { "35" }
+                        .find { it.parsedDescriptor.classType.isSame(hookDescriptorClassType) }
+                        ?.validatedDescriptor
+                    kspRequire(descriptor is InvokableDescriptor) { "35" }
                     val parameters = parameters.map {
                         validateHookParameter(hookKind, descriptor, it, descriptors)
                     }
@@ -236,14 +215,13 @@ class FrontendValidator(
                         kspError { "35.1" }
                     }
                     val ordinals = ordinalParameters.singleOrNull()?.indices.orEmpty().ifEmpty {
-                        listOf(getAnnotationDefaultIntValue(At::ordinal))
+                        listOf(At::ordinal.defaultValue)
                     }
                     hooks += when (hookKind) {
                         LapisHookKind.Body -> {
-                            kspRequire(returnType.isSame(descriptor.kspReturnType)) { "35.2" }
-                            MethodBodyHook(
-                                source = source,
-
+                            kspRequire(descriptor is MethodDescriptor) { "35.2" }
+                            kspRequire(returnType.isSame(descriptor.returnType)) { "35.3" }
+                            BodyHook(
                                 name = name,
                                 descriptor = descriptor,
                                 returnType = returnType,
@@ -253,11 +231,9 @@ class FrontendValidator(
 
                         LapisHookKind.Call -> {
                             val target = parameters.filterIsInstance<HookTargetParameter>().singleOrNull()?.descriptor
-                            kspRequireNotNull(target) { "36" }
-                            kspRequire(returnType?.makeNotNullable().isSame(target.kspReturnType)) { "37" }
-                            InvokeMethodHook(
-                                source = source,
-
+                            kspRequire(target is MethodDescriptor) { "36" }
+                            kspRequire(returnType?.makeNotNullable().isSame(target.returnType)) { "37" }
+                            CallHook(
                                 name = name,
                                 descriptor = descriptor,
                                 returnType = returnType,
@@ -273,8 +249,7 @@ class FrontendValidator(
                             val literalType = literalParameter.type
                             kspRequire(literalType.isSame(returnType)) { "38.1" }
                             kspRequire(!literalType.isMarkedNullable) { "38.2" }
-                            val literalTypeName = literalParameter.typeName
-                            val literalTypeClass = when (literalTypeName) {
+                            val literalTypeClass = when (literalParameter.typeName) {
                                 LaLiteral::int.name -> Int::class
                                 LaLiteral::float.name -> Float::class
                                 LaLiteral::long.name -> Long::class
@@ -284,24 +259,39 @@ class FrontendValidator(
                             }
                             kspRequire(literalType.declaration.isInstance(literalTypeClass)) { "38.4" }
                             LiteralHook(
-                                source = source,
-
                                 name = name,
                                 descriptor = descriptor,
-                                literalType = literalType,
-                                literalTypeName = literalTypeName,
-                                literalValue = literalParameter.value,
+                                type = literalType,
+                                typeName = literalParameter.typeName,
+                                value = literalParameter.value,
                                 ordinals = ordinals,
                                 parameters = parameters,
                             )
                         }
 
-                        else -> TODO()
+                        LapisHookKind.FieldGet -> {
+                            val target = parameters.filterIsInstance<HookTargetParameter>().singleOrNull()?.descriptor
+                            kspRequire(target is FieldDescriptor) { "38.4" }
+                            kspRequire(returnType?.makeNotNullable().isSame(target.type)) { "38.5" }
+                            FieldGetHook(
+                                name = name,
+                                descriptor = target,
+                                type = target.type,
+                                ordinals = ordinals,
+                            )
+                        }
+
+                        LapisHookKind.Head -> TODO("The kind ${hookKind.name} is not implemented.")
+                        LapisHookKind.Return -> TODO("The kind ${hookKind.name} is not implemented.")
+                        LapisHookKind.Tail -> TODO("The kind ${hookKind.name} is not implemented.")
+                        LapisHookKind.ReturnValue -> TODO("The kind ${hookKind.name} is not implemented.")
+                        LapisHookKind.New -> TODO("The kind ${hookKind.name} is not implemented.")
+                        LapisHookKind.FieldSet -> TODO("The kind ${hookKind.name} is not implemented.")
+                        LapisHookKind.LocalGet -> TODO("The kind ${hookKind.name} is not implemented.")
+                        LapisHookKind.LocalSet -> TODO("The kind ${hookKind.name} is not implemented.")
                     }
                 } else if (isPublic && !isAbstract && !isExtension) {
                     sharedFunctions += SharedFunction(
-                        source = source,
-
                         name = name,
                         parameters = parameters.map {
                             FunctionParameter(
@@ -315,11 +305,11 @@ class FrontendValidator(
             }
         }
         return Patch(
-            source = source,
+            symbol = symbol,
 
             name = name,
-            classDeclaration = classDeclaration,
-            targetClassDeclaration = targetClassDeclaration,
+            classType = classType,
+            targetClassType = targetClassType,
             side = side,
             accessProperties = accessProperties,
             accessFunctions = accessFunctions,
@@ -332,37 +322,47 @@ class FrontendValidator(
 
     private fun validateHookParameter(
         hookKind: LapisHookKind,
-        descriptor: MethodDescriptor,
+        descriptor: InvokableDescriptor,
         parameter: ParsedPatchFunctionParameter,
         descriptors: List<DescriptorBinding>,
     ): HookParameter = with(parameter) {
         kspRequireNotNull(name) { "41.5" }
         kspRequireNotNull(type) { "42" }
         when {
-            hasContextAnnotation -> {
-                kspRequire(hookKind != LapisHookKind.Body) { "42.1" }
-                if (contextDescriptorClassDeclaration?.isInstance(runtimeApi[ApiContext]) == false) {
-                    if (contextDescriptorClassDeclaration.isError) {
-                        throw InvalidStateSignal(true)
+            hasTargetAnnotation -> {
+                kspRequire(hookKind != LapisHookKind.Literal) { "42.1" }
+                val targetDescriptor = descriptors
+                    .find { it.parsedDescriptor.classType.isSame(targetDescriptorGenericClassType) }
+                    ?.validatedDescriptor
+                when {
+                    targetDescriptorClassType?.isInstance(builtins[Builtin.Callable]) == true -> {
+                        kspRequire(targetDescriptor is InvokableDescriptor) { "42.3" }
+                        HookCallableTargetParameter(targetDescriptor)
                     }
-                    kspError { "42.2" }
+
+                    targetDescriptorClassType?.isInstance(builtins[Builtin.Getter]) == true -> {
+                        kspRequire(targetDescriptor is FieldDescriptor) { "42.4" }
+                        HookGetterTargetParameter(targetDescriptor)
+                    }
+
+                    targetDescriptorClassType?.isInstance(builtins[Builtin.Setter]) == true -> {
+                        kspRequire(targetDescriptor is FieldDescriptor) { "42.5" }
+                        HookSetterTargetParameter(targetDescriptor)
+                    }
+
+                    else -> kspError { "42.6" }
                 }
-                kspRequireNotNull(contextDescriptorGenericClassDeclaration) { "42.3" }
-                val contextDescriptor = descriptors
-                    .find { it.parsed.classDeclaration.isSame(contextDescriptorGenericClassDeclaration) }
-                    ?.validated
-                kspRequire(contextDescriptor is MethodDescriptor && contextDescriptor == descriptor) { "42.4" }
-                HookContextParameter(contextDescriptor)
             }
 
-            hasTargetAnnotation -> {
-                kspRequire(hookKind != LapisHookKind.Literal) { "43" }
-                kspRequireNotNull(targetDescriptorClassDeclaration) { "43.1" }
-                val targetDescriptor = descriptors
-                    .find { it.parsed.classDeclaration.isSame(targetDescriptorClassDeclaration) }
-                    ?.validated
-                kspRequire(targetDescriptor is MethodDescriptor) { "43.2" }
-                HookTargetParameter(targetDescriptor)
+            hasContextAnnotation -> {
+                kspRequire(hookKind != LapisHookKind.Body) { "43.1" }
+                kspRequire(contextDescriptorClassType?.isInstance(builtins[Builtin.Context]) == true) { "43.2" }
+                kspRequireNotNull(contextDescriptorGenericClassType) { "43.3" }
+                val contextDescriptor = descriptors
+                    .find { it.parsedDescriptor.classType.isSame(contextDescriptorGenericClassType) }
+                    ?.validatedDescriptor
+                kspRequire(contextDescriptor == descriptor) { "43.4" }
+                HookContextParameter(descriptor)
             }
 
             hasLiteralAnnotation -> {
@@ -395,27 +395,27 @@ class FrontendValidator(
         }
     }
 
-    private fun buildHierarchy(patchBindings: List<PatchBinding>): List<Patch> {
-        patchBindings.forEach { patchBinding ->
-            patchBindings
-                .firstOrNull { it.parsed.classDeclaration.isSame(patchBinding.parsed.outerClassDeclaration) }
-                ?.validated
+    private fun buildPatchHierarchy(bindings: List<PatchBinding>): List<Patch> {
+        bindings.forEach { binding ->
+            bindings
+                .firstOrNull { it.parsedPatch.classType.isSame(binding.parsedPatch.outerClassType) }
+                ?.validatedPatch
                 ?.innerPatches
-                ?.add(patchBinding.validated)
+                ?.add(binding.validatedPatch)
         }
-        return patchBindings
-            .filter { it.parsed.outerClassDeclaration == null }
-            .map { it.validated }
+        return bindings
+            .filter { it.parsedPatch.outerClassType == null }
+            .map { it.validatedPatch }
     }
 
-    private inline fun KspSourceHolder.kspError(crossinline message: () -> String): Nothing {
+    private inline fun KSPSource.kspError(crossinline message: () -> String): Nothing {
         val message = message()
-        logger.error(message, source)
-        throw InvalidStateSignal()
+        logger.error(message, symbol)
+        throw ValidationErrorSignal
     }
 
     @OptIn(ExperimentalContracts::class)
-    private inline fun KspSourceHolder.kspRequire(condition: Boolean, crossinline message: () -> String) {
+    private inline fun KSPSource.kspRequire(condition: Boolean, crossinline message: () -> String) {
         contract {
             returns() implies condition
         }
@@ -425,7 +425,7 @@ class FrontendValidator(
     }
 
     @OptIn(ExperimentalContracts::class)
-    private inline fun <T> KspSourceHolder.kspRequireNotNull(value: T?, crossinline message: () -> String): T {
+    private inline fun <T> KSPSource.kspRequireNotNull(value: T?, crossinline message: () -> String): T {
         contract {
             returns() implies (value != null)
         }
@@ -433,12 +433,12 @@ class FrontendValidator(
     }
 
     private class DescriptorBinding(
-        val parsed: ParsedDescriptor,
-        val validated: Descriptor,
+        val parsedDescriptor: ParsedDescriptor,
+        val validatedDescriptor: Descriptor,
     )
 
     private class PatchBinding(
-        val parsed: ParsedPatch,
-        val validated: Patch,
+        val parsedPatch: ParsedPatch,
+        val validatedPatch: Patch,
     )
 }

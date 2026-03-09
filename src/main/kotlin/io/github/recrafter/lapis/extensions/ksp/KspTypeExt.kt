@@ -1,15 +1,15 @@
 package io.github.recrafter.lapis.extensions.ksp
 
-val KspType.genericTypes: List<KspType>
+val KSPType.genericTypes: List<KSPType>
     get() = arguments.mapNotNull { it.type?.resolve() }
 
-fun KspType.getGenericTypeOrNull(): KspType? =
+fun KSPType.getGenericTypeOrNull(): KSPType? =
     genericTypes.firstOrNull()
 
-fun KspType.takeNotUnit(): KspType? =
+fun KSPType.takeNotUnit(): KSPType? =
     takeUnless { it.declaration.isInstance<Unit>() }
 
-fun KspType?.isSame(other: KspType?): Boolean {
+fun KSPType?.isSame(other: KSPType?): Boolean {
     val thisName = this?.declaration?.qualifiedName?.asString()
     val otherName = other?.declaration?.qualifiedName?.asString()
     return thisName == otherName

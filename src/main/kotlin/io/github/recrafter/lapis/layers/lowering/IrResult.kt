@@ -1,59 +1,94 @@
 package io.github.recrafter.lapis.layers.lowering
 
 import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
-import io.github.recrafter.lapis.extensions.ksp.KspSymbol
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
-import io.github.recrafter.lapis.layers.lowering.types.IrParameterizedTypeName
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
-import io.github.recrafter.lapis.layers.validator.KspSourceHolder
+import io.github.recrafter.lapis.extensions.capitalize
+import io.github.recrafter.lapis.extensions.common.defaultValue
+import io.github.recrafter.lapis.extensions.ksp.KSPFile
+import io.github.recrafter.lapis.layers.generator.withInternalPrefix
+import io.github.recrafter.lapis.layers.lowering.types.IrClassType
+import io.github.recrafter.lapis.layers.lowering.types.IrGenericType
+import io.github.recrafter.lapis.layers.lowering.types.IrType
+import org.spongepowered.asm.mixin.injection.At
 
 class IrResult(
     val descriptors: List<IrDescriptor>,
     val mixins: List<IrMixin>,
 )
 
-class IrDescriptor(
-    override val source: KspSymbol,
+open class IrParameter(val name: String, val type: IrType)
+class IrSetterParameter(type: IrType) : IrParameter("newValue", type)
 
-    val contextImpl: IrDescriptorContextImpl?,
-    val targetImpl: IrDescriptorTargetImpl,
-) : KspSourceHolder()
-
-open class IrParameter(val name: String, val type: IrTypeName)
-class IrSetterParameter(type: IrTypeName) : IrParameter("newValue", type)
-
-class IrDescriptorContextImpl(
-    val type: IrClassName,
-    val superType: IrParameterizedTypeName,
-    val parameters: List<IrParameter>,
-    val returnType: IrTypeName?,
+sealed class IrDescriptor(
+    val containingFile: KSPFile?,
+    val classType: IrClassType,
 )
 
-class IrDescriptorTargetImpl(
-    val type: IrClassName,
-    val superType: IrClassName,
-    val receiverType: IrTypeName?,
+class IrInvokableDescriptor(
+    containingFile: KSPFile?,
+    classType: IrClassType,
+    val callable: IrDescriptorCallable?,
+    val context: IrDescriptorContext?,
+) : IrDescriptor(containingFile, classType)
+
+class IrFieldDescriptor(
+    containingFile: KSPFile?,
+    classType: IrClassType,
+    val getter: IrDescriptorGetter?,
+    val setter: IrDescriptorSetter?,
+) : IrDescriptor(containingFile, classType)
+
+sealed class IrDescriptorWrapper(
+    val classType: IrClassType,
+    val superClassType: IrGenericType,
+    val receiverType: IrType?,
     val parameters: List<IrParameter>,
-    val returnType: IrTypeName?,
+    val returnType: IrType?,
 )
+
+class IrDescriptorCallable(
+    classType: IrClassType,
+    superClassType: IrGenericType,
+    receiverType: IrType?,
+    parameters: List<IrParameter>,
+    returnType: IrType?,
+) : IrDescriptorWrapper(classType, superClassType, receiverType, parameters, returnType)
+
+class IrDescriptorContext(
+    classType: IrClassType,
+    superClassType: IrGenericType,
+    parameters: List<IrParameter>,
+    returnType: IrType?,
+) : IrDescriptorWrapper(classType, superClassType, null, parameters, returnType)
+
+class IrDescriptorGetter(
+    classType: IrClassType,
+    superClassType: IrGenericType,
+    receiverType: IrType?,
+    type: IrType?,
+) : IrDescriptorWrapper(classType, superClassType, receiverType, emptyList(), type)
+
+class IrDescriptorSetter(
+    classType: IrClassType,
+    superClassType: IrGenericType,
+    receiverType: IrType?,
+    type: IrType?,
+) : IrDescriptorWrapper(classType, superClassType, receiverType, emptyList(), type)
 
 class IrMixin(
-    override val source: KspSymbol,
+    val containingFile: KSPFile?,
 
-    val type: IrClassName,
+    val classType: IrClassType,
+    val patchClassType: IrClassType,
+    val patchImplClassType: IrClassType,
+    val targetClassType: IrClassType,
+
     val side: LapisPatchSide,
-
-    val patchDeclarationType: IrClassName,
-    val patchImplType: IrClassName,
-    val targetType: IrClassName,
-
     val extension: IrExtension?,
     val accessor: IrAccessor?,
     val injections: List<IrInjection>,
 
     val innerMixins: List<IrMixin>,
-) : KspSourceHolder() {
-
+) {
     fun isNotEmpty(): Boolean =
         extension != null || injections.isNotEmpty()
 
@@ -62,142 +97,147 @@ class IrMixin(
 }
 
 class IrExtension(
-    val type: IrClassName,
+    val classType: IrClassType,
     val kinds: List<IrExtensionKind>,
 )
 
 sealed class IrExtensionKind(
     val name: String,
-    val internalName: String,
     val parameters: List<IrParameter>,
-    val returnType: IrTypeName?,
-)
+    val returnType: IrType?,
+) {
+    abstract fun getInternalName(modId: String): String
+}
 
 class IrFieldGetterExtension(
     name: String,
-    internalName: String,
-    val type: IrTypeName,
-) : IrExtensionKind(name, internalName, emptyList(), type)
+    val type: IrType,
+) : IrExtensionKind(name, emptyList(), type) {
+
+    override fun getInternalName(modId: String): String =
+        ("get" + name.capitalize()).withInternalPrefix(modId)
+}
 
 class IrFieldSetterExtension(
     name: String,
-    internalName: String,
-    val type: IrTypeName,
-) : IrExtensionKind(name, internalName, listOf(IrSetterParameter(type)), null)
+    val type: IrType,
+) : IrExtensionKind(name, listOf(IrSetterParameter(type)), null) {
+
+    override fun getInternalName(modId: String): String =
+        ("set" + name.capitalize()).withInternalPrefix(modId)
+}
 
 class IrMethodExtension(
     name: String,
-    internalName: String,
     parameters: List<IrParameter>,
-    returnType: IrTypeName?,
-) : IrExtensionKind(name, internalName, parameters, returnType)
+    returnType: IrType?,
+) : IrExtensionKind(name, parameters, returnType) {
+
+    override fun getInternalName(modId: String): String =
+        name.withInternalPrefix(modId)
+}
 
 class IrAccessor(
-    val type: IrClassName,
+    val classType: IrClassType,
     val kinds: List<IrAccessorKind>,
 )
 
 sealed class IrAccessorKind(
-    override val source: KspSymbol,
-
     val name: String,
-    val internalName: String,
     val targetName: String,
     val parameters: List<IrParameter>,
-    val returnType: IrTypeName?,
+    val returnType: IrType?,
     val isStatic: Boolean,
-) : KspSourceHolder()
+) {
+    abstract val internalName: String
+}
 
 class IrFieldGetterAccessor(
-    override val source: KspSymbol,
-
-    val type: IrTypeName,
+    val type: IrType,
     name: String,
-    internalName: String,
     targetName: String,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, targetName, emptyList(), type, isStatic)
+) : IrAccessorKind(name, targetName, emptyList(), type, isStatic) {
+    override val internalName = "get" + name.capitalize()
+}
 
 class IrFieldSetterAccessor(
-    override val source: KspSymbol,
-
-    val type: IrTypeName,
+    val type: IrType,
     name: String,
-    internalName: String,
     targetName: String,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, targetName, listOf(IrSetterParameter(type)), null, isStatic)
+) : IrAccessorKind(name, targetName, listOf(IrSetterParameter(type)), null, isStatic) {
+    override val internalName = "set" + name.capitalize()
+}
 
 open class IrMethodAccessor(
-    override val source: KspSymbol,
-
     name: String,
-    internalName: String,
     targetName: String,
     parameters: List<IrParameter>,
-    returnType: IrTypeName?,
+    returnType: IrType?,
     isStatic: Boolean,
-) : IrAccessorKind(source, name, internalName, targetName, parameters, returnType, isStatic)
+) : IrAccessorKind(name, targetName, parameters, returnType, isStatic) {
+    override val internalName: String = "invoke" + name.capitalize()
+}
 
 class IrConstructorAccessor(
-    override val source: KspSymbol,
-
     name: String,
-    internalName: String,
     parameters: List<IrParameter>,
-    val classType: IrTypeName,
-) : IrMethodAccessor(source, name, internalName, "", parameters, classType, true)
+    val classType: IrType,
+) : IrMethodAccessor(name, "", parameters, classType, true) {
+    override val internalName: String = "invoke" + name.capitalize()
+}
 
 sealed class IrInjection(
-    override val source: KspSymbol,
-
     val name: String,
-    val hookName: String,
     val method: String,
-    val returnType: IrTypeName?,
+    val returnType: IrType?,
     val parameters: List<IrInjectionParameter>,
     val hookArguments: List<IrHookArgument>,
-) : KspSourceHolder()
+    val ordinal: Int,
+) {
+    val internalName: String = buildString {
+        append(name)
+        if (ordinal != At::ordinal.defaultValue) {
+            append("_ordinal$ordinal")
+        }
+    }
+}
 
 class IrWrapMethodInjection(
-    override val source: KspSymbol,
-
     name: String,
-    hookName: String,
     method: String,
     val isStatic: Boolean,
-    returnType: IrTypeName?,
+    returnType: IrType?,
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
-) : IrInjection(source, name, hookName, method, returnType, parameters, hookArguments)
+) : IrInjection(name, method, returnType, parameters, hookArguments, At::ordinal.defaultValue)
 
 class IrWrapOperationInjection(
-    override val source: KspSymbol,
-
     name: String,
-    hookName: String,
     method: String,
-    returnType: IrTypeName?,
+    returnType: IrType?,
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
     val target: String,
     val isStatic: Boolean,
-    val ordinal: Int?,
-) : IrInjection(source, name, hookName, method, returnType, parameters, hookArguments)
+    ordinal: Int,
+) : IrInjection(name, method, returnType, parameters, hookArguments, ordinal)
 
 class IrModifyConstantValueInjection(
-    override val source: KspSymbol,
-
     name: String,
-    hookName: String,
     method: String,
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
-    val literalType: IrTypeName,
-    val literalTypeName: String,
-    val literalValue: String,
-    val ordinal: Int?,
-) : IrInjection(source, name, hookName, method, literalType, parameters, hookArguments)
+    val type: IrType,
+    val typeName: String,
+    val value: String,
+    ordinal: Int,
+) : IrInjection(name, method, type, parameters, hookArguments, ordinal)
+
+class IrFieldGetInjection(
+
+)
 
 sealed interface IrInjectionParameter {
     val priority: Int
@@ -205,34 +245,34 @@ sealed interface IrInjectionParameter {
 }
 
 class IrInjectionReceiverParameter(
-    val type: IrTypeName,
+    val type: IrType,
     override val priority: Int = 0
 ) : IrInjectionParameter
 
 class IrInjectionArgumentParameter(
     val name: String,
-    val type: IrTypeName,
+    val type: IrType,
     override val priority: Int = 1
 ) : IrInjectionParameter
 
 class IrInjectionOperationParameter(
-    val returnType: IrTypeName?,
+    val returnType: IrType?,
     override val priority: Int = 2
 ) : IrInjectionParameter
 
 class IrInjectionLiteralParameter(
-    val type: IrTypeName,
+    val type: IrType,
     override val priority: Int = 3
 ) : IrInjectionParameter
 
 class IrInjectionCallbackParameter(
-    val returnType: IrTypeName?,
+    val returnType: IrType?,
     override val priority: Int = 4
 ) : IrInjectionParameter
 
 class IrInjectionParameterParameter(
     val name: String,
-    val type: IrTypeName,
+    val type: IrType,
     val index: Int,
     override val priority: Int = 5,
     override val subPriority: Int = index
@@ -240,15 +280,20 @@ class IrInjectionParameterParameter(
 
 class IrInjectionLocalParameter(
     val name: String,
-    val type: IrTypeName,
+    val type: IrType,
     val ordinal: Int,
     override val priority: Int = 6,
     override val subPriority: Int = ordinal
 ) : IrInjectionParameter
 
 sealed interface IrHookArgument
-class IrHookContextArgument(val descriptor: IrDescriptorContextImpl) : IrHookArgument
-class IrHookTargetArgument(val descriptor: IrDescriptorTargetImpl) : IrHookArgument
+
+sealed class IrHookTargetArgument(open val descriptor: IrDescriptorWrapper) : IrHookArgument
+class IrHookCallableTargetArgument(override val descriptor: IrDescriptorCallable) : IrHookTargetArgument(descriptor)
+class IrHookGetterTargetArgument(override val descriptor: IrDescriptorGetter) : IrHookTargetArgument(descriptor)
+class IrHookSetterTargetArgument(override val descriptor: IrDescriptorSetter) : IrHookTargetArgument(descriptor)
+
+class IrHookContextArgument(val descriptor: IrDescriptorContext) : IrHookArgument
 object IrHookLiteralArgument : IrHookArgument
 class IrHookOrdinalArgument(val ordinal: Int) : IrHookArgument
 class IrHookLocalArgument(val parameterName: String) : IrHookArgument

@@ -8,75 +8,78 @@ import com.google.devtools.ksp.symbol.Modifier
 import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ksp.*
-import io.github.recrafter.lapis.extensions.psi.PsiCallableReferenceExpression
-import io.github.recrafter.lapis.extensions.psi.PsiFunctionType
-import io.github.recrafter.lapis.extensions.psi.PsiSuperTypeCallEntry
-import io.github.recrafter.lapis.extensions.psi.PsiValueArgumentList
-import io.github.recrafter.lapis.layers.MemberKind
+import io.github.recrafter.lapis.extensions.psi.PSICallableReferenceExpression
+import io.github.recrafter.lapis.extensions.psi.PSIFunctionType
+import io.github.recrafter.lapis.extensions.psi.PSISuperTypeCallEntry
+import io.github.recrafter.lapis.extensions.psi.PSIValueArgumentList
+import io.github.recrafter.lapis.layers.JavaMemberKind
 import org.jetbrains.kotlin.psi.psiUtil.getChildOfType
 
-class SymbolParser(val logger: KspLogger) {
+object SymbolParser {
 
     fun parse(resolver: Resolver): ParserResult =
         ParserResult(
-            descriptorContainers = resolver.getSymbolsAnnotatedWith<LaDescriptors>().map { symbol ->
-                val classDeclaration = symbol.castOrNull<KspClassDeclaration>()
-                val targetClassDeclaration = symbol.annotations
-                    .firstOrNull { it.isInstance<LaDescriptors>() }
-                    ?.findClassArgument(LaDescriptors::target)
-                ParsedDescriptorContainer(
-                    source = symbol,
-                    classDeclaration = classDeclaration,
-                    targetClassDeclaration = targetClassDeclaration,
-                    descriptors = symbol.castOrNull<KspClassDeclaration>()
-                        ?.declarations
-                        ?.mapNotNull { parseDescriptor(it, targetClassDeclaration) }
-                        ?.toList()
-                        .orEmpty()
-                )
-            },
-            patches = resolver.getSymbolsAnnotatedWith<LaPatch>().map { parsePatch(it) },
+            descriptorContainers = resolver
+                .getSymbolsAnnotatedWith<LaDescriptors>()
+                .map { parseDescriptorContainer(it) },
+            patches = resolver
+                .getSymbolsAnnotatedWith<LaPatch>()
+                .map { parsePatch(it) },
         )
 
-    private fun parseDescriptor(
-        declaration: KspDeclaration,
-        targetClassDeclaration: KspClassDeclaration?,
-    ): ParsedDescriptor? {
-        if (declaration is KspFunctionDeclaration && declaration.isConstructor()) {
+    private fun parseDescriptorContainer(symbol: KSPAnnotated): ParsedDescriptorContainer {
+        val targetClassType = symbol.annotations
+            .firstOrNull { it.isInstance<LaDescriptors>() }
+            ?.findClassArgument(LaDescriptors::target)
+        return ParsedDescriptorContainer(
+            symbol = symbol,
+            classType = symbol.castOrNull<KSPClass>(),
+            targetClassType = targetClassType,
+            descriptors = symbol.castOrNull<KSPClass>()
+                ?.declarations
+                ?.mapNotNull { parseDescriptor(it, targetClassType) }
+                ?.toList()
+                .orEmpty()
+        )
+    }
+
+    private fun parseDescriptor(declaration: KSPDeclaration, targetClassType: KSPClass?): ParsedDescriptor? {
+        if (declaration is KSPFunction && declaration.isConstructor()) {
             return null
         }
-        val classDeclaration = declaration.castOrNull<KspClassDeclaration>()
+        val classDeclaration = declaration.castOrNull<KSPClass>()
         val superClass = classDeclaration?.getSuperClassOrNull()
-        val superClassDeclaration = superClass?.declaration?.castOrNull<KspClassDeclaration>()
+        val superClassDeclaration = superClass?.declaration?.castOrNull<KSPClass>()
         val functionType = superClass?.genericTypes?.firstOrNull()
         val functionGenericTypes = functionType?.genericTypes
         val psiDescriptorSuperType = classDeclaration?.findPsi()
             ?.superTypeListEntries
-            ?.filterIsInstance<PsiSuperTypeCallEntry>()
+            ?.filterIsInstance<PSISuperTypeCallEntry>()
             ?.firstOrNull()
         val psiFunctionType = psiDescriptorSuperType
             ?.typeArguments
             ?.firstOrNull()
             ?.typeReference
             ?.typeElement
-            ?.castOrNull<PsiFunctionType>()
+            ?.castOrNull<PSIFunctionType>()
         val psiCallableReference = psiDescriptorSuperType
-            ?.getChildOfType<PsiValueArgumentList>()
+            ?.getChildOfType<PSIValueArgumentList>()
             ?.arguments
             ?.firstOrNull()
             ?.getArgumentExpression()
-            ?.castOrNull<PsiCallableReferenceExpression>()
+            ?.castOrNull<PSICallableReferenceExpression>()
         val functionTypeReceiverName = psiFunctionType?.getReceiverTypeReference()?.text
-        val receiverType = if (functionTypeReceiverName != null) {
-            functionGenericTypes?.firstOrNull()
-        } else null
+        val receiverType = when {
+            functionTypeReceiverName != null -> functionGenericTypes?.firstOrNull()
+            else -> null
+        }
         val hasReceiver = receiverType != null
         return ParsedDescriptor(
-            source = declaration,
+            symbol = declaration,
 
-            classDeclaration = classDeclaration,
-            targetClassDeclaration = targetClassDeclaration,
-            memberKinds = MemberKind.entries.filter {
+            classType = classDeclaration,
+            targetClassType = targetClassType,
+            memberKinds = JavaMemberKind.entries.filter {
                 classDeclaration?.hasAnnotation(it.annotationClass) == true
             },
             hasStaticAnnotation = classDeclaration?.hasAnnotation<LaStatic>() == true,
@@ -104,159 +107,176 @@ class SymbolParser(val logger: KspLogger) {
             callableReceiverName = psiCallableReference?.receiverExpression?.text,
             callableName = psiCallableReference?.callableReference?.text,
 
-            superClassDeclaration = superClassDeclaration,
+            superClassType = superClassDeclaration,
         )
     }
 
-    private fun parsePatch(symbol: KspAnnotated): ParsedPatch {
+    private fun parsePatch(symbol: KSPAnnotated): ParsedPatch {
         val patchAnnotation = symbol.getAnnotationOrNull<LaPatch>()
-        val classDeclaration = symbol.castOrNull<KspClassDeclaration>()
+        val classType = symbol.castOrNull<KSPClass>()
 
-        val outerClass = classDeclaration?.parentDeclaration?.castOrNull<KspClassDeclaration>()
-        val outerAnnotation = outerClass?.getAnnotationOrNull<LaPatch>()
+        val outerClassType = classType?.parentDeclaration?.castOrNull<KSPClass>()
+        val outerAnnotation = outerClassType?.getAnnotationOrNull<LaPatch>()
 
-        val superClass = classDeclaration?.getSuperClassOrNull()
+        val superClass = classType?.getSuperClassOrNull()
 
         return ParsedPatch(
-            source = symbol,
+            symbol = symbol,
 
-            name = classDeclaration?.name,
+            name = classType?.name,
             side = patchAnnotation?.side,
             widener = patchAnnotation?.widener?.ifEmpty { null },
-            classDeclaration = classDeclaration,
+            classType = classType,
 
-            hasOuter = classDeclaration?.hasParent() == true,
+            hasOuter = classType?.hasParent() == true,
             hasOuterAnnotation = outerAnnotation != null,
             outerWidener = outerAnnotation?.widener?.ifEmpty { null },
-            outerClassDeclaration = outerClass,
+            outerClassType = outerClassType,
 
-            superClassDeclaration = superClass?.declaration?.castOrNull<KspClassDeclaration>(),
-            superGenericClassDeclaration = superClass
+            superClassType = superClass?.declaration?.castOrNull<KSPClass>(),
+            superGenericClassType = superClass
                 ?.getGenericTypeOrNull()
                 ?.declaration
-                ?.castOrNull<KspClassDeclaration>(),
+                ?.castOrNull<KSPClass>(),
 
-            targetClassDeclaration = symbol.annotations
+            targetClassType = symbol.annotations
                 .firstOrNull { it.isInstance<LaPatch>() }
                 ?.findClassArgument(LaPatch::target),
 
-            properties = classDeclaration?.getProperties()?.map { parsePatchProperty(it) }.orEmpty(),
-            functions = classDeclaration?.getFunctions()
+            properties = classType?.getProperties()?.map { parsePatchProperty(it) }.orEmpty(),
+            functions = classType?.getFunctions()
                 ?.filter { !it.isConstructor() }
                 ?.map { parsePatchFunction(it) }
                 .orEmpty(),
         )
     }
 
-    private fun parsePatchProperty(propertyDeclaration: KspPropertyDeclaration): ParsedPatchProperty {
-        val accessAnnotation = propertyDeclaration.getAnnotationOrNull<LaAccess>()
+    private fun parsePatchProperty(property: KSPProperty): ParsedPatchProperty {
+        val accessAnnotation = property.getAnnotationOrNull<LaAccess>()
         return ParsedPatchProperty(
-            source = propertyDeclaration,
+            symbol = property,
 
-            name = propertyDeclaration.name,
-            type = propertyDeclaration.type.resolve(),
-            isPublic = propertyDeclaration.isPublic(),
-            isAbstract = propertyDeclaration.isAbstract(),
-            isExtension = propertyDeclaration.isExtension(),
+            name = property.name,
+            type = property.type.resolve(),
+            isPublic = property.isPublic(),
+            isAbstract = property.isAbstract(),
+            isExtension = property.isExtension(),
 
             hasAccessAnnotation = accessAnnotation != null,
-            accessName = accessAnnotation?.name?.ifEmpty { propertyDeclaration.name },
-            hasFieldAnnotation = propertyDeclaration.hasAnnotation<LaField>(),
+            accessName = accessAnnotation?.name?.ifEmpty { property.name },
+            hasFieldAnnotation = property.hasAnnotation<LaField>(),
 
-            hasStaticAnnotation = propertyDeclaration.hasAnnotation<LaStatic>(),
-            isMutable = propertyDeclaration.isMutable,
-            isSetterPublic = propertyDeclaration.setter?.modifiers?.contains(Modifier.PUBLIC) == true,
+            hasStaticAnnotation = property.hasAnnotation<LaStatic>(),
+            isMutable = property.isMutable,
+            isSetterPublic = property.setter?.modifiers?.contains(Modifier.PUBLIC) == true,
         )
     }
 
-    private fun parsePatchFunction(functionDeclaration: KspFunctionDeclaration): ParsedPatchFunction {
-        val accessAnnotation = functionDeclaration.getAnnotationOrNull<LaAccess>()
+    private fun parsePatchFunction(function: KSPFunction): ParsedPatchFunction {
+        val accessAnnotation = function.getAnnotationOrNull<LaAccess>()
         return ParsedPatchFunction(
-            source = functionDeclaration,
+            symbol = function,
 
-            name = functionDeclaration.name,
-            parameters = functionDeclaration.parameters.map { parsePatchFunctionParameter(functionDeclaration, it) },
-            returnType = functionDeclaration.getReturnTypeOrNull(),
-            isPublic = functionDeclaration.isPublic(),
-            isAbstract = functionDeclaration.isAbstract,
-            isExtension = functionDeclaration.isExtension(),
+            name = function.name,
+            parameters = function.parameters.map { parsePatchFunctionParameter(function, it) },
+            returnType = function.getReturnTypeOrNull(),
+            isPublic = function.isPublic(),
+            isAbstract = function.isAbstract,
+            isExtension = function.isExtension(),
 
             hasAccessAnnotation = accessAnnotation != null,
-            accessName = accessAnnotation?.name?.ifEmpty { functionDeclaration.name },
-            accessMemberKinds = MemberKind.entries.filter {
-                functionDeclaration.hasAnnotation(it.annotationClass)
+            accessName = accessAnnotation?.name?.ifEmpty { function.name },
+            accessMemberKinds = JavaMemberKind.entries.filter {
+                function.hasAnnotation(it.annotationClass)
             },
 
-            hasStaticAnnotation = functionDeclaration.hasAnnotation<LaStatic>(),
+            hasStaticAnnotation = function.hasAnnotation<LaStatic>(),
 
-            hasHookAnnotation = functionDeclaration.hasAnnotation<LaHook>(),
-            hookDescriptorClassDeclaration = functionDeclaration.annotations
+            hasHookAnnotation = function.hasAnnotation<LaHook>(),
+            hookDescriptorClassType = function.annotations
                 .firstOrNull { it.isInstance<LaHook>() }
                 ?.findClassArgument(LaHook::descriptor),
-            hookKind = functionDeclaration.getAnnotationOrNull<LaHook>()?.kind,
+            hookKind = function.getAnnotationOrNull<LaHook>()?.kind,
         )
     }
 
     private fun parsePatchFunctionParameter(
-        functionDeclaration: KspFunctionDeclaration,
-        parameter: KspValueParameter,
+        function: KSPFunction,
+        parameter: KSPValueParameter,
     ): ParsedPatchFunctionParameter {
         val name = parameter.name?.asString()
         val type = parameter.type.resolve()
 
-        val contextAnnotation = parameter.getAnnotationOrNull<LaContext>()
-        val contextDescriptorClassDeclaration = if (contextAnnotation != null) {
-            type.declaration.castOrNull<KspClassDeclaration>()
-        } else null
-        val contextDescriptorGenericClassDeclaration = if (contextAnnotation != null) {
-            type.getGenericTypeOrNull()?.declaration?.castOrNull<KspClassDeclaration>()
-        } else null
-
         val targetAnnotation = parameter.getAnnotationOrNull<LaTarget>()
-        val targetDescriptorClass = if (targetAnnotation != null) {
-            type.declaration.castOrNull<KspClassDeclaration>()
-        } else null
+        val targetDescriptorClassType = when {
+            targetAnnotation != null -> type.declaration.castOrNull<KSPClass>()
+            else -> null
+        }
+        val targetDescriptorGenericClassType = when {
+            targetAnnotation != null -> type.getGenericTypeOrNull()?.declaration?.castOrNull<KSPClass>()
+            else -> null
+        }
+
+        val contextAnnotation = parameter.getAnnotationOrNull<LaContext>()
+        val contextDescriptorClassType = when {
+            contextAnnotation != null -> type.declaration.castOrNull<KSPClass>()
+            else -> null
+        }
+        val contextDescriptorGenericClassType = when {
+            contextAnnotation != null -> type.getGenericTypeOrNull()?.declaration?.castOrNull<KSPClass>()
+            else -> null
+        }
 
         val literalAnnotation = parameter.getAnnotationOrNull<LaLiteral>()
-        val literalType = if (literalAnnotation != null) {
-            type
-        } else null
-        val literalTypeName = if (literalAnnotation != null) {
-            functionDeclaration.findPsi()
-                ?.valueParameters
-                ?.firstOrNull { it.name == name }
-                ?.annotationEntries
-                ?.firstOrNull()
-                ?.valueArguments
-                ?.singleOrNull()
-                ?.getArgumentName()
-                ?.asName
-                ?.asString()
-        } else null
-        val literalValue = if (literalAnnotation != null) {
-            parameter.annotations
-                .firstOrNull { it.isInstance<LaLiteral>() }
-                ?.arguments
-                ?.find { it.name?.asString() == literalTypeName }
-                ?.value
-                ?.toString()
-        } else null
+        val literalType = when {
+            literalAnnotation != null -> type
+            else -> null
+        }
+        val literalTypeName = when {
+            literalAnnotation != null -> {
+                function.findPsi()
+                    .valueParameters
+                    .firstOrNull { it.name == name }
+                    ?.annotationEntries
+                    ?.firstOrNull()
+                    ?.valueArguments
+                    ?.singleOrNull()
+                    ?.getArgumentName()
+                    ?.asName
+                    ?.asString()
+            }
+
+            else -> null
+        }
+        val literalValue = when {
+            literalAnnotation != null -> {
+                parameter.annotations
+                    .firstOrNull { it.isInstance<LaLiteral>() }
+                    ?.arguments
+                    ?.find { it.name?.asString() == literalTypeName }
+                    ?.value
+                    ?.toString()
+            }
+
+            else -> null
+        }
 
         val ordinalAnnotation = parameter.getAnnotationOrNull<LaOrdinal>()
         val localAnnotation = parameter.getAnnotationOrNull<LaLocal>()
 
         return ParsedPatchFunctionParameter(
-            source = parameter,
+            symbol = parameter,
 
             name = name,
             type = type,
 
-            hasContextAnnotation = contextAnnotation != null,
-            contextDescriptorClassDeclaration = contextDescriptorClassDeclaration,
-            contextDescriptorGenericClassDeclaration = contextDescriptorGenericClassDeclaration,
-
             hasTargetAnnotation = targetAnnotation != null,
-            targetDescriptorClassDeclaration = targetDescriptorClass,
+            targetDescriptorClassType = targetDescriptorClassType,
+            targetDescriptorGenericClassType = targetDescriptorGenericClassType,
+
+            hasContextAnnotation = contextAnnotation != null,
+            contextDescriptorClassType = contextDescriptorClassType,
+            contextDescriptorGenericClassType = contextDescriptorGenericClassType,
 
             hasLiteralAnnotation = literalAnnotation != null,
             literalType = literalType,

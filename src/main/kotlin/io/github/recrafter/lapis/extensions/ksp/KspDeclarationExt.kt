@@ -1,19 +1,19 @@
 package io.github.recrafter.lapis.extensions.ksp
 
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrClassType
 import kotlin.reflect.KClass
 
-val KspDeclaration.name: String
+val KSPDeclaration.name: String
     get() = simpleName.asString()
 
-fun KspDeclaration.hasParent(): Boolean =
+fun KSPDeclaration.hasParent(): Boolean =
     parentDeclaration != null
 
-fun KspDeclaration.isInstance(typeClass: KClass<*>): Boolean =
+fun KSPDeclaration.isInstance(typeClass: KClass<*>): Boolean =
     qualifiedName?.asString() == typeClass.qualifiedName
 
-inline fun <reified T> KspDeclaration.isInstance(): Boolean =
+inline fun <reified T> KSPDeclaration.isInstance(): Boolean =
     isInstance(T::class)
 
-fun KspDeclaration.isInstance(type: IrClassName): Boolean =
+fun KSPDeclaration.isInstance(type: IrClassType): Boolean =
     qualifiedName?.asString() == type.qualifiedName

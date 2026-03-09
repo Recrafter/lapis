@@ -1,19 +1,19 @@
 package io.github.recrafter.lapis.extensions.ksp
 
-typealias KspSymbol = com.google.devtools.ksp.symbol.KSNode
-typealias KspType = com.google.devtools.ksp.symbol.KSType
-typealias KspModifier = com.google.devtools.ksp.symbol.Modifier
-typealias KspAnnotation = com.google.devtools.ksp.symbol.KSAnnotation
-typealias KspAnnotated = com.google.devtools.ksp.symbol.KSAnnotated
-typealias KspDeclaration = com.google.devtools.ksp.symbol.KSDeclaration
-typealias KspClassDeclaration = com.google.devtools.ksp.symbol.KSClassDeclaration
-typealias KspPropertyDeclaration = com.google.devtools.ksp.symbol.KSPropertyDeclaration
-typealias KspFunctionDeclaration = com.google.devtools.ksp.symbol.KSFunctionDeclaration
-typealias KspValueParameter = com.google.devtools.ksp.symbol.KSValueParameter
+typealias KSPSymbol = com.google.devtools.ksp.symbol.KSNode
+typealias KSPType = com.google.devtools.ksp.symbol.KSType
+typealias KSPModifier = com.google.devtools.ksp.symbol.Modifier
+typealias KSPAnnotation = com.google.devtools.ksp.symbol.KSAnnotation
+typealias KSPAnnotated = com.google.devtools.ksp.symbol.KSAnnotated
+typealias KSPDeclaration = com.google.devtools.ksp.symbol.KSDeclaration
+typealias KSPClass = com.google.devtools.ksp.symbol.KSClassDeclaration
+typealias KSPProperty = com.google.devtools.ksp.symbol.KSPropertyDeclaration
+typealias KSPFunction = com.google.devtools.ksp.symbol.KSFunctionDeclaration
+typealias KSPValueParameter = com.google.devtools.ksp.symbol.KSValueParameter
 
-typealias KspFile = com.google.devtools.ksp.symbol.KSFile
-typealias KspFileLocation = com.google.devtools.ksp.symbol.FileLocation
-typealias KspLogger = com.google.devtools.ksp.processing.KSPLogger
-typealias KspResolver = com.google.devtools.ksp.processing.Resolver
-typealias KspCodeGenerator = com.google.devtools.ksp.processing.CodeGenerator
-typealias KspDependencies = com.google.devtools.ksp.processing.Dependencies
+typealias KSPFile = com.google.devtools.ksp.symbol.KSFile
+typealias KSPFileLocation = com.google.devtools.ksp.symbol.FileLocation
+typealias KSPLogger = com.google.devtools.ksp.processing.KSPLogger
+typealias KSPResolver = com.google.devtools.ksp.processing.Resolver
+typealias KSPCodeGenerator = com.google.devtools.ksp.processing.CodeGenerator
+typealias KSPDependencies = com.google.devtools.ksp.processing.Dependencies

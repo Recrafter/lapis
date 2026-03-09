@@ -6,18 +6,25 @@ import io.github.recrafter.lapis.extensions.jp.buildJavaCodeBlock
 @JvmInline
 value class IrJavaMethodBodyBuilder(private val methodBuilder: JPMethodBuilder) {
 
-    fun IrJavaMethodBodyBuilder.line(
+    fun IrJavaMethodBodyBuilder.code(
         format: String,
         arguments: IrJavaCodeBlockBuilder.Arguments.() -> Unit = {}
     ) {
         methodBuilder.addStatement(buildJavaCodeBlock(format, arguments))
     }
 
+    fun IrJavaMethodBodyBuilder.throw_(
+        format: String,
+        arguments: IrJavaCodeBlockBuilder.Arguments.() -> Unit = {}
+    ) {
+        methodBuilder.addStatement(buildJavaCodeBlock("throw $format", arguments))
+    }
+
     fun IrJavaMethodBodyBuilder.return_(
         format: String? = null,
         arguments: IrJavaCodeBlockBuilder.Arguments.() -> Unit = {}
     ) {
-        line(
+        code(
             buildString {
                 append("return")
                 format?.let { append(" $it") }

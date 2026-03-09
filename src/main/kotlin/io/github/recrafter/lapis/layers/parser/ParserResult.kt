@@ -2,80 +2,83 @@ package io.github.recrafter.lapis.layers.parser
 
 import io.github.recrafter.lapis.annotations.enums.LapisHookKind
 import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
-import io.github.recrafter.lapis.extensions.ksp.KspAnnotated
-import io.github.recrafter.lapis.extensions.ksp.KspClassDeclaration
-import io.github.recrafter.lapis.extensions.ksp.KspSymbol
-import io.github.recrafter.lapis.extensions.ksp.KspType
-import io.github.recrafter.lapis.layers.MemberKind
-import io.github.recrafter.lapis.layers.validator.KspSourceHolder
+import io.github.recrafter.lapis.extensions.ksp.KSPAnnotated
+import io.github.recrafter.lapis.extensions.ksp.KSPClass
+import io.github.recrafter.lapis.extensions.ksp.KSPSymbol
+import io.github.recrafter.lapis.extensions.ksp.KSPType
+import io.github.recrafter.lapis.layers.JavaMemberKind
+import io.github.recrafter.lapis.layers.validator.KSPSource
 
 class ParserResult(
     val descriptorContainers: List<ParsedDescriptorContainer>,
     val patches: List<ParsedPatch>,
-)
+) {
+    val resolvedSymbols: List<KSPAnnotated>
+        get() = descriptorContainers.map { it.symbol } + patches.map { it.symbol }
+}
 
 class ParsedDescriptorContainer(
-    override val source: KspAnnotated,
+    override val symbol: KSPAnnotated,
 
-    val classDeclaration: KspClassDeclaration?,
-    val targetClassDeclaration: KspClassDeclaration?,
+    val classType: KSPClass?,
+    val targetClassType: KSPClass?,
     val descriptors: List<ParsedDescriptor>,
-) : KspSourceHolder()
+) : KSPSource(symbol)
 
 class ParsedFunctionTypeParameter(
-    val type: KspType,
+    val type: KSPType,
     val name: String?,
 )
 
 class ParsedDescriptor(
-    override val source: KspSymbol,
+    symbol: KSPSymbol,
 
-    val classDeclaration: KspClassDeclaration?,
-    val targetClassDeclaration: KspClassDeclaration?,
-    val memberKinds: List<MemberKind>,
+    val classType: KSPClass?,
+    val targetClassType: KSPClass?,
+    val memberKinds: List<JavaMemberKind>,
     val hasStaticAnnotation: Boolean,
 
     val isFunctionType: Boolean,
     val hasReceiver: Boolean,
     val functionTypeReceiverName: String?,
-    val receiverType: KspType?,
+    val receiverType: KSPType?,
     val parameters: List<ParsedFunctionTypeParameter>,
-    val returnType: KspType?,
+    val returnType: KSPType?,
 
     val isCallable: Boolean,
     val callableReceiverName: String?,
     val callableName: String?,
 
-    val superClassDeclaration: KspClassDeclaration?,
-) : KspSourceHolder()
+    val superClassType: KSPClass?,
+) : KSPSource(symbol)
 
 class ParsedPatch(
-    override val source: KspAnnotated,
+    override val symbol: KSPAnnotated,
 
     val name: String?,
     val side: LapisPatchSide?,
     val widener: String?,
-    val classDeclaration: KspClassDeclaration?,
+    val classType: KSPClass?,
 
     val hasOuter: Boolean,
     val hasOuterAnnotation: Boolean,
     val outerWidener: String?,
-    val outerClassDeclaration: KspClassDeclaration?,
+    val outerClassType: KSPClass?,
 
-    val superClassDeclaration: KspClassDeclaration?,
-    val superGenericClassDeclaration: KspClassDeclaration?,
+    val superClassType: KSPClass?,
+    val superGenericClassType: KSPClass?,
 
-    val targetClassDeclaration: KspClassDeclaration?,
+    val targetClassType: KSPClass?,
 
     val properties: List<ParsedPatchProperty>,
     val functions: List<ParsedPatchFunction>,
-) : KspSourceHolder()
+) : KSPSource(symbol)
 
 class ParsedPatchProperty(
-    override val source: KspSymbol,
+    symbol: KSPSymbol,
 
     val name: String,
-    val type: KspType,
+    val type: KSPType,
     val isPublic: Boolean,
     val isAbstract: Boolean,
     val isExtension: Boolean,
@@ -87,14 +90,14 @@ class ParsedPatchProperty(
     val hasStaticAnnotation: Boolean,
     val isMutable: Boolean,
     val isSetterPublic: Boolean,
-) : KspSourceHolder()
+) : KSPSource(symbol)
 
 class ParsedPatchFunction(
-    override val source: KspSymbol,
+    symbol: KSPSymbol,
 
     val name: String,
     val parameters: List<ParsedPatchFunctionParameter>,
-    val returnType: KspType?,
+    val returnType: KSPType?,
 
     val isPublic: Boolean,
     val isAbstract: Boolean,
@@ -102,30 +105,31 @@ class ParsedPatchFunction(
 
     val hasAccessAnnotation: Boolean,
     val accessName: String?,
-    val accessMemberKinds: List<MemberKind>,
+    val accessMemberKinds: List<JavaMemberKind>,
 
     val hasStaticAnnotation: Boolean,
 
     val hasHookAnnotation: Boolean,
-    val hookDescriptorClassDeclaration: KspClassDeclaration?,
+    val hookDescriptorClassType: KSPClass?,
     val hookKind: LapisHookKind?,
-) : KspSourceHolder()
+) : KSPSource(symbol)
 
 class ParsedPatchFunctionParameter(
-    override val source: KspSymbol,
+    symbol: KSPSymbol,
 
     val name: String?,
-    val type: KspType?,
-
-    val hasContextAnnotation: Boolean,
-    val contextDescriptorClassDeclaration: KspClassDeclaration?,
-    val contextDescriptorGenericClassDeclaration: KspClassDeclaration?,
+    val type: KSPType?,
 
     val hasTargetAnnotation: Boolean,
-    val targetDescriptorClassDeclaration: KspClassDeclaration?,
+    val targetDescriptorClassType: KSPClass?,
+    val targetDescriptorGenericClassType: KSPClass?,
+
+    val hasContextAnnotation: Boolean,
+    val contextDescriptorClassType: KSPClass?,
+    val contextDescriptorGenericClassType: KSPClass?,
 
     val hasLiteralAnnotation: Boolean,
-    val literalType: KspType?,
+    val literalType: KSPType?,
     val literalTypeName: String?,
     val literalValue: String?,
 
@@ -134,4 +138,4 @@ class ParsedPatchFunctionParameter(
 
     val hasLocalAnnotation: Boolean,
     val localOrdinal: Int?,
-) : KspSourceHolder()
+) : KSPSource(symbol)

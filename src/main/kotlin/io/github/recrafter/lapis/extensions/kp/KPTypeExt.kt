@@ -1,12 +1,13 @@
 package io.github.recrafter.lapis.extensions.kp
 
-import io.github.recrafter.lapis.extensions.singleQuoted
+import io.github.recrafter.lapis.extensions.common.lapisError
+import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeVariable
+import io.github.recrafter.lapis.layers.lowering.types.IrType
+import io.github.recrafter.lapis.layers.lowering.types.IrVariableType
 
-fun KPTypeBuilder.setConstructor(parameters: List<IrParameter>, vararg modifiers: IrModifier): List<KPProperty> {
+fun KPClassBuilder.setConstructor(parameters: List<IrParameter>, vararg modifiers: IrModifier): List<KPProperty> {
     primaryConstructor(buildKotlinConstructor {
         setParameters(parameters)
     })
@@ -18,29 +19,29 @@ fun KPTypeBuilder.setConstructor(parameters: List<IrParameter>, vararg modifiers
     }
 }
 
-fun KPTypeBuilder.setSuperClass(type: IrTypeName, vararg constructorParameters: KPCodeBlock) {
+fun KPClassBuilder.setSuperClass(type: IrType, vararg constructorParameters: KPCodeBlock) {
     superclass(type.kotlin)
     constructorParameters.forEach {
         addSuperclassConstructorParameter(it)
     }
 }
 
-fun KPTypeBuilder.addSuperInterface(type: IrTypeName) {
+fun KPClassBuilder.addSuperInterface(type: IrType) {
     addSuperinterface(type.kotlin)
 }
 
-fun KPTypeBuilder.setTypeVariables(vararg typeVariables: IrTypeVariable) {
-    addTypeVariables(typeVariables.map { it.kotlin })
+fun KPClassBuilder.setVariableTypes(vararg types: IrVariableType) {
+    addTypeVariables(types.map { it.kotlin })
 }
 
-fun KPTypeBuilder.setModifiers(vararg modifiers: IrModifier) {
+fun KPClassBuilder.setModifiers(vararg modifiers: IrModifier) {
     modifiers.forEach {
         when (it) {
             IrModifier.PUBLIC -> addModifiers(KPModifier.PUBLIC)
             IrModifier.PRIVATE -> addModifiers(KPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
-            IrModifier.STATIC -> error("Modifier ${it.name.singleQuoted()} is not applicable to Kotlin types")
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
+            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin classes")
         }
     }
 }

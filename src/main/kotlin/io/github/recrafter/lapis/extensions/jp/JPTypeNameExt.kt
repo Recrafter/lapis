@@ -1,17 +1,15 @@
 package io.github.recrafter.lapis.extensions.jp
 
-import io.github.recrafter.lapis.extensions.singleQuoted
-
-val JPTypeName.defaultValue: String
+val JPType.defaultValue: String
     get() = when (this) {
-        JPBoolean -> false.toString()
-        JPByte, JPShort, JPInt -> 0.toString()
+        JPBoolean -> "false"
+        JPByte, JPShort, JPInt -> "0"
         JPLong -> "0L"
-        JPChar -> """\0""".singleQuoted()
+        JPChar -> "'\\0'"
         JPFloat -> "0f"
         JPDouble -> "0d"
-        else -> null.toString()
+        else -> "null"
     }
 
-fun JPTypeName?.orVoid(): JPTypeName =
+fun JPType?.orVoid(): JPType =
     this ?: JPVoid

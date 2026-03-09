@@ -1,7 +1,9 @@
 package io.github.recrafter.lapis.extensions.kp
 
+import io.github.recrafter.lapis.extensions.common.lapisError
+import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.IrModifier
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrType
 
 inline fun <reified A : Annotation> KPPropertyBuilder.addAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildKotlinAnnotation<A>(builder))
@@ -16,7 +18,7 @@ fun KPPropertyBuilder.setSetter(builder: KPFunctionBuilder.() -> Unit = {}) {
     setter(buildKotlinSetter(builder))
 }
 
-fun KPPropertyBuilder.setReceiverType(type: IrTypeName) {
+fun KPPropertyBuilder.setReceiverType(type: IrType) {
     receiver(type.kotlin)
 }
 
@@ -28,6 +30,7 @@ fun KPPropertyBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
             IrModifier.STATIC -> addAnnotation<JvmStatic>()
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
+            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin properties")
         }
     }
 }

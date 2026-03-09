@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.extensions.jp
 
-import io.github.recrafter.lapis.extensions.singleQuoted
+import io.github.recrafter.lapis.extensions.common.lapisError
+import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 
 inline fun <reified A : Annotation> JPFieldBuilder.addAnnotation(builder: JPAnnotationBuilder.() -> Unit = {}) {
@@ -14,7 +15,7 @@ fun JPFieldBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.PRIVATE -> addModifiers(JPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
             IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
-            IrModifier.OVERRIDE -> error("Modifier ${it.name.singleQuoted()} is not applicable to Java fields")
+            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Java fields")
         }
     }
 }

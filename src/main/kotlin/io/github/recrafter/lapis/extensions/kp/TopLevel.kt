@@ -1,8 +1,9 @@
 package io.github.recrafter.lapis.extensions.kp
 
+import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrClassType
+import io.github.recrafter.lapis.layers.lowering.types.IrType
 
 typealias KPAnnotationBuilder = com.squareup.kotlinpoet.AnnotationSpec.Builder
 typealias KPAnnotation = com.squareup.kotlinpoet.AnnotationSpec
@@ -19,49 +20,51 @@ typealias KPFunction = com.squareup.kotlinpoet.FunSpec
 typealias KPParameterBuilder = com.squareup.kotlinpoet.ParameterSpec.Builder
 typealias KPParameter = com.squareup.kotlinpoet.ParameterSpec
 
-typealias KPTypeBuilder = com.squareup.kotlinpoet.TypeSpec.Builder
-typealias KPType = com.squareup.kotlinpoet.TypeSpec
+typealias KPClassBuilder = com.squareup.kotlinpoet.TypeSpec.Builder
+typealias KPClass = com.squareup.kotlinpoet.TypeSpec
 
 typealias KPFileBuilder = com.squareup.kotlinpoet.FileSpec.Builder
 typealias KPFile = com.squareup.kotlinpoet.FileSpec
 
-typealias KPTypeName = com.squareup.kotlinpoet.TypeName
-typealias KPClassName = com.squareup.kotlinpoet.ClassName
-typealias KPParameterizedTypeName = com.squareup.kotlinpoet.ParameterizedTypeName
-typealias KPWildcardTypeName = com.squareup.kotlinpoet.WildcardTypeName
-typealias KPTypeVariableName = com.squareup.kotlinpoet.TypeVariableName
+typealias KPType = com.squareup.kotlinpoet.TypeName
+typealias KPClassType = com.squareup.kotlinpoet.ClassName
+typealias KPGenericType = com.squareup.kotlinpoet.ParameterizedTypeName
+typealias KPWildcardType = com.squareup.kotlinpoet.WildcardTypeName
+typealias KPVariableType = com.squareup.kotlinpoet.TypeVariableName
+typealias KPFunctionType = com.squareup.kotlinpoet.LambdaTypeName
+typealias KPDynamicType = com.squareup.kotlinpoet.Dynamic
 
 typealias KPModifier = com.squareup.kotlinpoet.KModifier
 
-val KPNothing: KPClassName = KPClassName("kotlin", "Nothing")
+val KPNothing: KPClassType = KPClassType("kotlin", "Nothing")
 
-val KPUnit: KPClassName = com.squareup.kotlinpoet.UNIT
-val KPBoolean: KPClassName = com.squareup.kotlinpoet.BOOLEAN
-val KPByte: KPClassName = com.squareup.kotlinpoet.BYTE
-val KPShort: KPClassName = com.squareup.kotlinpoet.SHORT
-val KPInt: KPClassName = com.squareup.kotlinpoet.INT
-val KPLong: KPClassName = com.squareup.kotlinpoet.LONG
-val KPChar: KPClassName = com.squareup.kotlinpoet.CHAR
-val KPFloat: KPClassName = com.squareup.kotlinpoet.FLOAT
-val KPDouble: KPClassName = com.squareup.kotlinpoet.DOUBLE
+val KPUnit: KPClassType = com.squareup.kotlinpoet.UNIT
+val KPBoolean: KPClassType = com.squareup.kotlinpoet.BOOLEAN
+val KPByte: KPClassType = com.squareup.kotlinpoet.BYTE
+val KPShort: KPClassType = com.squareup.kotlinpoet.SHORT
+val KPInt: KPClassType = com.squareup.kotlinpoet.INT
+val KPLong: KPClassType = com.squareup.kotlinpoet.LONG
+val KPChar: KPClassType = com.squareup.kotlinpoet.CHAR
+val KPFloat: KPClassType = com.squareup.kotlinpoet.FLOAT
+val KPDouble: KPClassType = com.squareup.kotlinpoet.DOUBLE
 
-val KPAny: KPClassName = com.squareup.kotlinpoet.ANY
-val KPString: KPClassName = com.squareup.kotlinpoet.STRING
-val KPList: KPClassName = com.squareup.kotlinpoet.LIST
-val KPSet: KPClassName = com.squareup.kotlinpoet.SET
-val KPMap: KPClassName = com.squareup.kotlinpoet.MAP
+val KPAny: KPClassType = com.squareup.kotlinpoet.ANY
+val KPString: KPClassType = com.squareup.kotlinpoet.STRING
+val KPList: KPClassType = com.squareup.kotlinpoet.LIST
+val KPSet: KPClassType = com.squareup.kotlinpoet.SET
+val KPMap: KPClassType = com.squareup.kotlinpoet.MAP
 
-val KPArray: KPClassName = com.squareup.kotlinpoet.ARRAY
-val KPBooleanArray: KPClassName = com.squareup.kotlinpoet.BOOLEAN_ARRAY
-val KPByteArray: KPClassName = com.squareup.kotlinpoet.BYTE_ARRAY
-val KPShortArray: KPClassName = com.squareup.kotlinpoet.SHORT_ARRAY
-val KPIntArray: KPClassName = com.squareup.kotlinpoet.INT_ARRAY
-val KPLongArray: KPClassName = com.squareup.kotlinpoet.LONG_ARRAY
-val KPCharArray: KPClassName = com.squareup.kotlinpoet.CHAR_ARRAY
-val KPFloatArray: KPClassName = com.squareup.kotlinpoet.FLOAT_ARRAY
-val KPDoubleArray: KPClassName = com.squareup.kotlinpoet.DOUBLE_ARRAY
+val KPArray: KPClassType = com.squareup.kotlinpoet.ARRAY
+val KPBooleanArray: KPClassType = com.squareup.kotlinpoet.BOOLEAN_ARRAY
+val KPByteArray: KPClassType = com.squareup.kotlinpoet.BYTE_ARRAY
+val KPShortArray: KPClassType = com.squareup.kotlinpoet.SHORT_ARRAY
+val KPIntArray: KPClassType = com.squareup.kotlinpoet.INT_ARRAY
+val KPLongArray: KPClassType = com.squareup.kotlinpoet.LONG_ARRAY
+val KPCharArray: KPClassType = com.squareup.kotlinpoet.CHAR_ARRAY
+val KPFloatArray: KPClassType = com.squareup.kotlinpoet.FLOAT_ARRAY
+val KPDoubleArray: KPClassType = com.squareup.kotlinpoet.DOUBLE_ARRAY
 
-val KPStar: KPWildcardTypeName = com.squareup.kotlinpoet.STAR
+val KPStar: KPWildcardType = com.squareup.kotlinpoet.STAR
 
 inline fun <reified A : Annotation> buildKotlinAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}): KPAnnotation =
     KPAnnotation.builder(A::class).apply(builder).build()
@@ -77,7 +80,7 @@ fun buildKotlinCodeBlock(
         add(format, arguments)
     }
 
-fun buildKotlinProperty(name: String, type: IrTypeName, builder: KPPropertyBuilder.() -> Unit = {}): KPProperty =
+fun buildKotlinProperty(name: String, type: IrType, builder: KPPropertyBuilder.() -> Unit = {}): KPProperty =
     KPProperty.builder(name, type.kotlin).apply(builder).build()
 
 fun buildKotlinGetter(builder: KPFunctionBuilder.() -> Unit = {}): KPFunction =
@@ -91,25 +94,29 @@ fun buildKotlinFunction(name: String, builder: KPFunctionBuilder.() -> Unit = {}
 
 fun buildKotlinParameter(
     name: String,
-    type: IrTypeName,
+    type: IrType,
     builder: KPParameterBuilder.() -> Unit = {}
 ): KPParameter =
     KPParameter.builder(name, type.kotlin).apply(builder).build()
 
-fun buildKotlinInterface(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPType =
-    KPType.interfaceBuilder(name).apply(builder).build()
+fun buildKotlinInterface(name: String, builder: KPClassBuilder.() -> Unit = {}): KPClass =
+    KPClass.interfaceBuilder(name).apply(builder).build()
 
 fun buildKotlinConstructor(builder: KPFunctionBuilder.() -> Unit = {}): KPFunction =
     KPFunction.constructorBuilder().apply(builder).build()
 
-fun buildKotlinClass(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPType =
-    KPType.classBuilder(name).apply(builder).build()
+fun buildKotlinClass(name: String, builder: KPClassBuilder.() -> Unit = {}): KPClass =
+    KPClass.classBuilder(name).apply(builder).build()
 
-fun buildKotlinObject(name: String, builder: KPTypeBuilder.() -> Unit = {}): KPType =
-    KPType.objectBuilder(name).apply(builder).build()
+fun buildKotlinObject(name: String, builder: KPClassBuilder.() -> Unit = {}): KPClass =
+    KPClass.objectBuilder(name).apply(builder).build()
 
 fun buildKotlinFile(packageName: String, name: String, builder: KPFileBuilder.() -> Unit = {}): KPFile =
-    KPFile.builder(packageName, name).apply(builder).indent("    ").build()
+    KPFile.builder(packageName, name)
+        .addFileComment("Generated by ${LapisMeta.NAME}. Do not edit!")
+        .apply(builder)
+        .indent(" ".repeat(4))
+        .build()
 
-fun buildKotlinFile(className: IrClassName, builder: KPFileBuilder.() -> Unit = {}): KPFile =
+fun buildKotlinFile(className: IrClassType, builder: KPFileBuilder.() -> Unit = {}): KPFile =
     buildKotlinFile(className.packageName, className.name, builder)

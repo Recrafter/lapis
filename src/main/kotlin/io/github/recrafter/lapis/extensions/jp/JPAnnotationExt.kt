@@ -1,11 +1,15 @@
 package io.github.recrafter.lapis.extensions.jp
 
+import io.github.recrafter.lapis.extensions.common.defaultValue
 import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrClassType
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 
-fun <A : Annotation> JPAnnotationBuilder.setIntMember(property: KProperty1<A, Int>, int: Int) {
+inline fun <reified A : Annotation> JPAnnotationBuilder.setIntMember(property: KProperty1<A, Int>, int: Int) {
+    if (int == property.defaultValue) {
+        return
+    }
     addMember(property.name, buildJavaCodeBlock("%L") { arg(int) })
 }
 
@@ -21,25 +25,25 @@ inline fun <reified A : Annotation> JPAnnotationBuilder.setStringArrayMember(
     property: KProperty1<A, Array<String>>,
     vararg strings: String
 ) {
-    addArrayMember(property, strings, "%S") {
+    setArrayMember(property, strings, "%S") {
         strings.forEach { arg(it) }
     }
 }
 
 inline fun <reified A : Annotation> JPAnnotationBuilder.setClassArrayMember(
     property: KProperty1<A, Array<KClass<*>>>,
-    vararg types: IrClassName
+    vararg types: IrClassType
 ) {
-    addArrayMember(property, types, "%T.class") {
+    setArrayMember(property, types, "%T.class") {
         types.forEach { arg(it) }
     }
 }
 
-inline fun <reified R : Annotation, reified A : Annotation> JPAnnotationBuilder.setAnnotationArrayMember(
-    property: KProperty1<R, Array<A>>,
+inline fun <reified O : Annotation, reified I : Annotation> JPAnnotationBuilder.setAnnotationArrayMember(
+    property: KProperty1<O, Array<I>>,
     vararg annotations: JPAnnotation,
 ) {
-    addArrayMember(property, annotations, "%L") {
+    setArrayMember(property, annotations, "%L") {
         annotations.forEach { arg(it) }
     }
 }
@@ -51,7 +55,7 @@ inline fun <reified O : Annotation, reified I : Annotation> JPAnnotationBuilder.
     setAnnotationArrayMember(property, buildJavaAnnotation<I>(builder))
 }
 
-inline fun <reified A : Annotation> JPAnnotationBuilder.addArrayMember(
+inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayMember(
     property: KProperty1<A, Array<*>>,
     array: Array<*>,
     placeholder: String,

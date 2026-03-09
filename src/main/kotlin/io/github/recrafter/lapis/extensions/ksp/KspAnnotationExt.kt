@@ -4,13 +4,13 @@ import io.github.recrafter.lapis.extensions.common.castOrNull
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 
-fun <A : Annotation> KspAnnotation.findClassArgument(property: KProperty1<A, KClass<*>>): KspClassDeclaration? =
+fun <A : Annotation> KSPAnnotation.findClassArgument(property: KProperty1<A, KClass<*>>): KSPClass? =
     arguments
         .find { it.name?.asString() == property.name }
         ?.value
-        ?.castOrNull<KspType>()
+        ?.castOrNull<KSPType>()
         ?.declaration
-        ?.castOrNull<KspClassDeclaration>()
+        ?.castOrNull<KSPClass>()
 
-inline fun <reified A : Annotation> KspAnnotation.isInstance(): Boolean =
+inline fun <reified A : Annotation> KSPAnnotation.isInstance(): Boolean =
     shortName.getShortName() == A::class.simpleName && annotationType.resolve().declaration.isInstance<A>()

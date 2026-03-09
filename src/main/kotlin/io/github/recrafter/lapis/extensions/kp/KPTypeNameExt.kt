@@ -1,4 +1,4 @@
 package io.github.recrafter.lapis.extensions.kp
 
-fun KPTypeName?.orUnit(): KPTypeName =
+fun KPType?.orUnit(): KPType =
     this ?: KPUnit

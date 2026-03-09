@@ -8,11 +8,18 @@ import io.github.recrafter.lapis.extensions.kp.buildKotlinCodeBlock
 @JvmInline
 value class IrKotlinFunctionBodyBuilder(private val functionBuilder: KPFunctionBuilder) {
 
-    fun IrKotlinFunctionBodyBuilder.line(
+    fun IrKotlinFunctionBodyBuilder.code(
         format: String,
         arguments: IrKotlinCodeBlockBuilder.Arguments.() -> Unit = {}
     ) {
         functionBuilder.addStatement(buildKotlinCodeBlock(format, arguments))
+    }
+
+    fun IrKotlinFunctionBodyBuilder.throw_(
+        format: String,
+        arguments: IrKotlinCodeBlockBuilder.Arguments.() -> Unit = {}
+    ) {
+        functionBuilder.addStatement(buildKotlinCodeBlock("throw $format", arguments))
     }
 
     fun IrKotlinFunctionBodyBuilder.return_(

@@ -5,8 +5,7 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import io.github.recrafter.lapis.extensions.elements
-import io.github.recrafter.lapis.extensions.singleQuoted
-import io.github.recrafter.lapis.options.Options
+import io.github.recrafter.lapis.extensions.quoted
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.serialDescriptor
 import kotlinx.serialization.json.Json
@@ -35,15 +34,15 @@ class LapisProcessorProvider : SymbolProcessorProvider {
 
         val unknownOptions = processorOptions.keys - existingOptions
         require(unknownOptions.isEmpty()) {
-            "Unknown Lapis options: ${unknownOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}. " +
-                "Existing options: ${existingOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}."
+            "Unknown ${LapisMeta.NAME} options: ${unknownOptions.joinToString { it.withArgumentPrefix().quoted() }}. " +
+                "Existing options: ${existingOptions.joinToString { it.withArgumentPrefix().quoted() }}."
         }
 
         val requiredOptions = descriptorElements.filter { !it.isOptional }.map { it.name }.toSet()
         val missingOptions = requiredOptions - processorOptions.keys
         require(missingOptions.isEmpty()) {
-            "Missing Lapis options: ${missingOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}. " +
-                "Required options: ${requiredOptions.joinToString { it.withArgumentPrefix().singleQuoted() }}."
+            "Missing ${LapisMeta.NAME} options: ${missingOptions.joinToString { it.withArgumentPrefix().quoted() }}. " +
+                "Required options: ${requiredOptions.joinToString { it.withArgumentPrefix().quoted() }}."
         }
 
         return Json.decodeFromJsonElement(
@@ -62,6 +61,6 @@ class LapisProcessorProvider : SymbolProcessorProvider {
         removePrefix(ARGUMENT_PREFIX)
 
     companion object {
-        private const val ARGUMENT_PREFIX: String = "lapis."
+        private val ARGUMENT_PREFIX: String = LapisMeta.LOWER_NAME + "."
     }
 }

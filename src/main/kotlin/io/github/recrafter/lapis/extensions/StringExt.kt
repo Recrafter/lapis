@@ -6,8 +6,5 @@ fun String.capitalize(): String =
         else it.toString()
     }
 
-fun String.singleQuoted(): String =
+fun String.quoted(): String =
     "'$this'"
-
-fun String.backticked(): String =
-    "`$this`"

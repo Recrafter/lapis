@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.layers.generator
 
 import io.github.recrafter.lapis.extensions.jp.*
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrType
 
 @JvmInline
 value class IrJavaCodeBlockBuilder(private val builder: JPCodeBlockBuilder) {
@@ -51,7 +51,7 @@ value class IrJavaCodeBlockBuilder(private val builder: JPCodeBlockBuilder) {
             arguments += method
         }
 
-        fun arg(type: IrTypeName) {
+        fun arg(type: IrType) {
             arguments += type.java
         }
 

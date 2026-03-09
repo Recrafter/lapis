@@ -1,4 +1,4 @@
 package io.github.recrafter.lapis.extensions.jp
 
-val JPClassName.qualifiedName: String
+val JPClassType.qualifiedName: String
     get() = canonicalName()

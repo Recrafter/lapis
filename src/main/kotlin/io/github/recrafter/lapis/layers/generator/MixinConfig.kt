@@ -39,7 +39,7 @@ data class MixinConfig(
     val dedicatedServerOnlyMixins: List<String>? = null,
 ) {
     @Serializable
-    class ExtrasConfig(val minVersion: String)
+    data class ExtrasConfig(val minVersion: String)
 
     @Serializable
     data class InjectorConfig(val defaultRequire: Int)

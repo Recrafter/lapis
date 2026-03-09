@@ -1,11 +1,13 @@
 package io.github.recrafter.lapis.extensions.jp
 
+import io.github.recrafter.lapis.extensions.common.lapisError
+import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
 import io.github.recrafter.lapis.layers.generator.IrJavaMethodBodyBuilder
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrClassType
+import io.github.recrafter.lapis.layers.lowering.types.IrType
 
 inline fun <reified A : Annotation> JPMethodBuilder.addAnnotation(builder: JPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildJavaAnnotation<A>(builder))
@@ -20,7 +22,7 @@ fun JPMethodBuilder.if_(condition: JPCodeBlock, body: IrJavaCodeBlockBuilder.() 
 }
 
 fun JPMethodBuilder.try_(
-    exceptionType: IrClassName,
+    exceptionType: IrClassType,
     catchBody: (IrJavaCodeBlockBuilder.() -> Unit)? = null,
     exceptedName: String = if (catchBody == null) "ignored" else "e",
     finallyBody: (IrJavaCodeBlockBuilder.() -> Unit)? = null,
@@ -46,7 +48,7 @@ fun JPMethodBuilder.withControlFlow(controlFlow: JPCodeBlock, body: IrJavaCodeBl
     endControlFlow()
 }
 
-fun JPMethodBuilder.setReturnType(type: IrTypeName?) {
+fun JPMethodBuilder.setReturnType(type: IrType?) {
     returns(type?.java.orVoid())
 }
 
@@ -67,6 +69,7 @@ fun JPMethodBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
             IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
             IrModifier.OVERRIDE -> addAnnotation<Override>()
+            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Java methods")
         }
     }
 }
