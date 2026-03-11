@@ -19,8 +19,10 @@ import io.github.recrafter.lapis.extensions.ksp.toDependencies
 import io.github.recrafter.lapis.layers.Builtin
 import io.github.recrafter.lapis.layers.Builtins
 import io.github.recrafter.lapis.layers.lowering.*
+import io.github.recrafter.lapis.layers.lowering.types.IrType
 import io.github.recrafter.lapis.layers.lowering.types.orVoid
 import kotlinx.serialization.json.Json
+import org.objectweb.asm.Opcodes
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Mutable
 import org.spongepowered.asm.mixin.Unique
@@ -68,6 +70,7 @@ class MixinGenerator(
 
                     is IrFieldDescriptor -> {
                         descriptor.getter?.let { generateDescriptorGetterWrapper(it) }
+                        descriptor.setter?.let { generateDescriptorSetterWrapper(it) }
                     }
                 }
             }
@@ -327,6 +330,98 @@ class MixinGenerator(
         })
     }
 
+    private fun KPFileBuilder.generateDescriptorSetterWrapper(setter: IrDescriptorSetter) {
+        val receiverParameterName = "receiver".withInternalPrefix()
+        val valueParameterName = "value".withInternalPrefix()
+        val operationParameterName = "operation".withInternalPrefix()
+        addType(buildKotlinClass(setter.classType.simpleName) {
+            setConstructor(buildList {
+                setter.receiverType?.let { add(IrParameter(receiverParameterName, it)) }
+                add(IrParameter(valueParameterName, setter.type))
+                add(IrParameter(operationParameterName, Operation::class.asIr().generic(IrType.VOID)))
+            })
+            addSuperInterface(setter.superClassType)
+        })
+        setter.receiverType?.let {
+            addProperty(buildKotlinProperty("receiver", it) {
+                setReceiverType(setter.superClassType)
+                setGetter {
+                    addAnnotation<JvmName> {
+                        setStringMember(
+                            JvmName::name,
+                            setter.classType.simpleName.capitalize() + "_receiver"
+                        )
+                    }
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_("(this as %T).%L") {
+                            arg(setter.classType)
+                            arg(receiverParameterName)
+                        }
+                    }
+                }
+            })
+        }
+        addProperty(buildKotlinProperty("value", setter.type) {
+            setReceiverType(setter.superClassType)
+            setGetter {
+                addAnnotation<JvmName> {
+                    setStringMember(
+                        JvmName::name,
+                        setter.classType.simpleName.capitalize() + "_value"
+                    )
+                }
+                setModifiers(IrModifier.INLINE)
+                setBody {
+                    return_("(this as %T).%L") {
+                        arg(setter.classType)
+                        arg(valueParameterName)
+                    }
+                }
+            }
+        })
+        addFunction(buildKotlinFunction("set") {
+            addAnnotation<JvmName> {
+                setStringMember(
+                    JvmName::name,
+                    setter.classType.simpleName.capitalize() + "_set"
+                )
+            }
+            setModifiers(IrModifier.INLINE)
+            setReceiverType(setter.superClassType)
+            addParameter(buildKotlinParameter("value", setter.type) {
+                defaultValue(buildKotlinCodeBlock("this.%L") {
+                    arg("value")
+                })
+            })
+            setter.receiverType?.let {
+                addParameter(buildKotlinParameter("receiver", it) {
+                    defaultValue(buildKotlinCodeBlock("this.%L") {
+                        arg("receiver")
+                    })
+                })
+            }
+            setBody {
+                code(buildString {
+                    append("(this as %T).%L.%L(")
+                    if (setter.receiverType != null) {
+                        append("%L, ")
+                    }
+                    append("%L")
+                    append(")")
+                }) {
+                    arg(setter.classType)
+                    arg(operationParameterName)
+                    arg(Operation<*>::call)
+                    if (setter.receiverType != null) {
+                        arg("receiver")
+                    }
+                    arg("value")
+                }
+            }
+        })
+    }
+
     private fun generateMixin(mixin: IrMixin) {
         mixin.flattenTree().forEach { mixin ->
             if (mixin.isNotEmpty()) {
@@ -552,7 +647,17 @@ class MixinGenerator(
                     setAnnotationArrayMember<WrapOperation, At>(WrapOperation::at) {
                         setStringMember(At::value, "FIELD")
                         setStringMember(At::target, injection.target)
-                        setIntMember(At::opcode, 180)
+                        setIntMember(At::opcode, if (injection.isStatic) Opcodes.GETSTATIC else Opcodes.GETFIELD)
+                        setIntMember(At::ordinal, injection.ordinal)
+                    }
+                }
+
+                is IrFieldSetInjection -> addAnnotation<WrapOperation> {
+                    setStringArrayMember(WrapOperation::method, injection.method)
+                    setAnnotationArrayMember<WrapOperation, At>(WrapOperation::at) {
+                        setStringMember(At::value, "FIELD")
+                        setStringMember(At::target, injection.target)
+                        setIntMember(At::opcode, if (injection.isStatic) Opcodes.PUTSTATIC else Opcodes.PUTFIELD)
                         setIntMember(At::ordinal, injection.ordinal)
                     }
                 }
@@ -630,6 +735,11 @@ class MixinGenerator(
 
                                 is IrFieldGetInjection if !injection.isStatic -> {
                                     add(buildJavaCodeBlock(receiverParameterName))
+                                }
+
+                                is IrFieldSetInjection if !injection.isStatic -> {
+                                    add(buildJavaCodeBlock(receiverParameterName))
+                                    add(buildJavaCodeBlock("newValue".withInternalPrefix("argument")))
                                 }
 
                                 else -> {}

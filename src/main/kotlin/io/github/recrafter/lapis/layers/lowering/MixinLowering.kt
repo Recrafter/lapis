@@ -255,6 +255,16 @@ class MixinLowering(
                     fieldType = hook.irType,
                     ordinal = ordinal,
                 )
+
+                is FieldSetHook -> IrFieldSetInjection(
+                    name = hook.name,
+                    method = hook.descriptor.getMemberReference(),
+                    parameters = parameters,
+                    hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
+                    target = hook.fieldDescriptor.getMemberReference(withReceiver = true),
+                    isStatic = hook.fieldDescriptor.isStatic,
+                    ordinal = ordinal,
+                )
             }
         }
     }
@@ -265,10 +275,18 @@ class MixinLowering(
                 if (hook !is BodyHook && !parameter.descriptor.isStatic) {
                     add(IrInjectionReceiverParameter(parameter.descriptor.irReceiverType))
                 }
+                if (hook is FieldSetHook) {
+                    add(IrInjectionArgumentParameter("newValue", hook.irType))
+                }
                 addAll(parameter.descriptor.parameters.map { parameter ->
                     IrInjectionArgumentParameter(parameter.name, parameter.irType)
                 })
-                add(IrInjectionOperationParameter(parameter.descriptor.irReturnType))
+                add(
+                    IrInjectionOperationParameter(
+                        if (hook is FieldSetHook) IrType.VOID
+                        else parameter.descriptor.irReturnType
+                    )
+                )
             }
 
             is HookContextParameter -> buildList {

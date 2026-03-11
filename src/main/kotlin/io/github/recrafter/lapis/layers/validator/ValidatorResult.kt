@@ -201,6 +201,17 @@ class FieldGetHook(
     val irType: IrType = type.asIr()
 }
 
+class FieldSetHook(
+    name: String,
+    descriptor: InvokableDescriptor,
+    type: KSPType,
+    val fieldDescriptor: FieldDescriptor,
+    ordinals: List<Int>,
+    parameters: List<HookParameter>,
+) : Hook(name, descriptor, type, parameters, ordinals) {
+    val irType: IrType = type.asIr()
+}
+
 sealed interface HookParameter
 
 sealed class HookDescriptorParameter(open val descriptor: Descriptor) : HookParameter

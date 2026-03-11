@@ -243,8 +243,18 @@ class IrFieldGetInjection(
     val target: String,
     val isStatic: Boolean,
     ordinal: Int,
-    val fieldType: IrType,
+    fieldType: IrType,
 ) : IrInjection(name, method, fieldType, parameters, hookArguments, ordinal)
+
+class IrFieldSetInjection(
+    name: String,
+    method: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    val target: String,
+    val isStatic: Boolean,
+    ordinal: Int,
+) : IrInjection(name, method, null, parameters, hookArguments, ordinal)
 
 sealed interface IrInjectionParameter {
     val priority: Int

@@ -283,12 +283,26 @@ class FrontendValidator(
                             )
                         }
 
+
+                        LapisHookKind.FieldSet -> {
+                            val target = parameters.filterIsInstance<HookTargetParameter>().singleOrNull()?.descriptor
+                            kspRequire(target is FieldDescriptor) { "38.6" }
+                            kspRequire(returnType == null) { "38.7" }
+                            FieldSetHook(
+                                name = name,
+                                descriptor = descriptor,
+                                type = target.type,
+                                ordinals = ordinals,
+                                fieldDescriptor = target,
+                                parameters = parameters,
+                            )
+                        }
+
                         LapisHookKind.Head -> TODO("The kind ${hookKind.name} is not implemented.")
                         LapisHookKind.Return -> TODO("The kind ${hookKind.name} is not implemented.")
                         LapisHookKind.Tail -> TODO("The kind ${hookKind.name} is not implemented.")
                         LapisHookKind.ReturnValue -> TODO("The kind ${hookKind.name} is not implemented.")
                         LapisHookKind.New -> TODO("The kind ${hookKind.name} is not implemented.")
-                        LapisHookKind.FieldSet -> TODO("The kind ${hookKind.name} is not implemented.")
                         LapisHookKind.LocalGet -> TODO("The kind ${hookKind.name} is not implemented.")
                         LapisHookKind.LocalSet -> TODO("The kind ${hookKind.name} is not implemented.")
                     }
