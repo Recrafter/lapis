@@ -22,7 +22,7 @@ class LapisProcessor(
 
     private val builtins: Builtins = Builtins(options.generatedPackageName, codeGenerator)
     private val frontendValidator: FrontendValidator = FrontendValidator(logger, builtins)
-    private val mixinLowering: MixinLowering = MixinLowering(options, builtins)
+    private val mixinLowering: MixinLowering = MixinLowering(options, builtins, logger)
 
     private val descriptors: MutableMap<String, IrDescriptor> = mutableMapOf()
     private val mixins: MutableMap<String, IrMixin> = mutableMapOf()

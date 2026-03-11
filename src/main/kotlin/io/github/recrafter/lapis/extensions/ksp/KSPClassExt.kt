@@ -11,9 +11,6 @@ import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.parser.PsiHelper
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
-val KSPClass.isError: Boolean
-    get() = asStarProjectedType().isError
-
 fun KSPClass.isClass(): Boolean =
     classKind == ClassKind.CLASS
 

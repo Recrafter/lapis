@@ -174,7 +174,7 @@ class CallHook(
     descriptor: InvokableDescriptor,
     returnType: KSPType?,
     parameters: List<HookParameter>,
-    val targetDescriptor: MethodDescriptor,
+    val methodDescriptor: MethodDescriptor,
     ordinals: List<Int>,
 ) : Hook(name, descriptor, returnType, parameters, ordinals)
 
@@ -192,19 +192,25 @@ class LiteralHook(
 
 class FieldGetHook(
     name: String,
-    descriptor: FieldDescriptor,
+    descriptor: InvokableDescriptor,
     type: KSPType,
+    val fieldDescriptor: FieldDescriptor,
     ordinals: List<Int>,
-) : Hook(name, descriptor, type, emptyList(), ordinals)
+    parameters: List<HookParameter>,
+) : Hook(name, descriptor, type, parameters, ordinals) {
+    val irType: IrType = type.asIr()
+}
 
 sealed interface HookParameter
 
-sealed class HookTargetParameter(open val descriptor: Descriptor) : HookParameter
+sealed class HookDescriptorParameter(open val descriptor: Descriptor) : HookParameter
+
+sealed class HookTargetParameter(override val descriptor: Descriptor) : HookDescriptorParameter(descriptor)
 class HookCallableTargetParameter(override val descriptor: InvokableDescriptor) : HookTargetParameter(descriptor)
 class HookGetterTargetParameter(override val descriptor: FieldDescriptor) : HookTargetParameter(descriptor)
 class HookSetterTargetParameter(override val descriptor: FieldDescriptor) : HookTargetParameter(descriptor)
 
-class HookContextParameter(val descriptor: InvokableDescriptor) : HookParameter
+class HookContextParameter(override val descriptor: InvokableDescriptor) : HookDescriptorParameter(descriptor)
 
 class HookLiteralParameter(
     val type: KSPType,

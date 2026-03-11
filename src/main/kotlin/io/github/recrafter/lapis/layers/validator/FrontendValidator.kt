@@ -237,7 +237,7 @@ class FrontendValidator(
                                 name = name,
                                 descriptor = descriptor,
                                 returnType = returnType,
-                                targetDescriptor = target,
+                                methodDescriptor = target,
                                 ordinals = ordinals,
                                 parameters = parameters,
                             )
@@ -275,9 +275,11 @@ class FrontendValidator(
                             kspRequire(returnType?.makeNotNullable().isSame(target.type)) { "38.5" }
                             FieldGetHook(
                                 name = name,
-                                descriptor = target,
+                                descriptor = descriptor,
                                 type = target.type,
                                 ordinals = ordinals,
+                                fieldDescriptor = target,
+                                parameters = parameters,
                             )
                         }
 

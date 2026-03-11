@@ -64,14 +64,14 @@ class IrDescriptorGetter(
     classType: IrClassType,
     superClassType: IrGenericType,
     receiverType: IrType?,
-    type: IrType?,
+    val type: IrType,
 ) : IrDescriptorWrapper(classType, superClassType, receiverType, emptyList(), type)
 
 class IrDescriptorSetter(
     classType: IrClassType,
     superClassType: IrGenericType,
     receiverType: IrType?,
-    type: IrType?,
+    val type: IrType,
 ) : IrDescriptorWrapper(classType, superClassType, receiverType, emptyList(), type)
 
 class IrMixin(
@@ -229,15 +229,22 @@ class IrModifyConstantValueInjection(
     method: String,
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
-    val type: IrType,
-    val typeName: String,
-    val value: String,
+    val constantType: IrType,
+    val constantTypeName: String,
+    val constantValue: String,
     ordinal: Int,
-) : IrInjection(name, method, type, parameters, hookArguments, ordinal)
+) : IrInjection(name, method, constantType, parameters, hookArguments, ordinal)
 
 class IrFieldGetInjection(
-
-)
+    name: String,
+    method: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    val target: String,
+    val isStatic: Boolean,
+    ordinal: Int,
+    val fieldType: IrType,
+) : IrInjection(name, method, fieldType, parameters, hookArguments, ordinal)
 
 sealed interface IrInjectionParameter {
     val priority: Int

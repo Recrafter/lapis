@@ -6,6 +6,7 @@ import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.common.defaultValue
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.ksp.KSPLogger
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.Builtin
 import io.github.recrafter.lapis.layers.Builtins
@@ -18,6 +19,7 @@ import kotlin.reflect.KClass
 class MixinLowering(
     private val options: Options,
     private val builtins: Builtins,
+    private val logger: KSPLogger,
 ) {
     fun lower(validatorResult: ValidatorResult): IrResult {
         val descriptorBindings = validatorResult.descriptors.map { validated ->
@@ -35,40 +37,29 @@ class MixinLowering(
     private fun lowerDescriptor(descriptor: Descriptor, patches: List<Patch>): IrDescriptor =
         when (descriptor) {
             is InvokableDescriptor -> {
-                val callable = when {
-                    patches.hasHookParameter<HookCallableTargetParameter> { it.descriptor == descriptor } -> {
-                        IrDescriptorCallable(
-                            classType = IrClassType.of(
-                                options.generatedPackageName,
-                                "Callable".withQualifiedNamePrefix(descriptor.irClassType)
-                            ),
-                            superClassType = builtins[Builtin.Callable].generic(descriptor.irClassType),
-                            receiverType = when {
-                                descriptor.isStatic -> null
-                                else -> descriptor.irReceiverType
-                            },
-                            parameters = descriptor.parameters.asIr(),
-                            returnType = descriptor.irReturnType,
-                        )
-                    }
-
-                    else -> null
-                }
-                val context = when {
-                    patches.hasHookParameter<HookContextParameter> { it.descriptor == descriptor } -> {
-                        IrDescriptorContext(
-                            classType = IrClassType.of(
-                                options.generatedPackageName,
-                                "Context".withQualifiedNamePrefix(descriptor.irClassType)
-                            ),
-                            superClassType = builtins[Builtin.Context].generic(descriptor.irClassType),
-                            parameters = descriptor.parameters.asIr(),
-                            returnType = descriptor.irReturnType,
-                        )
-                    }
-
-                    else -> null
-                }
+                val callable = if (patches.hasHookParameter<HookCallableTargetParameter>(descriptor)) {
+                    IrDescriptorCallable(
+                        classType = IrClassType.of(
+                            options.generatedPackageName,
+                            "Callable".withQualifiedNamePrefix(descriptor.irClassType)
+                        ),
+                        superClassType = builtins[Builtin.Callable].generic(descriptor.irClassType),
+                        receiverType = if (descriptor.isStatic) null else descriptor.irReceiverType,
+                        parameters = descriptor.parameters.asIr(),
+                        returnType = descriptor.irReturnType,
+                    )
+                } else null
+                val context = if (patches.hasHookParameter<HookContextParameter>(descriptor)) {
+                    IrDescriptorContext(
+                        classType = IrClassType.of(
+                            options.generatedPackageName,
+                            "Context".withQualifiedNamePrefix(descriptor.irClassType)
+                        ),
+                        superClassType = builtins[Builtin.Context].generic(descriptor.irClassType),
+                        parameters = descriptor.parameters.asIr(),
+                        returnType = descriptor.irReturnType,
+                    )
+                } else null
                 IrInvokableDescriptor(
                     containingFile = descriptor.containingFile,
                     classType = descriptor.irClassType,
@@ -78,32 +69,26 @@ class MixinLowering(
             }
 
             is FieldDescriptor -> {
-                val getter = if (patches.hasHookParameter<HookGetterTargetParameter> { it.descriptor == descriptor }) {
+                val getter = if (patches.hasHookParameter<HookGetterTargetParameter>(descriptor)) {
                     IrDescriptorGetter(
                         classType = IrClassType.of(
                             options.generatedPackageName,
                             "Getter".withQualifiedNamePrefix(descriptor.irClassType)
                         ),
-                        superClassType = builtins[Builtin.Callable].generic(descriptor.irClassType),
-                        receiverType = when {
-                            descriptor.isStatic -> null
-                            else -> descriptor.irReceiverType
-                        },
-                        type = descriptor.irReturnType,
+                        superClassType = builtins[Builtin.Getter].generic(descriptor.irClassType),
+                        receiverType = if (descriptor.isStatic) null else descriptor.irReceiverType,
+                        type = descriptor.irType,
                     )
                 } else null
-                val setter = if (patches.hasHookParameter<HookSetterTargetParameter> { it.descriptor == descriptor }) {
+                val setter = if (patches.hasHookParameter<HookSetterTargetParameter>(descriptor)) {
                     IrDescriptorSetter(
                         classType = IrClassType.of(
                             options.generatedPackageName,
                             "Setter".withQualifiedNamePrefix(descriptor.irClassType)
                         ),
-                        superClassType = builtins[Builtin.Callable].generic(descriptor.irClassType),
-                        receiverType = when {
-                            descriptor.isStatic -> null
-                            else -> descriptor.irReceiverType
-                        },
-                        type = descriptor.irReturnType,
+                        superClassType = builtins[Builtin.Setter].generic(descriptor.irClassType),
+                        receiverType = if (descriptor.isStatic) null else descriptor.irReceiverType,
+                        type = descriptor.irType,
                     )
                 } else null
                 IrFieldDescriptor(
@@ -244,8 +229,8 @@ class MixinLowering(
                     returnType = hook.irReturnType,
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
-                    target = hook.targetDescriptor.getMemberReference(withReceiver = true),
-                    isStatic = hook.targetDescriptor.isStatic,
+                    target = hook.methodDescriptor.getMemberReference(withReceiver = true),
+                    isStatic = hook.methodDescriptor.isStatic,
                     ordinal = ordinal,
                 )
 
@@ -254,13 +239,22 @@ class MixinLowering(
                     method = hook.descriptor.getMemberReference(),
                     parameters = parameters,
                     hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
-                    type = hook.irType,
-                    typeName = hook.typeName,
-                    value = hook.value,
+                    constantType = hook.irType,
+                    constantTypeName = hook.typeName,
+                    constantValue = hook.value,
                     ordinal = ordinal,
                 )
 
-                is FieldGetHook -> TODO("Field hooks not supported yet.")
+                is FieldGetHook -> IrFieldGetInjection(
+                    name = hook.name,
+                    method = hook.descriptor.getMemberReference(),
+                    parameters = parameters,
+                    hookArguments = hook.parameters.map { lowerHookArgument(it, descriptorBindings, ordinal) },
+                    target = hook.fieldDescriptor.getMemberReference(withReceiver = true),
+                    isStatic = hook.fieldDescriptor.isStatic,
+                    fieldType = hook.irType,
+                    ordinal = ordinal,
+                )
             }
         }
     }
@@ -268,7 +262,7 @@ class MixinLowering(
     private fun lowerInjectionParameter(hook: Hook, parameter: HookParameter): List<IrInjectionParameter> =
         when (parameter) {
             is HookTargetParameter -> buildList {
-                if (hook is CallHook && !parameter.descriptor.isStatic) {
+                if (hook !is BodyHook && !parameter.descriptor.isStatic) {
                     add(IrInjectionReceiverParameter(parameter.descriptor.irReceiverType))
                 }
                 addAll(parameter.descriptor.parameters.map { parameter ->
@@ -346,10 +340,16 @@ class MixinLowering(
         firstOrNull { it.validated.irClassType == classType }?.lowered?.castOrNull<T>()
             ?: lapisError("Binding for ${classType.qualifiedName.quoted()} not found")
 
-    private inline fun <reified T : HookParameter> List<Patch>.hasHookParameter(
-        predicate: (T) -> Boolean
+    private inline fun <reified T : HookDescriptorParameter> List<Patch>.hasHookParameter(
+        descriptor: Descriptor
     ): Boolean =
-        any { patch -> patch.hooks.any { hook -> hook.parameters.any { it is T && predicate(it) } } }
+        any { patch ->
+            patch.hooks.any { hook ->
+                hook.parameters.any {
+                    it is T && it.descriptor == descriptor
+                }
+            }
+        }
 
     private class DescriptorBinding(
         val validated: Descriptor,

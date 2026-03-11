@@ -9,12 +9,10 @@ val SerialDescriptor.elements: List<DescriptorElement>
         DescriptorElement(
             name = getElementName(index),
             isOptional = isElementOptional(index),
-            descriptor = getElementDescriptor(index),
         )
     }
 
 class DescriptorElement(
     val name: String,
     val isOptional: Boolean,
-    val descriptor: SerialDescriptor,
 )

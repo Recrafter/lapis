@@ -18,10 +18,9 @@ class Builtins(
         private set
 
     private val rootClassType: IrClassType = IrClassType.of(generatedPackageName, LapisMeta.NAME)
-    private val classTypes: Map<Builtin, IrClassType> = Builtin.entries.associateWith { rootClassType.nested(it.name) }
-
-    operator fun get(builtin: Builtin): IrClassType =
-        classTypes.getValue(builtin)
+    private val classTypes: Map<Builtin, IrClassType> = Builtin.entries.associateWith {
+        rootClassType.nested(it.name)
+    }
 
     fun generate() {
         if (isGenerated) {
@@ -41,6 +40,9 @@ class Builtins(
 
         isGenerated = true
     }
+
+    operator fun get(builtin: Builtin): IrClassType =
+        classTypes.getValue(builtin)
 }
 
 enum class Builtin {

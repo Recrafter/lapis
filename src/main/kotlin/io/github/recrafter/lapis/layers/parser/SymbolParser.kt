@@ -69,10 +69,9 @@ object SymbolParser {
             ?.getArgumentExpression()
             ?.castOrNull<PSICallableReferenceExpression>()
         val functionTypeReceiverName = psiFunctionType?.getReceiverTypeReference()?.text
-        val receiverType = when {
-            functionTypeReceiverName != null -> functionGenericTypes?.firstOrNull()
-            else -> null
-        }
+        val receiverType = if (functionTypeReceiverName != null) {
+            functionGenericTypes?.firstOrNull()
+        } else null
         val hasReceiver = receiverType != null
         return ParsedDescriptor(
             symbol = declaration,
@@ -208,58 +207,43 @@ object SymbolParser {
         val type = parameter.type.resolve()
 
         val targetAnnotation = parameter.getAnnotationOrNull<LaTarget>()
-        val targetDescriptorClassType = when {
-            targetAnnotation != null -> type.declaration.castOrNull<KSPClass>()
-            else -> null
-        }
-        val targetDescriptorGenericClassType = when {
-            targetAnnotation != null -> type.getGenericTypeOrNull()?.declaration?.castOrNull<KSPClass>()
-            else -> null
-        }
+        val targetDescriptorClassType = if (targetAnnotation != null) {
+            type.declaration.castOrNull<KSPClass>()
+        } else null
+        val targetDescriptorGenericClassType = if (targetAnnotation != null) {
+            type.getGenericTypeOrNull()?.declaration?.castOrNull<KSPClass>()
+        } else null
 
         val contextAnnotation = parameter.getAnnotationOrNull<LaContext>()
-        val contextDescriptorClassType = when {
-            contextAnnotation != null -> type.declaration.castOrNull<KSPClass>()
-            else -> null
-        }
-        val contextDescriptorGenericClassType = when {
-            contextAnnotation != null -> type.getGenericTypeOrNull()?.declaration?.castOrNull<KSPClass>()
-            else -> null
-        }
+        val contextDescriptorClassType = if (contextAnnotation != null) {
+            type.declaration.castOrNull<KSPClass>()
+        } else null
+        val contextDescriptorGenericClassType = if (contextAnnotation != null) {
+            type.getGenericTypeOrNull()?.declaration?.castOrNull<KSPClass>()
+        } else null
 
         val literalAnnotation = parameter.getAnnotationOrNull<LaLiteral>()
-        val literalType = when {
-            literalAnnotation != null -> type
-            else -> null
-        }
-        val literalTypeName = when {
-            literalAnnotation != null -> {
-                function.findPsi()
-                    .valueParameters
-                    .firstOrNull { it.name == name }
-                    ?.annotationEntries
-                    ?.firstOrNull()
-                    ?.valueArguments
-                    ?.singleOrNull()
-                    ?.getArgumentName()
-                    ?.asName
-                    ?.asString()
-            }
-
-            else -> null
-        }
-        val literalValue = when {
-            literalAnnotation != null -> {
-                parameter.annotations
-                    .firstOrNull { it.isInstance<LaLiteral>() }
-                    ?.arguments
-                    ?.find { it.name?.asString() == literalTypeName }
-                    ?.value
-                    ?.toString()
-            }
-
-            else -> null
-        }
+        val literalType = if (literalAnnotation != null) type else null
+        val literalTypeName = if (literalAnnotation != null) {
+            function.findPsi()
+                .valueParameters
+                .firstOrNull { it.name == name }
+                ?.annotationEntries
+                ?.firstOrNull()
+                ?.valueArguments
+                ?.singleOrNull()
+                ?.getArgumentName()
+                ?.asName
+                ?.asString()
+        } else null
+        val literalValue = if (literalAnnotation != null) {
+            parameter.annotations
+                .firstOrNull { it.isInstance<LaLiteral>() }
+                ?.arguments
+                ?.find { it.name?.asString() == literalTypeName }
+                ?.value
+                ?.toString()
+        } else null
 
         val ordinalAnnotation = parameter.getAnnotationOrNull<LaOrdinal>()
         val localAnnotation = parameter.getAnnotationOrNull<LaLocal>()
