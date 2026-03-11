@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.layers.lowering
 
 import io.github.recrafter.lapis.extensions.jp.*
+import io.github.recrafter.lapis.layers.lowering.types.IrType
 import io.github.recrafter.lapis.layers.validator.*
 
 class JvmDescriptor(private val type: JPType) {
@@ -34,6 +35,18 @@ class JvmDescriptor(private val type: JPType) {
 
     private val JPArrayType.typeDescriptor: String
         get() = "[" + componentType().asJvmDescriptor().typeDescriptor
+
+    companion object {
+        fun of(type: IrType): String =
+            type.java.asJvmDescriptor().typeDescriptor
+
+        fun buildMethodSignature(parameterTypes: List<IrType>, returnType: IrType?): String = buildString {
+            append("(")
+            parameterTypes.forEach { append(of(it)) }
+            append(")")
+            append(returnType?.let { of(it) } ?: VOID_NAME)
+        }
+    }
 }
 
 private const val CONSTRUCTOR_NAME: String = "<init>"
@@ -43,28 +56,24 @@ fun Descriptor.getMemberReference(withReceiver: Boolean = false): String =
     when (val descriptor = this) {
         is InvokableDescriptor -> buildString {
             if (withReceiver) {
-                append(irReceiverType.java.asJvmDescriptor().typeDescriptor)
+                append(JvmDescriptor.of(irReceiverType))
             }
             append(binaryName)
-            append("(")
-            parameters.forEach {
-                append(it.irType.java.asJvmDescriptor().typeDescriptor)
-            }
-            append(")")
-            if (descriptor is ConstructorDescriptor) {
-                append(VOID_NAME)
-            } else {
-                append(irReturnType?.java?.asJvmDescriptor()?.typeDescriptor ?: VOID_NAME)
-            }
+            append(
+                JvmDescriptor.buildMethodSignature(
+                    parameters.map { it.irType },
+                    if (descriptor is ConstructorDescriptor) null else irReturnType
+                )
+            )
         }
 
         is FieldDescriptor -> buildString {
             if (withReceiver) {
-                append(irReceiverType.java.asJvmDescriptor().typeDescriptor)
+                append(JvmDescriptor.of(irReceiverType))
             }
             append(targetName)
             append(":")
-            append(irType.java.asJvmDescriptor().typeDescriptor)
+            append(JvmDescriptor.of(irType))
         }
     }
 
@@ -77,8 +86,8 @@ val InvokableDescriptor.binaryName: String
         is MethodDescriptor -> targetName
     }
 
-val IrAccessorKind.binaryName: String
+val IrInvokableDescriptor.binaryName: String
     get() = when (this) {
-        is IrConstructorAccessor -> CONSTRUCTOR_NAME
-        else -> targetName
+        is IrConstructorDescriptor -> CONSTRUCTOR_NAME
+        is IrMethodDescriptor -> targetName
     }

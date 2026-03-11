@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.extensions.kp
 
+import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
 import io.github.recrafter.lapis.layers.generator.IrKotlinFunctionBodyBuilder
 import io.github.recrafter.lapis.layers.lowering.IrModifier
@@ -63,5 +64,11 @@ fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
             IrModifier.INLINE -> addModifiers(KPModifier.INLINE)
         }
+    }
+}
+
+fun KPFunctionBuilder.setJvmName(name: String) {
+    addAnnotation<JvmName> {
+        setStringMember(JvmName::name, name)
     }
 }

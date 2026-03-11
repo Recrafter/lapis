@@ -1,6 +1,6 @@
 package io.github.recrafter.lapis.extensions.kp
 
-fun KPFileBuilder.suppress(warnings: List<KWarning>) {
+fun KPFileBuilder.suppressWarnings(warnings: List<KWarning>) {
     addAnnotation<Suppress> {
         setStringVarargMember(
             Suppress::names,
@@ -9,8 +9,8 @@ fun KPFileBuilder.suppress(warnings: List<KWarning>) {
     }
 }
 
-fun KPFileBuilder.suppress(vararg warnings: KWarning) {
-    suppress(warnings.toList())
+fun KPFileBuilder.suppressWarnings(vararg warnings: KWarning) {
+    suppressWarnings(warnings.toList())
 }
 
 enum class KWarning(private val isScreamingSnake: Boolean = false) {

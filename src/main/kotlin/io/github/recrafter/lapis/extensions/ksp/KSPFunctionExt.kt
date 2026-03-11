@@ -10,8 +10,8 @@ import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
 import kotlin.math.abs
 
-fun KSPFunction.isExtension(): Boolean =
-    extensionReceiver != null
+val KSPFunction.isExtension: Boolean
+    get() = extensionReceiver != null
 
 fun KSPFunction.getReturnTypeOrNull(): KSPType? =
     returnType?.resolve()?.takeNotUnit()

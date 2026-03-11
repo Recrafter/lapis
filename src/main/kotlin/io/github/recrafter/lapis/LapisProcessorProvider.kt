@@ -20,8 +20,8 @@ class LapisProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
         LapisProcessor(
             parseOptions(environment.options),
-            environment.logger,
             environment.codeGenerator,
+            environment.logger,
         )
 
     private fun parseOptions(options: Map<String, String>): Options {

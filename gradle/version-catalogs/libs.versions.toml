@@ -4,12 +4,12 @@ projektor = "5.+"
 kotlin = "2.2.21"
 ksp = "2.2.21-2.0.5"
 
-mixin = "0.8"
-mixin-extras = "0.4.0"
+mixin = "0.8.7"
+mixin-extras = "0.5.3"
 
 asm = "9.9.1"
 
-lapis = "0.6.4"
+lapis-annotations = "0.7.4"
 
 java-poet = "0.11.0"
 kotlin-poet = "2.2.0"
@@ -34,7 +34,7 @@ asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
 asm-util = { group = "org.ow2.asm", name = "asm-util", version.ref = "asm" }
 asm-commons = { group = "org.ow2.asm", name = "asm-commons", version.ref = "asm" }
 
-lapis-annotations = { group = "io.github.recrafter", name = "lapis-annotations", version.ref = "lapis" }
+lapis-annotations = { group = "io.github.recrafter", name = "lapis-annotations", version.ref = "lapis-annotations" }
 
 java-poet = { group = "com.palantir.javapoet", name = "javapoet", version.ref = "java-poet" }
 kotlin-poet = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "kotlin-poet" }

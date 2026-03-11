@@ -1,4 +1,4 @@
 package io.github.recrafter.lapis.extensions.ksp
 
-fun KSPProperty.isExtension(): Boolean =
-    extensionReceiver != null
+val KSPProperty.isExtension: Boolean
+    get() = extensionReceiver != null

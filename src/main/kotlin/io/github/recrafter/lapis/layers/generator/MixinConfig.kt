@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.layers.generator
 
-import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
+import io.github.recrafter.lapis.Side
+import io.github.recrafter.lapis.annotations.LaPatch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -51,11 +52,11 @@ data class MixinConfig(
         fun of(
             mixinPackage: String,
             refmapFileName: String,
-            qualifiedNames: Map<LapisPatchSide, List<String>>,
+            qualifiedNames: Map<Side, List<String>>,
         ): MixinConfig =
             MixinConfig(
                 isRequired = true,
-                minVersion = "0.6", // Accessor/Invoker
+                minVersion = "0.5.7", // Unique
                 extrasConfig = ExtrasConfig(
                     minVersion = "0.4.0" // WrapMethod
                 ),
@@ -69,21 +70,21 @@ data class MixinConfig(
                 ),
                 refmapFileName = refmapFileName,
                 commonMixins = qualifiedNames.getPackageRelativeClassNames(
-                    LapisPatchSide.Common,
+                    Side.Common,
                     mixinPackage
                 ),
                 clientOnlyMixins = qualifiedNames.getPackageRelativeClassNames(
-                    LapisPatchSide.ClientOnly,
+                    Side.ClientOnly,
                     mixinPackage
                 ),
                 dedicatedServerOnlyMixins = qualifiedNames.getPackageRelativeClassNames(
-                    LapisPatchSide.DedicatedServerOnly,
+                    Side.DedicatedServerOnly,
                     mixinPackage
                 ),
             )
 
-        private fun Map<LapisPatchSide, List<String>>.getPackageRelativeClassNames(
-            side: LapisPatchSide,
+        private fun Map<Side, List<String>>.getPackageRelativeClassNames(
+            side: Side,
             packageName: String,
         ): List<String>? =
             get(side)

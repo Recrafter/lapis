@@ -3,7 +3,7 @@ package io.github.recrafter.lapis.layers.validator
 import com.google.devtools.ksp.containingFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import io.github.recrafter.lapis.annotations.enums.LapisPatchSide
+import io.github.recrafter.lapis.Side
 import io.github.recrafter.lapis.extensions.common.defaultValue
 import io.github.recrafter.lapis.extensions.ksp.*
 import io.github.recrafter.lapis.layers.lowering.asIr
@@ -12,72 +12,106 @@ import io.github.recrafter.lapis.layers.lowering.types.IrType
 import org.spongepowered.asm.mixin.injection.At
 
 class ValidatorResult(
-    val descriptors: List<Descriptor>,
+    val schemas: List<Schema>,
     val patches: List<Patch>,
 )
 
-class FunctionParameter(
-    val name: String,
-    type: KSPType,
+class Schema(
+    symbol: KSPSymbol,
+
+    classType: KSPClass,
+    targetClassType: KSPClass?,
+    val needAccess: Boolean,
+    val needRemoveFinal: Boolean,
+    val widener: String,
+    val descriptors: List<Descriptor>,
 ) {
-    val irType: IrType = type.asIr()
+    val irClassType: IrClassType = classType.asIr()
+    val irTargetClassType: IrClassType = targetClassType?.asIr() ?: IrClassType.ofBinaryClassName(widener)
+    val containingFile: KSPFile? = symbol.containingFile?.warmUp()
 }
 
 sealed class Descriptor(
-    symbol: KSPSymbol,
-
+    val name: String,
     val targetName: String,
     classType: KSPClass,
     receiverType: KSPType,
     val parameters: List<FunctionParameter>,
     val returnType: KSPType?,
     val isStatic: Boolean,
+    val needAccess: Boolean,
+    val needRemoveFinal: Boolean,
 ) {
     val irClassType: IrClassType = classType.asIr()
     val irReceiverType: IrType = receiverType.asIr()
-    val irReturnType: IrType? = returnType?.asIr()
-    val containingFile: KSPFile? = symbol.containingFile?.warmUp()
+    open val irReturnType: IrType? = returnType?.asIr()
 }
 
 sealed class InvokableDescriptor(
-    symbol: KSPSymbol,
-
+    name: String,
     targetName: String,
     classType: KSPClass,
     receiverType: KSPType,
     parameters: List<FunctionParameter>,
     returnType: KSPType?,
     isStatic: Boolean,
-) : Descriptor(symbol, targetName, classType, receiverType, parameters, returnType, isStatic)
+    needAccess: Boolean,
+    needRemoveFinal: Boolean,
+) : Descriptor(name, targetName, classType, receiverType, parameters, returnType, isStatic, needAccess, needRemoveFinal)
 
 class ConstructorDescriptor(
-    symbol: KSPSymbol,
-
+    name: String,
     classType: KSPClass,
-    returnType: KSPType,
+    ownerClassType: KSPType,
     parameters: List<FunctionParameter>,
-) : InvokableDescriptor(symbol, "", classType, returnType, parameters, returnType, true)
+    needAccess: Boolean,
+    needRemoveFinal: Boolean,
+) : InvokableDescriptor(
+    name,
+    "",
+    classType,
+    ownerClassType,
+    parameters,
+    ownerClassType,
+    true,
+    needAccess,
+    needRemoveFinal
+) {
+    val irOwnerReturnType: IrType = ownerClassType.asIr()
+}
 
 open class MethodDescriptor(
-    symbol: KSPSymbol,
-
+    name: String,
     classType: KSPClass,
     receiverType: KSPType,
     returnType: KSPType?,
     targetName: String,
     parameters: List<FunctionParameter>,
     isStatic: Boolean,
-) : InvokableDescriptor(symbol, targetName, classType, receiverType, parameters, returnType, isStatic)
+    needAccess: Boolean,
+    needRemoveFinal: Boolean,
+) : InvokableDescriptor(
+    name,
+    targetName,
+    classType,
+    receiverType,
+    parameters,
+    returnType,
+    isStatic,
+    needAccess,
+    needRemoveFinal
+)
 
 class FieldDescriptor(
-    symbol: KSPSymbol,
-
+    name: String,
     classType: KSPClass,
     receiverType: KSPType,
     targetName: String,
     val type: KSPType,
     isStatic: Boolean,
-) : Descriptor(symbol, targetName, classType, receiverType, emptyList(), type, isStatic) {
+    needAccess: Boolean,
+    needRemoveFinal: Boolean,
+) : Descriptor(name, targetName, classType, receiverType, emptyList(), type, isStatic, needAccess, needRemoveFinal) {
     val irType: IrType = type.asIr()
 }
 
@@ -85,61 +119,25 @@ class Patch(
     symbol: KSPSymbol,
 
     val name: String,
-    val side: LapisPatchSide,
+    val side: Side,
 
     classType: KSPClass,
     targetClassType: KSPClass,
 
-    val accessProperties: List<AccessProperty>,
-    val accessFunctions: List<AccessFunction>,
-    val accessConstructors: List<AccessConstructor>,
-
     val sharedProperties: List<SharedProperty>,
     val sharedFunctions: List<SharedFunction>,
 
-    val hooks: List<Hook>,
-
-    val innerPatches: MutableList<Patch> = mutableListOf(),
+    val hooks: List<HookModel>,
 ) {
     val irClassType: IrClassType = classType.asIr()
     val irTargetClassType: IrClassType = targetClassType.asIr()
     val containingFile: KSPFile? = symbol.containingFile?.warmUp()
 }
 
-class AccessProperty(
-    val name: String,
-    type: KSPType,
-
-    val vanillaName: String,
-    val isStatic: Boolean,
-    val isMutable: Boolean,
-) {
-    val irType: IrType = type.asIr()
-}
-
-open class AccessFunction(
-    val name: String,
-    val vanillaName: String,
-    val isStatic: Boolean,
-    val parameters: List<FunctionParameter>,
-    returnType: KSPType?,
-) {
-    val irReturnType: IrType? = returnType?.asIr()
-}
-
-class AccessConstructor(
-    val name: String,
-    classType: KSPType,
-    val parameters: List<FunctionParameter>,
-) {
-    val irClassType: IrType = classType.asIr()
-}
-
 class SharedProperty(
     val name: String,
     type: KSPType,
     val isMutable: Boolean,
-    val isSetterPublic: Boolean,
 ) {
     val irType: IrType = type.asIr()
 }
@@ -152,7 +150,7 @@ class SharedFunction(
     val irReturnType: IrType? = returnType?.asIr()
 }
 
-sealed class Hook(
+sealed class HookModel(
     val name: String,
     val descriptor: Descriptor,
     returnType: KSPType?,
@@ -167,7 +165,7 @@ class BodyHook(
     descriptor: MethodDescriptor,
     returnType: KSPType?,
     parameters: List<HookParameter>,
-) : Hook(name, descriptor, returnType, parameters, listOf(At::ordinal.defaultValue))
+) : HookModel(name, descriptor, returnType, parameters, listOf(At::ordinal.defaultValue))
 
 class CallHook(
     name: String,
@@ -176,7 +174,7 @@ class CallHook(
     parameters: List<HookParameter>,
     val methodDescriptor: MethodDescriptor,
     ordinals: List<Int>,
-) : Hook(name, descriptor, returnType, parameters, ordinals)
+) : HookModel(name, descriptor, returnType, parameters, ordinals)
 
 class LiteralHook(
     name: String,
@@ -186,7 +184,7 @@ class LiteralHook(
     val typeName: String,
     val value: String,
     ordinals: List<Int>,
-) : Hook(name, descriptor, type, parameters, ordinals) {
+) : HookModel(name, descriptor, type, parameters, ordinals) {
     val irType: IrType = type.asIr()
 }
 
@@ -197,7 +195,7 @@ class FieldGetHook(
     val fieldDescriptor: FieldDescriptor,
     ordinals: List<Int>,
     parameters: List<HookParameter>,
-) : Hook(name, descriptor, type, parameters, ordinals) {
+) : HookModel(name, descriptor, type, parameters, ordinals) {
     val irType: IrType = type.asIr()
 }
 
@@ -208,7 +206,7 @@ class FieldSetHook(
     val fieldDescriptor: FieldDescriptor,
     ordinals: List<Int>,
     parameters: List<HookParameter>,
-) : Hook(name, descriptor, type, parameters, ordinals) {
+) : HookModel(name, descriptor, type, parameters, ordinals) {
     val irType: IrType = type.asIr()
 }
 
@@ -237,6 +235,13 @@ class HookLocalParameter(
     type: KSPType,
     val ordinal: Int
 ) : HookParameter {
+    val irType: IrType = type.asIr()
+}
+
+class FunctionParameter(
+    val name: String,
+    type: KSPType,
+) {
     val irType: IrType = type.asIr()
 }
 

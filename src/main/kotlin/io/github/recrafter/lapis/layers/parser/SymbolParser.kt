@@ -19,34 +19,36 @@ object SymbolParser {
 
     fun parse(resolver: Resolver): ParserResult =
         ParserResult(
-            descriptorContainers = resolver
-                .getSymbolsAnnotatedWith<LaDescriptors>()
-                .map { parseDescriptorContainer(it) },
-            patches = resolver
-                .getSymbolsAnnotatedWith<LaPatch>()
-                .map { parsePatch(it) },
+            schemas = resolver.getSymbolsAnnotatedWith<LaSchema>()
+                .filterIsInstance<KSPClass>()
+                .filter { symbol ->
+                    val parent = symbol.parentDeclaration
+                    parent == null || !parent.hasAnnotation<LaSchema>()
+                }
+                .map { parseSchema(it) },
+            patches = resolver.getSymbolsAnnotatedWith<LaPatch>().map { parsePatch(it) },
         )
 
-    private fun parseDescriptorContainer(symbol: KSPAnnotated): ParsedDescriptorContainer {
-        val targetClassType = symbol.annotations
-            .firstOrNull { it.isInstance<LaDescriptors>() }
-            ?.findClassArgument(LaDescriptors::target)
-        return ParsedDescriptorContainer(
+    private fun parseSchema(symbol: KSPClass): ParsedSchema {
+        val (nestedSchemas, descriptors) = symbol.declarations
+            .filterIsInstance<KSPClass>()
+            .partition { it.hasAnnotation<LaSchema>() }
+        val schemaAnnotation = symbol.getAnnotationOrNull<LaSchema>()
+        return ParsedSchema(
             symbol = symbol,
-            classType = symbol.castOrNull<KSPClass>(),
-            targetClassType = targetClassType,
-            descriptors = symbol.castOrNull<KSPClass>()
-                ?.declarations
-                ?.mapNotNull { parseDescriptor(it, targetClassType) }
-                ?.toList()
-                .orEmpty()
+            classType = symbol,
+            targetClassType = symbol.annotations
+                .firstOrNull { it.isInstance<LaSchema>() }
+                ?.findClassArgument(LaSchema::target)
+                ?.takeNotNothing(),
+            widener = schemaAnnotation?.widener?.ifEmpty { null },
+            isMarkedAsFinal = schemaAnnotation?.final == true,
+            descriptors = descriptors.map { parseDescriptor(it) },
+            nestedSchemas = nestedSchemas.map { parseSchema(it) },
         )
     }
 
-    private fun parseDescriptor(declaration: KSPDeclaration, targetClassType: KSPClass?): ParsedDescriptor? {
-        if (declaration is KSPFunction && declaration.isConstructor()) {
-            return null
-        }
+    private fun parseDescriptor(declaration: KSPDeclaration): ParsedDescriptor {
         val classDeclaration = declaration.castOrNull<KSPClass>()
         val superClass = classDeclaration?.getSuperClassOrNull()
         val superClassDeclaration = superClass?.declaration?.castOrNull<KSPClass>()
@@ -73,15 +75,20 @@ object SymbolParser {
             functionGenericTypes?.firstOrNull()
         } else null
         val hasReceiver = receiverType != null
+
+        val accessAnnotation = classDeclaration?.getAnnotationOrNull<LaAccess>()
+        val isMarkedAsFinal = accessAnnotation?.final == true
         return ParsedDescriptor(
             symbol = declaration,
 
+            name = classDeclaration?.name,
             classType = classDeclaration,
-            targetClassType = targetClassType,
             memberKinds = JavaMemberKind.entries.filter {
                 classDeclaration?.hasAnnotation(it.annotationClass) == true
             },
             hasStaticAnnotation = classDeclaration?.hasAnnotation<LaStatic>() == true,
+            hasAccessAnnotation = classDeclaration?.hasAnnotation<LaAccess>() == true,
+            isMarkedAsFinal = isMarkedAsFinal,
 
             isFunctionType = psiFunctionType != null && functionType?.isFunctionType == true,
             hasReceiver = hasReceiver,
@@ -113,10 +120,6 @@ object SymbolParser {
     private fun parsePatch(symbol: KSPAnnotated): ParsedPatch {
         val patchAnnotation = symbol.getAnnotationOrNull<LaPatch>()
         val classType = symbol.castOrNull<KSPClass>()
-
-        val outerClassType = classType?.parentDeclaration?.castOrNull<KSPClass>()
-        val outerAnnotation = outerClassType?.getAnnotationOrNull<LaPatch>()
-
         val superClass = classType?.getSuperClassOrNull()
 
         return ParsedPatch(
@@ -124,13 +127,7 @@ object SymbolParser {
 
             name = classType?.name,
             side = patchAnnotation?.side,
-            widener = patchAnnotation?.widener?.ifEmpty { null },
             classType = classType,
-
-            hasOuter = classType?.hasParent() == true,
-            hasOuterAnnotation = outerAnnotation != null,
-            outerWidener = outerAnnotation?.widener?.ifEmpty { null },
-            outerClassType = outerClassType,
 
             superClassType = superClass?.declaration?.castOrNull<KSPClass>(),
             superGenericClassType = superClass
@@ -142,54 +139,40 @@ object SymbolParser {
                 .firstOrNull { it.isInstance<LaPatch>() }
                 ?.findClassArgument(LaPatch::target),
 
-            properties = classType?.getProperties()?.map { parsePatchProperty(it) }.orEmpty(),
-            functions = classType?.getFunctions()
+            properties = classType?.properties?.map {
+                parsePatchProperty(it)
+            }.orEmpty(),
+            functions = classType?.functions
                 ?.filter { !it.isConstructor() }
                 ?.map { parsePatchFunction(it) }
                 .orEmpty(),
         )
     }
 
-    private fun parsePatchProperty(property: KSPProperty): ParsedPatchProperty {
-        val accessAnnotation = property.getAnnotationOrNull<LaAccess>()
-        return ParsedPatchProperty(
+    private fun parsePatchProperty(property: KSPProperty): ParsedPatchProperty =
+        ParsedPatchProperty(
             symbol = property,
 
             name = property.name,
             type = property.type.resolve(),
             isPublic = property.isPublic(),
             isAbstract = property.isAbstract(),
-            isExtension = property.isExtension(),
-
-            hasAccessAnnotation = accessAnnotation != null,
-            accessName = accessAnnotation?.name?.ifEmpty { property.name },
-            hasFieldAnnotation = property.hasAnnotation<LaField>(),
-
-            hasStaticAnnotation = property.hasAnnotation<LaStatic>(),
-            isMutable = property.isMutable,
-            isSetterPublic = property.setter?.modifiers?.contains(Modifier.PUBLIC) == true,
+            isExtension = property.isExtension,
+            isMutable = property.isMutable && property.setter?.modifiers?.contains(Modifier.PUBLIC) == true,
         )
-    }
 
-    private fun parsePatchFunction(function: KSPFunction): ParsedPatchFunction {
-        val accessAnnotation = function.getAnnotationOrNull<LaAccess>()
-        return ParsedPatchFunction(
+    private fun parsePatchFunction(function: KSPFunction): ParsedPatchFunction =
+        ParsedPatchFunction(
             symbol = function,
 
             name = function.name,
             parameters = function.parameters.map { parsePatchFunctionParameter(function, it) },
             returnType = function.getReturnTypeOrNull(),
+            hasTypeParameters = function.typeParameters.isNotEmpty(),
+
             isPublic = function.isPublic(),
             isAbstract = function.isAbstract,
-            isExtension = function.isExtension(),
-
-            hasAccessAnnotation = accessAnnotation != null,
-            accessName = accessAnnotation?.name?.ifEmpty { function.name },
-            accessMemberKinds = JavaMemberKind.entries.filter {
-                function.hasAnnotation(it.annotationClass)
-            },
-
-            hasStaticAnnotation = function.hasAnnotation<LaStatic>(),
+            isExtension = function.isExtension,
 
             hasHookAnnotation = function.hasAnnotation<LaHook>(),
             hookDescriptorClassType = function.annotations
@@ -197,7 +180,6 @@ object SymbolParser {
                 ?.findClassArgument(LaHook::descriptor),
             hookKind = function.getAnnotationOrNull<LaHook>()?.kind,
         )
-    }
 
     private fun parsePatchFunctionParameter(
         function: KSPFunction,

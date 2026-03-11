@@ -11,20 +11,23 @@ import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.parser.PsiHelper
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 
-fun KSPClass.isClass(): Boolean =
-    classKind == ClassKind.CLASS
+val KSPClass.isClass: Boolean
+    get() = classKind == ClassKind.CLASS
 
-fun KSPClass.isInner(): Boolean =
-    modifiers.contains(KSPModifier.INNER)
+val KSPClass.isInner: Boolean
+    get() = modifiers.contains(KSPModifier.INNER)
 
-fun KSPClass.getProperties(): List<KSPProperty> =
-    getDeclaredProperties().toList()
+val KSPClass.properties: List<KSPProperty>
+    get() = getDeclaredProperties().toList()
 
-fun KSPClass.getFunctions(): List<KSPFunction> =
-    getDeclaredFunctions().toList()
+val KSPClass.functions: List<KSPFunction>
+    get() = getDeclaredFunctions().toList()
 
 fun KSPClass.getSuperClassOrNull(): KSPType? =
-    superTypes.map { it.resolve() }.find { it.declaration.castOrNull<KSPClass>()?.isClass() == true }
+    superTypes.map { it.resolve() }.find { it.declaration.castOrNull<KSPClass>()?.isClass == true }
+
+fun KSPClass.takeNotNothing(): KSPClass? =
+    takeUnless { it.isInstance(Nothing::class) }
 
 fun KSPClass.findPsi(): PSIClass {
     val (psiFile, _) = PsiHelper.findPsiFile(this)

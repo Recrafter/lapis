@@ -28,7 +28,7 @@ class Builtins(
         }
 
         buildKotlinFile(rootClassType) {
-            suppress(
+            suppressWarnings(
                 KWarning.RedundantVisibilityModifier,
                 KWarning.ObjectInheritsException,
                 KWarning.JavaIoSerializableObjectMustHaveReadResolve,

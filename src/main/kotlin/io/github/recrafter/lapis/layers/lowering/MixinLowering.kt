@@ -6,7 +6,6 @@ import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.common.defaultValue
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.ksp.KSPLogger
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.Builtin
 import io.github.recrafter.lapis.layers.Builtins
@@ -19,17 +18,26 @@ import kotlin.reflect.KClass
 class MixinLowering(
     private val options: Options,
     private val builtins: Builtins,
-    private val logger: KSPLogger,
 ) {
     fun lower(validatorResult: ValidatorResult): IrResult {
-        val descriptorBindings = validatorResult.descriptors.map { validated ->
-            DescriptorBinding(
-                validated = validated,
-                lowered = lowerDescriptor(validated, validatorResult.patches),
+        val descriptorBindings = mutableListOf<DescriptorBinding>()
+        val irSchemas = validatorResult.schemas.map { validatedSchema ->
+            IrSchema(
+                containingFile = validatedSchema.containingFile,
+
+                needAccess = validatedSchema.needAccess,
+                needRemoveFinal = validatedSchema.needRemoveFinal,
+                classType = validatedSchema.irClassType,
+                targetClassType = validatedSchema.irTargetClassType,
+                descriptors = validatedSchema.descriptors.map { validatorDescriptor ->
+                    val irDescriptor = lowerDescriptor(validatorDescriptor, validatorResult.patches)
+                    descriptorBindings += DescriptorBinding(validatorDescriptor, irDescriptor)
+                    irDescriptor
+                },
             )
         }
         return IrResult(
-            descriptors = descriptorBindings.map { it.lowered },
+            schemas = irSchemas,
             mixins = validatorResult.patches.map { lowerMixin(it, descriptorBindings) },
         )
     }
@@ -45,8 +53,6 @@ class MixinLowering(
                         ),
                         superClassType = builtins[Builtin.Callable].generic(descriptor.irClassType),
                         receiverType = if (descriptor.isStatic) null else descriptor.irReceiverType,
-                        parameters = descriptor.parameters.asIr(),
-                        returnType = descriptor.irReturnType,
                     )
                 } else null
                 val context = if (patches.hasHookParameter<HookContextParameter>(descriptor)) {
@@ -56,16 +62,28 @@ class MixinLowering(
                             "Context".withQualifiedNamePrefix(descriptor.irClassType)
                         ),
                         superClassType = builtins[Builtin.Context].generic(descriptor.irClassType),
+                    )
+                } else null
+                if (descriptor is ConstructorDescriptor) {
+                    IrConstructorDescriptor(
+                        needAccess = descriptor.needAccess,
+                        callable = callable,
+                        context = context,
+                        parameters = descriptor.parameters.asIr(),
+                        classType = descriptor.irOwnerReturnType,
+                    )
+                } else {
+                    IrMethodDescriptor(
+                        needAccess = descriptor.needAccess,
+                        needRemoveFinal = descriptor.needRemoveFinal,
+                        name = descriptor.name,
+                        targetName = descriptor.targetName,
+                        callable = callable,
+                        context = context,
                         parameters = descriptor.parameters.asIr(),
                         returnType = descriptor.irReturnType,
                     )
-                } else null
-                IrInvokableDescriptor(
-                    containingFile = descriptor.containingFile,
-                    classType = descriptor.irClassType,
-                    callable = callable,
-                    context = context,
-                )
+                }
             }
 
             is FieldDescriptor -> {
@@ -77,7 +95,6 @@ class MixinLowering(
                         ),
                         superClassType = builtins[Builtin.Getter].generic(descriptor.irClassType),
                         receiverType = if (descriptor.isStatic) null else descriptor.irReceiverType,
-                        type = descriptor.irType,
                     )
                 } else null
                 val setter = if (patches.hasHookParameter<HookSetterTargetParameter>(descriptor)) {
@@ -88,14 +105,16 @@ class MixinLowering(
                         ),
                         superClassType = builtins[Builtin.Setter].generic(descriptor.irClassType),
                         receiverType = if (descriptor.isStatic) null else descriptor.irReceiverType,
-                        type = descriptor.irType,
                     )
                 } else null
                 IrFieldDescriptor(
-                    containingFile = descriptor.containingFile,
-                    classType = descriptor.irClassType,
+                    needAccess = descriptor.needAccess,
+                    needRemoveFinal = descriptor.needRemoveFinal,
+                    name = descriptor.name,
+                    targetName = descriptor.targetName,
                     getter = getter,
                     setter = setter,
+                    type = descriptor.irType,
                 )
             }
         }
@@ -117,61 +136,8 @@ class MixinLowering(
 
             side = patch.side,
             extension = lowerExtension(patch, patch.irClassType),
-            accessor = lowerAccessor(patch, patch.irClassType),
             injections = patch.hooks.flatMap { lowerInjections(it, descriptorBindings) },
-
-            innerMixins = patch.innerPatches.map { lowerMixin(it, descriptorBindings) },
         )
-
-    private fun lowerAccessor(patch: Patch, patchClassType: IrClassType): IrAccessor? {
-        if (patch.accessProperties.isEmpty() && patch.accessFunctions.isEmpty() && patch.accessConstructors.isEmpty()) {
-            return null
-        }
-        return IrAccessor(
-            classType = IrClassType.of(
-                options.mixinPackageName,
-                "Accessor".withQualifiedNamePrefix(patchClassType)
-            ),
-            kinds = buildList {
-                patch.accessProperties.forEach { property ->
-                    add(
-                        IrFieldGetterAccessor(
-                            name = property.name,
-                            targetName = property.vanillaName,
-                            type = property.irType,
-                            isStatic = property.isStatic,
-                        )
-                    )
-                    if (property.isMutable) {
-                        add(
-                            IrFieldSetterAccessor(
-                                name = property.name,
-                                targetName = property.vanillaName,
-                                type = property.irType,
-                                isStatic = property.isStatic,
-                            )
-                        )
-                    }
-                }
-                addAll(patch.accessConstructors.map { constructor ->
-                    IrConstructorAccessor(
-                        name = constructor.name,
-                        parameters = constructor.parameters.asIr(),
-                        classType = constructor.irClassType,
-                    )
-                })
-                addAll(patch.accessFunctions.map { function ->
-                    IrMethodAccessor(
-                        name = function.name,
-                        targetName = function.vanillaName,
-                        parameters = function.parameters.asIr(),
-                        returnType = function.irReturnType,
-                        isStatic = function.isStatic,
-                    )
-                })
-            },
-        )
-    }
 
     private fun lowerExtension(patch: Patch, patchClassType: IrClassType): IrExtension? {
         if (patch.sharedProperties.isEmpty() && patch.sharedFunctions.isEmpty()) {
@@ -190,7 +156,7 @@ class MixinLowering(
                             type = property.irType,
                         )
                     )
-                    if (property.isMutable && property.isSetterPublic) {
+                    if (property.isMutable) {
                         add(
                             IrFieldSetterExtension(
                                 name = property.name,
@@ -210,7 +176,7 @@ class MixinLowering(
         )
     }
 
-    private fun lowerInjections(hook: Hook, descriptorBindings: List<DescriptorBinding>): List<IrInjection> {
+    private fun lowerInjections(hook: HookModel, descriptorBindings: List<DescriptorBinding>): List<IrInjection> {
         val parameters = hook.parameters.flatMap { lowerInjectionParameter(hook, it) }
         return hook.ordinals.map { ordinal ->
             when (hook) {
@@ -269,7 +235,7 @@ class MixinLowering(
         }
     }
 
-    private fun lowerInjectionParameter(hook: Hook, parameter: HookParameter): List<IrInjectionParameter> =
+    private fun lowerInjectionParameter(hook: HookModel, parameter: HookParameter): List<IrInjectionParameter> =
         when (parameter) {
             is HookTargetParameter -> buildList {
                 if (hook !is BodyHook && !parameter.descriptor.isStatic) {
@@ -329,25 +295,40 @@ class MixinLowering(
         ordinal: Int = At::ordinal.defaultValue,
     ): IrHookArgument =
         when (parameter) {
-            is HookCallableTargetParameter -> IrHookCallableTargetArgument(
-                descriptorBindings.findLowered<IrInvokableDescriptor>(parameter.descriptor.irClassType).callable
-                    ?: lapisError("Callable for ${parameter.descriptor.irClassType.qualifiedName.quoted()} expected")
-            )
+            is HookCallableTargetParameter -> {
+                val classType = parameter.descriptor.irClassType
+                val descriptor = descriptorBindings.findLowered<IrInvokableDescriptor>(classType)
+                IrHookCallableTargetArgument(
+                    descriptor,
+                    descriptor.callable ?: lapisError("Callable for ${classType.qualifiedName.quoted()} expected")
+                )
+            }
 
-            is HookGetterTargetParameter -> IrHookGetterTargetArgument(
-                descriptorBindings.findLowered<IrFieldDescriptor>(parameter.descriptor.irClassType).getter
-                    ?: lapisError("Getter for ${parameter.descriptor.irClassType.qualifiedName.quoted()} expected")
-            )
+            is HookGetterTargetParameter -> {
+                val classType = parameter.descriptor.irClassType
+                val descriptor = descriptorBindings.findLowered<IrFieldDescriptor>(classType)
+                IrHookGetterTargetArgument(
+                    descriptor.getter ?: lapisError("Getter for ${classType.qualifiedName.quoted()} expected")
+                )
+            }
 
-            is HookSetterTargetParameter -> IrHookSetterTargetArgument(
-                descriptorBindings.findLowered<IrFieldDescriptor>(parameter.descriptor.irClassType).setter
-                    ?: lapisError("Setter for ${parameter.descriptor.irClassType.qualifiedName.quoted()} expected")
-            )
+            is HookSetterTargetParameter -> {
+                val classType = parameter.descriptor.irClassType
+                val descriptor = descriptorBindings.findLowered<IrFieldDescriptor>(parameter.descriptor.irClassType)
 
-            is HookContextParameter -> IrHookContextArgument(
-                descriptorBindings.findLowered<IrInvokableDescriptor>(parameter.descriptor.irClassType).context
-                    ?: lapisError("Context for ${parameter.descriptor.irClassType.qualifiedName.quoted()} expected")
-            )
+                IrHookSetterTargetArgument(
+                    descriptor.setter ?: lapisError("Setter for ${classType.qualifiedName.quoted()} expected")
+                )
+            }
+
+            is HookContextParameter -> {
+                val classType = parameter.descriptor.irClassType
+                val descriptor = descriptorBindings.findLowered<IrInvokableDescriptor>(classType)
+                IrHookContextArgument(
+                    descriptor,
+                    descriptor.context ?: lapisError("Context for ${classType.qualifiedName.quoted()} expected")
+                )
+            }
 
             is HookLiteralParameter -> IrHookLiteralArgument
             is HookOrdinalParameter -> IrHookOrdinalArgument(ordinal)
@@ -355,7 +336,7 @@ class MixinLowering(
         }
 
     private inline fun <reified T : IrDescriptor> List<DescriptorBinding>.findLowered(classType: IrClassType): T =
-        firstOrNull { it.validated.irClassType == classType }?.lowered?.castOrNull<T>()
+        firstOrNull { it.validatedDescriptor.irClassType == classType }?.irDescriptor?.castOrNull<T>()
             ?: lapisError("Binding for ${classType.qualifiedName.quoted()} not found")
 
     private inline fun <reified T : HookDescriptorParameter> List<Patch>.hasHookParameter(
@@ -370,8 +351,8 @@ class MixinLowering(
         }
 
     private class DescriptorBinding(
-        val validated: Descriptor,
-        val lowered: IrDescriptor,
+        val validatedDescriptor: Descriptor,
+        val irDescriptor: IrDescriptor,
     )
 }
 
