@@ -825,7 +825,6 @@ class MixinGenerator(
                         MethodEntry(
                             ownerClass = schema.targetClassType,
                             name = descriptor.binaryName,
-                            srgName = null,
                             parameterTypes = descriptor.parameters.map { it.type },
                             returnType = when (descriptor) {
                                 is IrConstructorDescriptor -> null
@@ -840,7 +839,6 @@ class MixinGenerator(
                         FieldEntry(
                             ownerClass = schema.targetClassType,
                             name = descriptor.targetName,
-                            internalName = null,
                             type = descriptor.type,
                             needRemoveFinal = descriptor.needRemoveFinal,
                         )
@@ -849,6 +847,8 @@ class MixinGenerator(
             }
         }
         if (entries.isEmpty()) {
+            options.accessWidener?.let { File(it).delete() }
+            options.accessTransformer?.let { File(it).delete() }
             return
         }
         val sortedEntries = entries.distinctBy { it.awEntry }.sorted()
@@ -879,8 +879,11 @@ class MixinGenerator(
             }
         }
 
-        options.accessTransformer?.let { _ ->
-            TODO("[LAPIS] Access Transformer support not implemented yet.")
+        options.accessTransformer?.let { path ->
+            File(path).apply {
+                parentFile?.mkdirs()
+                writeText(formatConfig { it.atEntry })
+            }
         }
     }
 }

@@ -50,9 +50,6 @@ class LapisProcessor(
     private fun generate() {
         val sortedSchemas = schemas.values.sortedBy { it.classType.qualifiedName }
         val sortedMixins = mixins.values.sortedBy { it.patchClassType.qualifiedName }
-        if (sortedSchemas.isEmpty() && sortedMixins.isEmpty()) {
-            return
-        }
         MixinGenerator(options, builtins, codeGenerator).generate(sortedSchemas, sortedMixins)
     }
 }

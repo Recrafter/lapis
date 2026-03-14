@@ -53,7 +53,6 @@ class ClassEntry(
 class FieldEntry(
     override val ownerClass: IrClassType,
     val name: String,
-    val internalName: String?,
     val type: IrType,
     val needRemoveFinal: Boolean,
 ) : AccessorConfigEntry {
@@ -83,7 +82,8 @@ class FieldEntry(
             )
             append(" ")
             append(ownerClass.atClassName)
-            append(" $internalName # $name")
+            append(" ")
+            append(name)
         }
 
     override val sectionIndex: Int = 1
@@ -93,7 +93,6 @@ class FieldEntry(
 class MethodEntry(
     override val ownerClass: IrClassType,
     val name: String,
-    val srgName: String?,
     val parameterTypes: List<IrType>,
     val returnType: IrType?,
     val needRemoveFinal: Boolean,
@@ -123,12 +122,8 @@ class MethodEntry(
             append(" ")
             append(ownerClass.atClassName)
             append(" ")
-            append(
-                if (isConstructor) name
-                else srgName
-            )
+            append(name)
             append(JvmDescriptor.buildMethodSignature(parameterTypes, returnType))
-            append(" # $name")
         }
 
     override val sectionIndex: Int = if (isConstructor) 2 else 3
