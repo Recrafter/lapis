@@ -2,8 +2,6 @@ package io.github.recrafter.lapis.layers.parser
 
 import io.github.recrafter.lapis.Hook
 import io.github.recrafter.lapis.Side
-import io.github.recrafter.lapis.annotations.LaHook
-import io.github.recrafter.lapis.annotations.LaPatch
 import io.github.recrafter.lapis.extensions.ksp.KSPAnnotated
 import io.github.recrafter.lapis.extensions.ksp.KSPClass
 import io.github.recrafter.lapis.extensions.ksp.KSPSymbol
@@ -25,15 +23,11 @@ class ParsedSchema(
     val classType: KSPClass?,
     val targetClassType: KSPClass?,
     val widener: String?,
+    val hasWidener: Boolean,
     val isMarkedAsFinal: Boolean,
     val descriptors: List<ParsedDescriptor>,
     val nestedSchemas: List<ParsedSchema>,
 ) : KSPSource(symbol)
-
-class ParsedFunctionTypeParameter(
-    val type: KSPType,
-    val name: String?,
-)
 
 class ParsedDescriptor(
     symbol: KSPSymbol,
@@ -132,3 +126,8 @@ class ParsedPatchFunctionParameter(
     val hasLocalAnnotation: Boolean,
     val localOrdinal: Int?,
 ) : KSPSource(symbol)
+
+class ParsedFunctionTypeParameter(
+    val type: KSPType,
+    val name: String?,
+)

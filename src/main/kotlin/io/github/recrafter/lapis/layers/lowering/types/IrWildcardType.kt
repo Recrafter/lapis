@@ -6,13 +6,17 @@ import io.github.recrafter.lapis.extensions.jp.JPStar
 import io.github.recrafter.lapis.extensions.jp.JPWildcardType
 import io.github.recrafter.lapis.extensions.kp.KPStar
 import io.github.recrafter.lapis.extensions.kp.KPWildcardType
+import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.asIr
 
 class IrWildcardType(override val kotlin: KPWildcardType) : IrType(kotlin) {
 
     override val java: JPWildcardType by lazy {
         if (kotlin.inTypes.size > 1 || kotlin.outTypes.size > 1) {
-            lapisError("Wildcard type $kotlin with multiple bounds is not supported, but was leaked into lowering")
+            lapisError(
+                "Wildcard type ${kotlin.toString().quoted()} with multiple bounds is not supported, " +
+                    "but was leaked into IR"
+            )
         }
         if (kotlin == KPStar) {
             return@lazy JPStar

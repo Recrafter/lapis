@@ -8,7 +8,7 @@ fun <T> unsafeLazy(initializer: () -> T): Lazy<T> =
 
 fun lapisError(message: String): Nothing =
     error(
-        "Internal error: ${message.quoted()}. " +
+        "$message. " +
             "This is a ${LapisMeta.NAME} bug. " +
             "Please report it to the issue tracker: " +
             "https://github.com/Recrafter/${LapisMeta.NAME}/issues"

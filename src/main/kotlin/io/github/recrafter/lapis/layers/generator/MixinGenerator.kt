@@ -16,9 +16,8 @@ import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ksp.KSPDependencies
 import io.github.recrafter.lapis.extensions.ksp.createResourceFile
 import io.github.recrafter.lapis.extensions.ksp.toDependencies
-import io.github.recrafter.lapis.layers.Builtin
-import io.github.recrafter.lapis.layers.Builtins
 import io.github.recrafter.lapis.layers.lowering.*
+import io.github.recrafter.lapis.layers.lowering.types.IrClassType
 import io.github.recrafter.lapis.layers.lowering.types.IrType
 import io.github.recrafter.lapis.layers.lowering.types.orVoid
 import kotlinx.serialization.json.Json
@@ -91,8 +90,9 @@ class MixinGenerator(
                     add(IrParameter(receiverParameterName, it))
                     add(IrParameter(invokeWithReceiverParameterName, Boolean::class.asIr()))
                 }
-                addAll(descriptor.parameters.map { parameter ->
-                    IrParameter(parameter.name.withInternalPrefix("argument"), parameter.type)
+                addAll(descriptor.parameters.mapIndexed { index, parameter ->
+                    val name = parameter.name ?: index.toString()
+                    IrParameter(name.withInternalPrefix("argument"), parameter.type)
                 })
                 add(
                     IrParameter(
@@ -103,16 +103,17 @@ class MixinGenerator(
             })
             addSuperInterface(callable.superClassType)
         })
-        addProperties(descriptor.parameters.map { parameter ->
-            buildKotlinProperty(parameter.name, parameter.type) {
+        addProperties(descriptor.parameters.mapNotNull { parameter ->
+            val name = parameter.name ?: return@mapNotNull null
+            buildKotlinProperty(name, parameter.type) {
                 setReceiverType(callable.superClassType)
                 setGetter {
-                    setJvmName(callable.classType.simpleName + "_get" + parameter.name.capitalize())
+                    setJvmName(callable.classType.simpleName + "_get" + name.capitalize())
                     setModifiers(IrModifier.INLINE)
                     setBody {
                         return_("(this as %T).%L") {
                             arg(callable.classType)
-                            arg(parameter.name.withInternalPrefix("argument"))
+                            arg(name.withInternalPrefix("argument"))
                         }
                     }
                 }
@@ -137,9 +138,10 @@ class MixinGenerator(
             setModifiers(IrModifier.INLINE)
             setReceiverType(callable.superClassType)
             descriptor.parameters.forEach { parameter ->
-                addParameter(buildKotlinParameter(parameter.name, parameter.type) {
+                val name = parameter.name ?: return@forEach
+                addParameter(buildKotlinParameter(name, parameter.type) {
                     defaultValue(buildKotlinCodeBlock("this.%L") {
-                        arg(parameter.name)
+                        arg(name)
                     })
                 })
             }
@@ -163,16 +165,18 @@ class MixinGenerator(
                     }
                 }
 
-                val parameters = descriptor.parameters.map { it.name }
+                val parameterNames = descriptor.parameters.mapIndexed { index, it ->
+                    it.name ?: index.toString().withInternalPrefix("argument")
+                }
                 if (callable.receiverType != null) {
                     if_(buildKotlinCodeBlock(invokeWithReceiverParameterName)) {
-                        callOperation(listOf(receiverParameterName) + parameters)
+                        callOperation(listOf(receiverParameterName) + parameterNames)
                         if (descriptor.returnType == null) {
                             return_()
                         }
                     }
                 }
-                callOperation(parameters)
+                callOperation(parameterNames)
             }
         })
     }
@@ -184,8 +188,9 @@ class MixinGenerator(
         val callbackParameterName = "callback".withInternalPrefix()
         addType(buildKotlinClass(context.classType.simpleName) {
             setConstructor(buildList {
-                addAll(descriptor.parameters.map { parameter ->
-                    IrParameter(parameter.name.withInternalPrefix("parameter"), parameter.type)
+                addAll(descriptor.parameters.mapIndexed { index, parameter ->
+                    val name = parameter.name ?: index.toString()
+                    IrParameter(name.withInternalPrefix("parameter"), parameter.type)
                 })
                 add(
                     IrParameter(
@@ -198,16 +203,17 @@ class MixinGenerator(
             })
             addSuperInterface(context.superClassType)
         })
-        addProperties(descriptor.parameters.map { parameter ->
-            buildKotlinProperty(parameter.name, parameter.type) {
+        addProperties(descriptor.parameters.mapNotNull { parameter ->
+            val name = parameter.name ?: return@mapNotNull null
+            buildKotlinProperty(name, parameter.type) {
                 setReceiverType(context.superClassType)
                 setGetter {
-                    setJvmName(context.classType.simpleName + "_get" + parameter.name.capitalize())
+                    setJvmName(context.classType.simpleName + "_get" + name.capitalize())
                     setModifiers(IrModifier.INLINE)
                     setBody {
                         return_("(this as %T).%L") {
                             arg(context.classType)
-                            arg(parameter.name.withInternalPrefix("parameter"))
+                            arg(name.withInternalPrefix("parameter"))
                         }
                     }
                 }
@@ -556,8 +562,13 @@ class MixinGenerator(
                         buildJavaParameter(receiverParameterName, parameter.type)
                     }
 
+                    is IrInjectionSetterValueParameter -> {
+                        buildJavaParameter("newValue".withInternalPrefix(), parameter.type)
+                    }
+
                     is IrInjectionArgumentParameter -> {
-                        buildJavaParameter(parameter.name.withInternalPrefix("argument"), parameter.type)
+                        val name = parameter.name ?: parameter.index.toString()
+                        buildJavaParameter(name.withInternalPrefix("argument"), parameter.type)
                     }
 
                     is IrInjectionOperationParameter -> {
@@ -580,9 +591,10 @@ class MixinGenerator(
                     }
 
                     is IrInjectionParameterParameter -> {
-                        buildJavaParameter(parameter.name.withInternalPrefix("parameter"), parameter.type) {
+                        val name = parameter.name ?: parameter.index.toString()
+                        buildJavaParameter(name.withInternalPrefix("parameter"), parameter.type) {
                             addAnnotation<Local> {
-                                setIntMember(Local::index, parameter.index)
+                                setIntMember(Local::index, parameter.localIndex)
                                 setBooleanMember(Local::argsOnly, true)
                             }
                         }
@@ -628,8 +640,9 @@ class MixinGenerator(
                                 else -> {}
                             }
                             if (argument is IrHookCallableTargetArgument) {
-                                addAll(argument.descriptor.parameters.map {
-                                    buildJavaCodeBlock(it.name.withInternalPrefix("argument"))
+                                addAll(argument.descriptor.parameters.mapIndexed { index, parameter ->
+                                    val name = parameter.name ?: index.toString()
+                                    buildJavaCodeBlock(name.withInternalPrefix("argument"))
                                 })
                             }
                             add(buildJavaCodeBlock(originalParameterName))
@@ -646,8 +659,9 @@ class MixinGenerator(
 
                     is IrHookContextArgument -> {
                         val constructorArgumentCodeBlocks = buildList {
-                            addAll(argument.descriptor.parameters.map {
-                                buildJavaCodeBlock(it.name.withInternalPrefix("parameter"))
+                            addAll(argument.descriptor.parameters.mapIndexed { index, parameter ->
+                                val name = parameter.name ?: index.toString()
+                                buildJavaCodeBlock(name.withInternalPrefix("parameter"))
                             })
                             add(buildJavaCodeBlock(callbackParameterName))
                         }
@@ -801,7 +815,7 @@ class MixinGenerator(
         schemas.forEach { schema ->
             if (schema.needAccess) {
                 entries += ClassEntry(
-                    classType = schema.targetClassType,
+                    ownerClass = schema.targetClassType,
                     needRemoveFinal = schema.needRemoveFinal,
                 )
             }
@@ -809,18 +823,24 @@ class MixinGenerator(
                 entries += when (descriptor) {
                     is IrInvokableDescriptor -> {
                         MethodEntry(
-                            ownerClassType = schema.targetClassType,
+                            ownerClass = schema.targetClassType,
                             name = descriptor.binaryName,
+                            srgName = null,
                             parameterTypes = descriptor.parameters.map { it.type },
-                            returnType = if (descriptor is IrConstructorDescriptor) null else descriptor.returnType,
+                            returnType = when (descriptor) {
+                                is IrConstructorDescriptor -> null
+                                else -> descriptor.returnType
+                            },
                             needRemoveFinal = descriptor.needRemoveFinal,
+                            isConstructor = descriptor is IrConstructorDescriptor,
                         )
                     }
 
                     is IrFieldDescriptor -> {
                         FieldEntry(
-                            ownerClassType = schema.targetClassType,
+                            ownerClass = schema.targetClassType,
                             name = descriptor.targetName,
+                            internalName = null,
                             type = descriptor.type,
                             needRemoveFinal = descriptor.needRemoveFinal,
                         )
@@ -831,30 +851,36 @@ class MixinGenerator(
         if (entries.isEmpty()) {
             return
         }
-        val sortedEntries = entries.distinctBy { it.awEntry }.sortedWith(
-            compareBy<AccessorConfigEntry> {
-                when (it) {
-                    is ClassEntry -> 0
-                    is FieldEntry -> 1
-                    is MethodEntry -> 2
-                }
-            }.thenBy { it.awEntry }
-        )
-        options.accessWidener?.let { path ->
-            val file = File(path)
-            file.parentFile?.mkdirs()
-            file.writeText(buildString {
-                appendLine("accessWidener v2 named")
+        val sortedEntries = entries.distinctBy { it.awEntry }.sorted()
+
+        fun formatConfig(header: String? = null, directive: (AccessorConfigEntry) -> String): String = buildString {
+            header?.let {
+                appendLine(it)
                 appendLine()
-                sortedEntries.forEach { appendLine(it.awEntry) }
-            })
+            }
+            var lastOwner: IrClassType? = null
+            sortedEntries.forEach { entry ->
+                if (lastOwner != entry.ownerClass) {
+                    if (lastOwner != null) {
+                        appendLine()
+                    }
+                    appendLine("# ${entry.ownerClass.name}")
+                    lastOwner = entry.ownerClass
+                }
+                appendLine(directive(entry))
+            }
         }
-        options.accessTransformer?.let { path ->
-            val file = File(path)
-            file.parentFile?.mkdirs()
-            file.writeText(buildString {
-                sortedEntries.forEach { appendLine(it.atEntry) }
-            })
+
+        options.accessWidener?.let { path ->
+            val content = formatConfig("accessWidener v2 named") { it.awEntry }
+            File(path).apply {
+                parentFile?.mkdirs()
+                writeText(content)
+            }
+        }
+
+        options.accessTransformer?.let { _ ->
+            TODO("[LAPIS] Access Transformer support not implemented yet.")
         }
     }
 }

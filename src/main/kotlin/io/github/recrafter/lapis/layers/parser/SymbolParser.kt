@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.layers.parser
 
+import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isPublic
@@ -25,26 +26,35 @@ object SymbolParser {
                     val parent = symbol.parentDeclaration
                     parent == null || !parent.hasAnnotation<LaSchema>()
                 }
-                .map { parseSchema(it) },
+                .map { parseSchema(resolver, it) },
             patches = resolver.getSymbolsAnnotatedWith<LaPatch>().map { parsePatch(it) },
         )
 
-    private fun parseSchema(symbol: KSPClass): ParsedSchema {
+    private fun parseSchema(resolver: Resolver, symbol: KSPClass, parentWidener: String? = null): ParsedSchema {
         val (nestedSchemas, descriptors) = symbol.declarations
             .filterIsInstance<KSPClass>()
             .partition { it.hasAnnotation<LaSchema>() }
         val schemaAnnotation = symbol.getAnnotationOrNull<LaSchema>()
+        val widener = schemaAnnotation?.widener?.ifEmpty { null }
+        val explicitTarget = symbol.annotations
+            .firstOrNull { it.isInstance<LaSchema>() }
+            ?.findClassArgument(LaSchema::target)
+            ?.takeNotNothing()
+        val currentWidener = when {
+            parentWidener != null && widener != null -> parentWidener + "." + widener.removePrefix(".")
+            widener != null -> widener
+            explicitTarget != null -> explicitTarget.qualifiedName?.asString()
+            else -> null
+        }
         return ParsedSchema(
             symbol = symbol,
             classType = symbol,
-            targetClassType = symbol.annotations
-                .firstOrNull { it.isInstance<LaSchema>() }
-                ?.findClassArgument(LaSchema::target)
-                ?.takeNotNothing(),
-            widener = schemaAnnotation?.widener?.ifEmpty { null },
+            targetClassType = explicitTarget ?: currentWidener?.let { resolver.getClassDeclarationByName(it) },
+            widener = currentWidener,
+            hasWidener = widener != null,
             isMarkedAsFinal = schemaAnnotation?.final == true,
             descriptors = descriptors.map { parseDescriptor(it) },
-            nestedSchemas = nestedSchemas.map { parseSchema(it) },
+            nestedSchemas = nestedSchemas.map { parseSchema(resolver, it, currentWidener) },
         )
     }
 

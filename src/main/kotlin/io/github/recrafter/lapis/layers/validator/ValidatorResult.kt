@@ -20,14 +20,13 @@ class Schema(
     symbol: KSPSymbol,
 
     classType: KSPClass,
-    targetClassType: KSPClass?,
+    targetClassType: KSPClass,
     val needAccess: Boolean,
     val needRemoveFinal: Boolean,
-    val widener: String,
     val descriptors: List<Descriptor>,
 ) {
     val irClassType: IrClassType = classType.asIr()
-    val irTargetClassType: IrClassType = targetClassType?.asIr() ?: IrClassType.ofBinaryClassName(widener)
+    val irTargetClassType: IrClassType = targetClassType.asIr()
     val containingFile: KSPFile? = symbol.containingFile?.warmUp()
 }
 
@@ -36,7 +35,7 @@ sealed class Descriptor(
     val targetName: String,
     classType: KSPClass,
     receiverType: KSPType,
-    val parameters: List<FunctionParameter>,
+    val parameters: List<FunctionTypeParameter>,
     val returnType: KSPType?,
     val isStatic: Boolean,
     val needAccess: Boolean,
@@ -52,7 +51,7 @@ sealed class InvokableDescriptor(
     targetName: String,
     classType: KSPClass,
     receiverType: KSPType,
-    parameters: List<FunctionParameter>,
+    parameters: List<FunctionTypeParameter>,
     returnType: KSPType?,
     isStatic: Boolean,
     needAccess: Boolean,
@@ -63,7 +62,7 @@ class ConstructorDescriptor(
     name: String,
     classType: KSPClass,
     ownerClassType: KSPType,
-    parameters: List<FunctionParameter>,
+    parameters: List<FunctionTypeParameter>,
     needAccess: Boolean,
     needRemoveFinal: Boolean,
 ) : InvokableDescriptor(
@@ -86,7 +85,7 @@ open class MethodDescriptor(
     receiverType: KSPType,
     returnType: KSPType?,
     targetName: String,
-    parameters: List<FunctionParameter>,
+    parameters: List<FunctionTypeParameter>,
     isStatic: Boolean,
     needAccess: Boolean,
     needRemoveFinal: Boolean,
@@ -240,6 +239,13 @@ class HookLocalParameter(
 
 class FunctionParameter(
     val name: String,
+    type: KSPType,
+) {
+    val irType: IrType = type.asIr()
+}
+
+class FunctionTypeParameter(
+    val name: String?,
     type: KSPType,
 ) {
     val irType: IrType = type.asIr()

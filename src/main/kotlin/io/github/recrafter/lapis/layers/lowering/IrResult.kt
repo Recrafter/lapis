@@ -1,7 +1,6 @@
 package io.github.recrafter.lapis.layers.lowering
 
 import io.github.recrafter.lapis.Side
-import io.github.recrafter.lapis.annotations.LaPatch
 import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.extensions.common.defaultValue
 import io.github.recrafter.lapis.extensions.ksp.KSPFile
@@ -36,7 +35,7 @@ sealed class IrInvokableDescriptor(
     needRemoveFinal: Boolean,
     val callable: IrDescriptorCallable?,
     val context: IrDescriptorContext?,
-    val parameters: List<IrParameter>,
+    val parameters: List<IrFunctionTypeParameter>,
     val returnType: IrType?,
 ) : IrDescriptor(needAccess, needRemoveFinal)
 
@@ -44,7 +43,7 @@ class IrConstructorDescriptor(
     needAccess: Boolean,
     callable: IrDescriptorCallable?,
     context: IrDescriptorContext?,
-    parameters: List<IrParameter>,
+    parameters: List<IrFunctionTypeParameter>,
     val classType: IrType,
 ) : IrInvokableDescriptor(needAccess, false, callable, context, parameters, classType)
 
@@ -55,7 +54,7 @@ class IrMethodDescriptor(
     val targetName: String,
     callable: IrDescriptorCallable?,
     context: IrDescriptorContext?,
-    parameters: List<IrParameter>,
+    parameters: List<IrFunctionTypeParameter>,
     returnType: IrType?,
 ) : IrInvokableDescriptor(needAccess, needRemoveFinal, callable, context, parameters, returnType)
 
@@ -226,40 +225,47 @@ class IrInjectionReceiverParameter(
     override val priority: Int = 0
 ) : IrInjectionParameter
 
-class IrInjectionArgumentParameter(
-    val name: String,
+class IrInjectionSetterValueParameter(
     val type: IrType,
     override val priority: Int = 1
 ) : IrInjectionParameter
 
+class IrInjectionArgumentParameter(
+    val name: String?,
+    val index: Int,
+    val type: IrType,
+    override val priority: Int = 2
+) : IrInjectionParameter
+
 class IrInjectionOperationParameter(
     val returnType: IrType?,
-    override val priority: Int = 2
+    override val priority: Int = 3
 ) : IrInjectionParameter
 
 class IrInjectionLiteralParameter(
     val type: IrType,
-    override val priority: Int = 3
+    override val priority: Int = 4
 ) : IrInjectionParameter
 
 class IrInjectionCallbackParameter(
     val returnType: IrType?,
-    override val priority: Int = 4
+    override val priority: Int = 5
 ) : IrInjectionParameter
 
 class IrInjectionParameterParameter(
-    val name: String,
-    val type: IrType,
+    val name: String?,
     val index: Int,
-    override val priority: Int = 5,
-    override val subPriority: Int = index
+    val type: IrType,
+    val localIndex: Int,
+    override val priority: Int = 6,
+    override val subPriority: Int = localIndex
 ) : IrInjectionParameter
 
 class IrInjectionLocalParameter(
     val name: String,
     val type: IrType,
     val ordinal: Int,
-    override val priority: Int = 6,
+    override val priority: Int = 7,
     override val subPriority: Int = ordinal
 ) : IrInjectionParameter
 
@@ -281,3 +287,5 @@ class IrHookLocalArgument(val parameterName: String) : IrHookArgument
 
 open class IrParameter(val name: String, val type: IrType)
 class IrSetterParameter(type: IrType) : IrParameter("newValue", type)
+
+open class IrFunctionTypeParameter(val name: String?, val type: IrType)

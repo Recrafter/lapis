@@ -3,6 +3,7 @@ package io.github.recrafter.lapis.layers.lowering.types
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.asIr
 
 open class IrType(
@@ -33,8 +34,15 @@ open class IrType(
             is KPGenericType -> kotlin.asIr().java
             is KPWildcardType -> kotlin.asIr().java
             is KPVariableType -> kotlin.asIr().java
-            is KPFunctionType -> lapisError("Function type $kotlin is not supported, but was leaked into lowering")
-            is KPDynamicType -> lapisError("Dynamic type $kotlin is not supported, but was leaked into lowering")
+            is KPFunctionType -> lapisError(
+                "Function type ${kotlin.toString().quoted()} is not supported, " +
+                    "but was leaked into IR"
+            )
+
+            is KPDynamicType -> lapisError(
+                "Dynamic type ${kotlin.toString().quoted()} is not supported, " +
+                    "but was leaked into IR"
+            )
         }
     }
 

@@ -5,7 +5,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import io.github.recrafter.lapis.extensions.ksp.KSPAnnotated
 import io.github.recrafter.lapis.extensions.ksp.KSPLogger
-import io.github.recrafter.lapis.layers.Builtins
+import io.github.recrafter.lapis.layers.generator.Builtins
 import io.github.recrafter.lapis.layers.generator.MixinGenerator
 import io.github.recrafter.lapis.layers.lowering.IrMixin
 import io.github.recrafter.lapis.layers.lowering.IrSchema

@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.layers
+package io.github.recrafter.lapis.layers.generator
 
 import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.extensions.kp.*

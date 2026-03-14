@@ -7,8 +7,8 @@ import io.github.recrafter.lapis.extensions.common.defaultValue
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.layers.Builtin
-import io.github.recrafter.lapis.layers.Builtins
+import io.github.recrafter.lapis.layers.generator.Builtin
+import io.github.recrafter.lapis.layers.generator.Builtins
 import io.github.recrafter.lapis.layers.generator.withInternalPrefix
 import io.github.recrafter.lapis.layers.lowering.types.*
 import io.github.recrafter.lapis.layers.validator.*
@@ -69,7 +69,7 @@ class MixinLowering(
                         needAccess = descriptor.needAccess,
                         callable = callable,
                         context = context,
-                        parameters = descriptor.parameters.asIr(),
+                        parameters = descriptor.parameters.map { it.asIr() },
                         classType = descriptor.irOwnerReturnType,
                     )
                 } else {
@@ -80,7 +80,7 @@ class MixinLowering(
                         targetName = descriptor.targetName,
                         callable = callable,
                         context = context,
-                        parameters = descriptor.parameters.asIr(),
+                        parameters = descriptor.parameters.map { it.asIr() },
                         returnType = descriptor.irReturnType,
                     )
                 }
@@ -242,10 +242,10 @@ class MixinLowering(
                     add(IrInjectionReceiverParameter(parameter.descriptor.irReceiverType))
                 }
                 if (hook is FieldSetHook) {
-                    add(IrInjectionArgumentParameter("newValue", hook.irType))
+                    add(IrInjectionSetterValueParameter(hook.irType))
                 }
-                addAll(parameter.descriptor.parameters.map { parameter ->
-                    IrInjectionArgumentParameter(parameter.name, parameter.irType)
+                addAll(parameter.descriptor.parameters.mapIndexed { index, parameter ->
+                    IrInjectionArgumentParameter(parameter.name, index, parameter.irType)
                 })
                 add(
                     IrInjectionOperationParameter(
@@ -257,11 +257,11 @@ class MixinLowering(
 
             is HookContextParameter -> buildList {
                 var currentSlot = if (parameter.descriptor.isStatic) 0 else 1
-                addAll(parameter.descriptor.parameters.map { parameter ->
+                addAll(parameter.descriptor.parameters.mapIndexed { index, parameter ->
                     val irType = parameter.irType
-                    val irParameter = IrInjectionParameterParameter(parameter.name, irType, currentSlot)
+                    val irParameter = IrInjectionParameterParameter(parameter.name, index, irType, currentSlot)
                     currentSlot += if (irType.is64bit) 2 else 1
-                    return@map irParameter
+                    return@mapIndexed irParameter
                 })
                 add(IrInjectionCallbackParameter(parameter.descriptor.irReturnType))
             }
@@ -358,6 +358,9 @@ class MixinLowering(
 
 fun List<FunctionParameter>.asIr(): List<IrParameter> =
     map { parameter -> IrParameter(parameter.name, parameter.irType) }
+
+fun FunctionTypeParameter.asIr(): IrFunctionTypeParameter =
+    IrFunctionTypeParameter(name, irType)
 
 fun KClass<*>.asIr(): IrClassType =
     asClassName().asIr()

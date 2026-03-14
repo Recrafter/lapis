@@ -38,12 +38,5 @@ class IrClassType(override val kotlin: KPClassType) : IrType(kotlin) {
     companion object {
         fun of(packageName: String, vararg names: String): IrClassType =
             KPClassType(packageName, *names).asIr()
-
-        fun ofBinaryClassName(name: String): IrClassType {
-            val lastDotIndex = name.lastIndexOf('.').takeIf { it != -1 }
-            val packageName = lastDotIndex?.let { name.substring(0, lastDotIndex) }.orEmpty()
-            val names = if (lastDotIndex != null) name.substring(lastDotIndex + 1).split('$') else listOf(name)
-            return of(packageName, *names.toTypedArray())
-        }
     }
 }
