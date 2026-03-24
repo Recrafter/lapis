@@ -3,7 +3,7 @@ package io.github.recrafter.lapis.extensions.kp
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.IrModifier
-import io.github.recrafter.lapis.layers.lowering.types.IrType
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> KPPropertyBuilder.addAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildKotlinAnnotation<A>(builder))
@@ -18,8 +18,8 @@ fun KPPropertyBuilder.setSetter(builder: KPFunctionBuilder.() -> Unit = {}) {
     setter(buildKotlinSetter(builder))
 }
 
-fun KPPropertyBuilder.setReceiverType(type: IrType) {
-    receiver(type.kotlin)
+fun KPPropertyBuilder.setReceiverType(typeName: IrTypeName) {
+    receiver(typeName.kotlin)
 }
 
 fun KPPropertyBuilder.setModifiers(vararg modifiers: IrModifier) {

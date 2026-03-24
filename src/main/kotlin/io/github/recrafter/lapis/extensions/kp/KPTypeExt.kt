@@ -4,33 +4,33 @@ import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrType
-import io.github.recrafter.lapis.layers.lowering.types.IrVariableType
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrVariableTypeName
 
 fun KPClassBuilder.setConstructor(parameters: List<IrParameter>, vararg modifiers: IrModifier): List<KPProperty> {
     primaryConstructor(buildKotlinConstructor {
         setParameters(parameters)
     })
     return parameters.map { parameter ->
-        buildKotlinProperty(parameter.name, parameter.type) {
+        buildKotlinProperty(parameter.name, parameter.typeName) {
             initializer(parameter.name)
             setModifiers(*modifiers)
         }.also { addProperty(it) }
     }
 }
 
-fun KPClassBuilder.setSuperClass(type: IrType, vararg constructorParameters: KPCodeBlock) {
-    superclass(type.kotlin)
+fun KPClassBuilder.setSuperClass(typeName: IrTypeName, vararg constructorParameters: KPCodeBlock) {
+    superclass(typeName.kotlin)
     constructorParameters.forEach {
         addSuperclassConstructorParameter(it)
     }
 }
 
-fun KPClassBuilder.addSuperInterface(type: IrType) {
-    addSuperinterface(type.kotlin)
+fun KPClassBuilder.addSuperInterface(typeName: IrTypeName) {
+    addSuperinterface(typeName.kotlin)
 }
 
-fun KPClassBuilder.setVariableTypes(vararg types: IrVariableType) {
+fun KPClassBuilder.setVariableTypes(vararg types: IrVariableTypeName) {
     addTypeVariables(types.map { it.kotlin })
 }
 

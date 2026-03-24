@@ -1,7 +1,6 @@
 package io.github.recrafter.lapis.layers.generator
 
-import io.github.recrafter.lapis.Side
-import io.github.recrafter.lapis.annotations.LaPatch
+import io.github.recrafter.lapis.annotations.Side
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -27,9 +26,6 @@ data class MixinConfig(
     @SerialName("overwrites")
     val overwriteConfig: OverwriteConfig,
 
-    @SerialName("refmap")
-    val refmapFileName: String,
-
     @SerialName("mixins")
     val commonMixins: List<String>? = null,
 
@@ -49,11 +45,7 @@ data class MixinConfig(
     data class OverwriteConfig(val requireAnnotations: Boolean)
 
     companion object {
-        fun of(
-            mixinPackage: String,
-            refmapFileName: String,
-            qualifiedNames: Map<Side, List<String>>,
-        ): MixinConfig =
+        fun of(mixinPackage: String, qualifiedNames: Map<Side, List<String>>): MixinConfig =
             MixinConfig(
                 isRequired = true,
                 minVersion = "0.5.7", // Unique
@@ -68,7 +60,6 @@ data class MixinConfig(
                 overwriteConfig = OverwriteConfig(
                     requireAnnotations = true,
                 ),
-                refmapFileName = refmapFileName,
                 commonMixins = qualifiedNames.getPackageRelativeClassNames(
                     Side.Common,
                     mixinPackage

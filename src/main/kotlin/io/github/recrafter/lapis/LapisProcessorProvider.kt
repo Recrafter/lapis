@@ -61,6 +61,6 @@ class LapisProcessorProvider : SymbolProcessorProvider {
         removePrefix(ARGUMENT_PREFIX)
 
     companion object {
-        private val ARGUMENT_PREFIX: String = LapisMeta.LOWER_NAME + "."
+        private val ARGUMENT_PREFIX: String = LapisMeta.NAME.lowercase() + "."
     }
 }

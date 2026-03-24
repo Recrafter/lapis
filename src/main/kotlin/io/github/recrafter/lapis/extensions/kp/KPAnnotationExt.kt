@@ -1,6 +1,6 @@
 package io.github.recrafter.lapis.extensions.kp
 
-import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
+import io.github.recrafter.lapis.layers.generator.builders.IrKotlinCodeBlockBuilder
 import kotlin.reflect.KProperty1
 
 fun <A : Annotation> KPAnnotationBuilder.setStringMember(property: KProperty1<A, String>, string: String) {

@@ -15,7 +15,7 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
-object PsiHelper {
+object PSIHelper {
 
     @OptIn(K1Deprecation::class)
     private val factory: PSIFactory by unsafeLazy {
@@ -29,7 +29,7 @@ object PsiHelper {
 
     private val cache: MutableMap<String, PSIFile> = mutableMapOf()
 
-    fun findPsiFile(symbol: KSPSymbol): Pair<PSIFile, Int> {
+    fun findPSIFile(symbol: KSPSymbol): Pair<PSIFile, Int> {
         val location = symbol.location.castOrNull<KSPFileLocation>()
         val file = location?.file?.takeIf { it.isFile }
             ?: lapisError("Symbol ${symbol.toString().quoted()} does not have a valid file location.")

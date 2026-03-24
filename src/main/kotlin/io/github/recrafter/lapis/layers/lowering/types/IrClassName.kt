@@ -5,12 +5,14 @@ import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.layers.lowering.asIr
 
-class IrClassType(override val kotlin: KPClassType) : IrType(kotlin) {
+class IrClassName(override val kotlin: KPClassType) : IrTypeName(kotlin) {
 
     val packageName: String = kotlin.packageName
     val simpleName: String = kotlin.simpleName
-    val name: String = kotlin.simpleNames.joinToString(".")
-    val qualifiedName: String = "$packageName.$name"
+    val nestedName: String = kotlin.simpleNames.joinToString(".")
+    val qualifiedName: String = "$packageName.$nestedName"
+    val binaryName: String get() = java.binaryName
+    val internalName: String get() = java.internalName
 
     override val java: JPClassType by lazy {
         box().javaPrimitiveType as? JPClassType ?: when (kotlin) {
@@ -27,16 +29,14 @@ class IrClassType(override val kotlin: KPClassType) : IrType(kotlin) {
         }
     }
 
-    fun nested(name: String): IrClassType =
+    fun nested(name: String): IrClassName =
         kotlin.nestedClass(name).asIr()
 
-    fun generic(vararg argumentTypes: IrType?): IrGenericType =
-        kotlin
-            .parameterizedBy(argumentTypes.map { it?.kotlin.orUnit() })
-            .asIr()
+    fun generic(vararg argumentTypeNames: IrTypeName?): IrGenericTypeName =
+        kotlin.parameterizedBy(argumentTypeNames.map { it?.kotlin.orUnit() }).asIr()
 
     companion object {
-        fun of(packageName: String, vararg names: String): IrClassType =
+        fun of(packageName: String, vararg names: String): IrClassName =
             KPClassType(packageName, *names).asIr()
     }
 }

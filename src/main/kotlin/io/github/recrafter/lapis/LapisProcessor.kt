@@ -5,7 +5,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import io.github.recrafter.lapis.extensions.ksp.KSPAnnotated
 import io.github.recrafter.lapis.extensions.ksp.KSPLogger
-import io.github.recrafter.lapis.layers.generator.Builtins
+import io.github.recrafter.lapis.layers.generator.builtins.Builtins
 import io.github.recrafter.lapis.layers.generator.MixinGenerator
 import io.github.recrafter.lapis.layers.lowering.IrMixin
 import io.github.recrafter.lapis.layers.lowering.IrSchema
@@ -30,12 +30,13 @@ class LapisProcessor(
         val parserResult = SymbolParser.parse(resolver)
         if (!builtins.isGenerated) {
             builtins.generate()
-            return parserResult.symbols
+            return parserResult.schemas.map { it.source } + parserResult.patches.map { it.source }
         }
         val validatorResult = frontendValidator.validate(parserResult)
         val irResult = mixinLowering.lower(validatorResult)
-        irResult.schemas.forEach { schemas[it.classType.qualifiedName] = it }
-        irResult.mixins.forEach { mixins[it.patchClassType.qualifiedName] = it }
+
+        irResult.schemas.forEach { schemas[it.className.qualifiedName] = it }
+        irResult.mixins.forEach { mixins[it.patchClassName.qualifiedName] = it }
         return emptyList()
     }
 
@@ -48,8 +49,8 @@ class LapisProcessor(
     }
 
     private fun generate() {
-        val sortedSchemas = schemas.values.sortedBy { it.classType.qualifiedName }
-        val sortedMixins = mixins.values.sortedBy { it.patchClassType.qualifiedName }
+        val sortedSchemas = schemas.values.sortedBy { it.className.qualifiedName }
+        val sortedMixins = mixins.values.sortedBy { it.patchClassName.qualifiedName }
         MixinGenerator(options, builtins, codeGenerator).generate(sortedSchemas, sortedMixins)
     }
 }

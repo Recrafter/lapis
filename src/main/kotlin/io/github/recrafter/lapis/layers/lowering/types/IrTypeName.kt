@@ -6,7 +6,7 @@ import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.asIr
 
-open class IrType(
+open class IrTypeName(
     open val kotlin: KPType,
     val boxed: Boolean = kotlin.isNullable,
 ) {
@@ -72,20 +72,20 @@ open class IrType(
         JPArrayType.of(arrayComponentType)
     }
 
-    fun box(): IrType =
+    fun box(): IrTypeName =
         if (boxed) this
-        else IrType(kotlin, true)
+        else IrTypeName(kotlin, true)
 
-    fun unbox(): IrType =
-        if (boxed) IrType(kotlin, false)
+    fun unbox(): IrTypeName =
+        if (boxed) IrTypeName(kotlin, false)
         else this
 
-    fun makeNullable(): IrType =
+    fun makeNullable(): IrTypeName =
         if (kotlin.isNullable) this
-        else IrType(kotlin.copy(nullable = true))
+        else IrTypeName(kotlin.copy(nullable = true))
 
-    fun makeNotNullable(): IrType =
-        if (kotlin.isNullable) IrType(kotlin.copy(nullable = false))
+    fun makeNotNullable(): IrTypeName =
+        if (kotlin.isNullable) IrTypeName(kotlin.copy(nullable = false))
         else this
 
     override fun toString(): String =
@@ -100,7 +100,7 @@ open class IrType(
         if (this === other) {
             return true
         }
-        if (other !is IrType) {
+        if (other !is IrTypeName) {
             return false
         }
         return kotlin == other.kotlin && boxed == other.boxed
@@ -110,9 +110,9 @@ open class IrType(
         kotlin.hashCode()
 
     companion object {
-        val VOID: IrType = Void::class.asIr()
+        val VOID: IrTypeName = Void::class.asIr()
     }
 }
 
-fun IrType?.orVoid(): IrType =
-    this ?: IrType.VOID
+fun IrTypeName?.orVoid(): IrTypeName =
+    this ?: IrTypeName.VOID

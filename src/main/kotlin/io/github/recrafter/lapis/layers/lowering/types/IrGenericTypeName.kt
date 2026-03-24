@@ -4,7 +4,7 @@ import io.github.recrafter.lapis.extensions.jp.JPGenericType
 import io.github.recrafter.lapis.extensions.kp.KPGenericType
 import io.github.recrafter.lapis.layers.lowering.asIr
 
-class IrGenericType(override val kotlin: KPGenericType) : IrType(kotlin) {
+class IrGenericTypeName(override val kotlin: KPGenericType) : IrTypeName(kotlin) {
 
     override val java: JPGenericType by lazy {
         JPGenericType.get(

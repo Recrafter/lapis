@@ -2,12 +2,12 @@ package io.github.recrafter.lapis.extensions.jp
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
-import io.github.recrafter.lapis.layers.generator.IrJavaMethodBodyBuilder
+import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlockBuilder
+import io.github.recrafter.lapis.layers.generator.builders.IrJavaMethodBodyBuilder
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrClassType
-import io.github.recrafter.lapis.layers.lowering.types.IrType
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> JPMethodBuilder.addAnnotation(builder: JPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildJavaAnnotation<A>(builder))
@@ -22,7 +22,7 @@ fun JPMethodBuilder.if_(condition: JPCodeBlock, body: IrJavaCodeBlockBuilder.() 
 }
 
 fun JPMethodBuilder.try_(
-    exceptionType: IrClassType,
+    exceptionClassName: IrClassName,
     catchBody: (IrJavaCodeBlockBuilder.() -> Unit)? = null,
     exceptedName: String = if (catchBody == null) "ignored" else "e",
     finallyBody: (IrJavaCodeBlockBuilder.() -> Unit)? = null,
@@ -31,7 +31,7 @@ fun JPMethodBuilder.try_(
     beginControlFlow(buildJavaCodeBlock("try"))
     buildJavaCodeBlock(tryBody)
     nextControlFlow(buildJavaCodeBlock("catch (%T %L)") {
-        arg(exceptionType)
+        arg(exceptionClassName)
         arg(exceptedName)
     })
     catchBody?.let { buildJavaCodeBlock(it) }
@@ -48,13 +48,13 @@ fun JPMethodBuilder.withControlFlow(controlFlow: JPCodeBlock, body: IrJavaCodeBl
     endControlFlow()
 }
 
-fun JPMethodBuilder.setReturnType(type: IrType?) {
-    returns(type?.java.orVoid())
+fun JPMethodBuilder.setReturnType(typeName: IrTypeName?) {
+    returns(typeName?.java.orVoid())
 }
 
 fun JPMethodBuilder.addParameter(parameter: IrParameter): JPParameter =
     JPParameter
-        .builder(parameter.type.java, parameter.name)
+        .builder(parameter.typeName.java, parameter.name)
         .build()
         .also { addParameter(it) }
 

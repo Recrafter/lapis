@@ -9,7 +9,7 @@ mixin-extras = "0.5.3"
 
 asm = "9.9.1"
 
-lapis-annotations = "0.7.4"
+lapis-annotations = "0.8.4"
 
 java-poet = "0.11.0"
 kotlin-poet = "2.2.0"

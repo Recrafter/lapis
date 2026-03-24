@@ -1,11 +1,10 @@
 package io.github.recrafter.lapis.extensions.kp
 
-import io.github.recrafter.lapis.extensions.capitalize
-import io.github.recrafter.lapis.layers.generator.IrKotlinCodeBlockBuilder
-import io.github.recrafter.lapis.layers.generator.IrKotlinFunctionBodyBuilder
+import io.github.recrafter.lapis.layers.generator.builders.IrKotlinCodeBlockBuilder
+import io.github.recrafter.lapis.layers.generator.builders.IrKotlinFunctionBodyBuilder
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrType
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> KPFunctionBuilder.addAnnotation(builder: KPAnnotationBuilder.() -> Unit = {}) {
     addAnnotation(buildKotlinAnnotation<A>(builder))
@@ -37,17 +36,17 @@ fun KPFunctionBuilder.withControlFlow(controlFlow: KPCodeBlock, body: IrKotlinCo
     endControlFlow()
 }
 
-fun KPFunctionBuilder.setReturnType(type: IrType?) {
-    returns(type?.kotlin.orUnit())
+fun KPFunctionBuilder.setReturnType(typeName: IrTypeName?) {
+    returns(typeName?.kotlin.orUnit())
 }
 
-fun KPFunctionBuilder.setReceiverType(type: IrType) {
-    receiver(type.kotlin)
+fun KPFunctionBuilder.setReceiverType(typeName: IrTypeName) {
+    receiver(typeName.kotlin)
 }
 
 fun KPFunctionBuilder.addParameter(parameter: IrParameter): KPParameter =
     KPParameter
-        .builder(parameter.name, parameter.type.kotlin)
+        .builder(parameter.name, parameter.typeName.kotlin)
         .build()
         .also { addParameter(it) }
 
@@ -63,6 +62,7 @@ fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.STATIC -> addAnnotation<JvmStatic>()
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
             IrModifier.INLINE -> addModifiers(KPModifier.INLINE)
+            IrModifier.OPERATOR -> addModifiers(KPModifier.OPERATOR)
         }
     }
 }

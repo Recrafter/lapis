@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.extensions.jp
 
 import io.github.recrafter.lapis.extensions.common.defaultValue
-import io.github.recrafter.lapis.layers.generator.IrJavaCodeBlockBuilder
-import io.github.recrafter.lapis.layers.lowering.types.IrClassType
+import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlockBuilder
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 
@@ -32,10 +32,10 @@ inline fun <reified A : Annotation> JPAnnotationBuilder.setStringArrayMember(
 
 inline fun <reified A : Annotation> JPAnnotationBuilder.setClassArrayMember(
     property: KProperty1<A, Array<KClass<*>>>,
-    vararg types: IrClassType
+    vararg classNames: IrClassName
 ) {
-    setArrayMember(property, types, "%T.class") {
-        types.forEach { arg(it) }
+    setArrayMember(property, classNames, "%T.class") {
+        classNames.forEach { arg(it) }
     }
 }
 

@@ -7,4 +7,5 @@ enum class IrModifier {
     STATIC,
     OVERRIDE,
     INLINE,
+    OPERATOR,
 }

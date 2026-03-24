@@ -1,9 +1,5 @@
-kotlin-library
 ksp
+kotlin-library
 code-generation
-annotation-processing
-kotlin-extension
-minecraft
-minecraft-mod
-modding-toolkit
-mixins
+mixin
+minecraft-modding

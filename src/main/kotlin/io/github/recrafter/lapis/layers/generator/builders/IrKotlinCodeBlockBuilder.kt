@@ -1,9 +1,9 @@
-package io.github.recrafter.lapis.layers.generator
+package io.github.recrafter.lapis.layers.generator.builders
 
 import io.github.recrafter.lapis.extensions.kp.KPCodeBlock
 import io.github.recrafter.lapis.extensions.kp.KPCodeBlockBuilder
 import io.github.recrafter.lapis.extensions.kp.KPParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrType
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 import kotlin.reflect.KFunction
 
 @JvmInline
@@ -42,8 +42,8 @@ value class IrKotlinCodeBlockBuilder(private val builder: KPCodeBlockBuilder) {
             arguments += parameter
         }
 
-        fun arg(type: IrType) {
-            arguments += type.kotlin
+        fun arg(typeName: IrTypeName) {
+            arguments += typeName.kotlin
         }
 
         fun build(): List<Any> =

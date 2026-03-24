@@ -13,6 +13,6 @@ fun KSPCodeGenerator.createResourceFile(
         dependencies = containingFiles.toDependencies(aggregating),
         packageName = file.parent?.replace(File.separatorChar, '.').orEmpty(),
         fileName = file.nameWithoutExtension,
-        extensionName = file.extension
+        extensionName = file.extension,
     ).bufferedWriter().use { it.write(contents) }
 }

@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.layers.generator
+package io.github.recrafter.lapis.layers.generator.builders
 
 import io.github.recrafter.lapis.extensions.kp.KPFunctionBuilder
 import io.github.recrafter.lapis.extensions.kp.addReturnStatement

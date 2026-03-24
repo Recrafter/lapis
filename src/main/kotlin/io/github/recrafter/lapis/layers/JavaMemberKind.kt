@@ -1,12 +1,12 @@
 package io.github.recrafter.lapis.layers
 
-import io.github.recrafter.lapis.annotations.LaConstructor
-import io.github.recrafter.lapis.annotations.LaField
-import io.github.recrafter.lapis.annotations.LaMethod
+import io.github.recrafter.lapis.annotations.Constructor
+import io.github.recrafter.lapis.annotations.Field
+import io.github.recrafter.lapis.annotations.Method
 import kotlin.reflect.KClass
 
 enum class JavaMemberKind(val annotationClass: KClass<out Annotation>) {
-    CONSTRUCTOR(LaConstructor::class),
-    METHOD(LaMethod::class),
-    FIELD(LaField::class);
+    CONSTRUCTOR(Constructor::class),
+    METHOD(Method::class),
+    FIELD(Field::class);
 }

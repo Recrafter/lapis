@@ -9,7 +9,7 @@ import io.github.recrafter.lapis.extensions.kp.KPWildcardType
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.asIr
 
-class IrWildcardType(override val kotlin: KPWildcardType) : IrType(kotlin) {
+class IrWildcardTypeName(override val kotlin: KPWildcardType) : IrTypeName(kotlin) {
 
     override val java: JPWildcardType by lazy {
         if (kotlin.inTypes.size > 1 || kotlin.outTypes.size > 1) {

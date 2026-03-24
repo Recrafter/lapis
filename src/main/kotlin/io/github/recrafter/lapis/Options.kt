@@ -6,13 +6,11 @@ import kotlinx.serialization.Serializable
 data class Options(
     val modId: String,
     private val packageName: String,
-    val refmapFileName: String,
-    val accessWidener: String? = null,
-    val accessTransformer: String? = null,
+    val isUnobfuscated: Boolean,
+    val mixinConfigName: String = "$modId.mixins.json",
+    val accessWidenerConfigName: String? = null,
+    val accessTransformerConfigName: String? = null,
 ) {
-    val mixinPackageName: String
-        get() = "$packageName.mixin"
-
-    val generatedPackageName: String
-        get() = "$packageName.generated"
+    val mixinPackageName: String get() = "$packageName.mixin"
+    val generatedPackageName: String get() = "$packageName.generated"
 }
