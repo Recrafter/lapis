@@ -2,7 +2,6 @@ package io.github.recrafter.lapis.layers.lowering
 
 import com.squareup.kotlinpoet.asClassName
 import io.github.recrafter.lapis.Options
-import io.github.recrafter.lapis.annotations.Zero.Condition.*
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
@@ -11,7 +10,6 @@ import io.github.recrafter.lapis.layers.generator.builtins.Builtins
 import io.github.recrafter.lapis.layers.generator.builtins.DescBuiltin
 import io.github.recrafter.lapis.layers.lowering.types.*
 import io.github.recrafter.lapis.layers.validator.*
-import org.spongepowered.asm.mixin.injection.Constant
 import kotlin.reflect.KClass
 
 class MixinLowering(
@@ -174,7 +172,28 @@ class MixinLowering(
     }
 
     private fun lowerInjections(hook: HookModel): List<IrInjection> {
-        val parameters = hook.parameters.flatMap { lowerInjectionParameter(hook, it) }
+        val parameters = buildList {
+            if (hook is HookWithTarget) {
+                if (hook !is BodyHook && !hook.targetDesc.isStatic) {
+                    add(IrInjectionReceiverParameter(hook.targetDesc.receiverTypeName))
+                }
+                if (hook is FieldWriteHook) {
+                    add(IrInjectionArgumentParameter("fieldValue", 0, hook.typeName))
+                }
+                addAll(hook.targetDesc.parameters.mapIndexed { index, parameter ->
+                    IrInjectionArgumentParameter(parameter.name, index, parameter.typeName)
+                })
+                add(
+                    IrInjectionOperationParameter(
+                        if (hook is FieldWriteHook) IrTypeName.VOID
+                        else hook.targetDesc.returnTypeName
+                    )
+                )
+            } else if (hook is LiteralHook) {
+                add(IrInjectionValueParameter(hook.typeName))
+            }
+            addAll(hook.parameters.flatMap { lowerInjectionParameter(hook, it) })
+        }
         return hook.ordinals.map { ordinal ->
             when (hook) {
                 is BodyHook -> IrWrapMethodInjection(
@@ -260,30 +279,8 @@ class MixinLowering(
 
     private fun lowerInjectionParameter(hook: HookModel, parameter: HookParameter): List<IrInjectionParameter> =
         when (parameter) {
-            is HookOriginParameter -> buildList {
-                if (hook is HookWithTarget) {
-                    if (hook !is BodyHook && !hook.targetDesc.isStatic) {
-                        add(IrInjectionReceiverParameter(hook.targetDesc.receiverTypeName))
-                    }
-                    if (hook is FieldWriteHook) {
-                        add(IrInjectionArgumentParameter("fieldValue", 0, hook.typeName))
-                    }
-                    addAll(hook.targetDesc.parameters.mapIndexed { index, parameter ->
-                        IrInjectionArgumentParameter(parameter.name, index, parameter.typeName)
-                    })
-                    add(
-                        IrInjectionOperationParameter(
-                            if (hook is FieldWriteHook) IrTypeName.VOID
-                            else hook.targetDesc.returnTypeName
-                        )
-                    )
-                } else if (hook is LiteralHook) {
-                    add(IrInjectionValueParameter(hook.typeName))
-                }
-            }
-
+            is HookOriginParameter -> emptyList()
             is HookCancelParameter -> listOf(IrInjectionCallbackParameter(hook.desc.returnTypeName))
-
             is HookParamParameter -> buildList {
                 var currentSlot = if (hook.desc.isStatic) 0 else 1
                 addAll(hook.desc.parameters.mapIndexed { index, parameter ->

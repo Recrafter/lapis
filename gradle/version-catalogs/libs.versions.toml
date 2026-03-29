@@ -1,15 +1,15 @@
 [versions]
-projektor = "5.+"
+projektor = "6.+"
 
-kotlin = "2.2.21"
-ksp = "2.2.21-2.0.5"
+kotlin = "2.3.0"
+ksp = "2.3.6"
 
 mixin = "0.8.7"
 mixin-extras = "0.5.3"
 
 asm = "9.9.1"
 
-lapis-annotations = "0.8.4"
+lapis-annotations = "0.8.5"
 
 java-poet = "0.11.0"
 kotlin-poet = "2.2.0"

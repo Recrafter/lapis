@@ -15,7 +15,6 @@ import io.github.recrafter.lapis.layers.generator.builtins.DescBuiltin
 import io.github.recrafter.lapis.layers.parser.*
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
-import kotlin.reflect.KClass
 
 class FrontendValidator(
     private val logger: KSPLogger,
@@ -197,7 +196,7 @@ class FrontendValidator(
         val desc = findDesc(hookDescClassDecl)
         kspRequire(desc is InvokableDesc) { "50.2" }
         val parameters = parameters.map {
-            validateHookParameter(hookAt, desc, it)
+            validateHookParameter(function, hookAt, desc, it)
         }
         when (hookAt) {
             Hook.At.Body -> {
@@ -212,29 +211,10 @@ class FrontendValidator(
             }
 
             Hook.At.Literal -> {
-                val (argName, argType, argValue) = kspRequireNotNull(atLiteralArguments.singleOrNull()) { "50.8" }
+                val (_, argType, _) = kspRequireNotNull(atLiteralArguments.singleOrNull()) { "50.8" }
                 kspRequireNotNull(argType) { "50.89" }
-                kspRequireNotNull(argValue) { "50.92" }
-                val literal = when (kspRequireNotNull(argName) { "50.81" }) {
-                    AtLiteral::zero.name -> ZeroLiteral(atLiteralZeroConditions)
-                    AtLiteral::int.name -> IntLiteral(kspRequireNotNull(atLiteralInt) { "50.82" })
-                    AtLiteral::float.name -> FloatLiteral(kspRequireNotNull(atLiteralFloat) { "50.83" })
-                    AtLiteral::long.name -> LongLiteral(kspRequireNotNull(atLiteralLong) { "50.84" })
-                    AtLiteral::double.name -> DoubleLiteral(kspRequireNotNull(atLiteralDouble) { "50.85" })
-                    AtLiteral::string.name -> StringLiteral(kspRequireNotNull(atLiteralString) { "50.86" })
-                    AtLiteral::`class`.name -> ClassLiteral(kspRequireNotNull(argType.toClassDeclOrNull()) { "50.87" })
-                    AtLiteral::`null`.name -> NullLiteral
-                    else -> kspError { "50.88" }
-                }
-                val kClass = when (literal) {
-                    is ZeroLiteral, is IntLiteral -> Int::class
-                    is FloatLiteral -> Float::class
-                    is LongLiteral -> Long::class
-                    is DoubleLiteral -> Double::class
-                    is StringLiteral -> String::class
-                    is ClassLiteral -> KClass::class
-                    else -> null
-                }
+                val literal = validateLiteral(function)
+                val kClass = literal.kClass
                 if (kClass != null) {
                     if (literal !is StringLiteral && literal !is ClassLiteral) {
                         kspRequire(returnType?.isMarkedNullable == false) { "50.91" }
@@ -304,7 +284,26 @@ class FrontendValidator(
         }
     }
 
+    private fun validateLiteral(function: ParsedPatchFunction): Literal = with(function) {
+        val (argName, argType, argValue) = kspRequireNotNull(atLiteralArguments.singleOrNull()) { "50.8" }
+        kspRequireNotNull(argType) { "50.89" }
+        kspRequireNotNull(argValue) { "50.92" }
+        kspRequireNotNull(argName) { "50.81" }
+        when (argName) {
+            AtLiteral::zero.name -> ZeroLiteral(atLiteralZeroConditions)
+            AtLiteral::int.name -> IntLiteral(kspRequireNotNull(atLiteralInt) { "50.82" })
+            AtLiteral::float.name -> FloatLiteral(kspRequireNotNull(atLiteralFloat) { "50.83" })
+            AtLiteral::long.name -> LongLiteral(kspRequireNotNull(atLiteralLong) { "50.84" })
+            AtLiteral::double.name -> DoubleLiteral(kspRequireNotNull(atLiteralDouble) { "50.85" })
+            AtLiteral::string.name -> StringLiteral(kspRequireNotNull(atLiteralString) { "50.86" })
+            AtLiteral::`class`.name -> ClassLiteral(kspRequireNotNull(argType.toClassDeclOrNull()) { "50.87" })
+            AtLiteral::`null`.name -> NullLiteral
+            else -> kspError { "50.88" }
+        }
+    }
+
     private fun validateHookParameter(
+        functionParameter: ParsedPatchFunction,
         at: Hook.At,
         desc: InvokableDesc,
         parameter: ParsedPatchFunctionParameter,
@@ -335,7 +334,12 @@ class FrontendValidator(
                     }
                 }
 
-                Hook.At.Literal -> HookOriginValueParameter()
+                Hook.At.Literal -> {
+                    val kClass = validateLiteral(functionParameter).kClass
+                    kspRequireNotNull(kClass) { "60.61" }
+                    kspRequire(type.isSame(kClass)) { "60.62" }
+                    HookOriginValueParameter()
+                }
 
                 else -> {
                     TODO()

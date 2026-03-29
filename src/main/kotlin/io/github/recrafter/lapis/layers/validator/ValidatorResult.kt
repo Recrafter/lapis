@@ -11,6 +11,7 @@ import io.github.recrafter.lapis.layers.lowering.asIr
 import io.github.recrafter.lapis.layers.lowering.types.IrClassName
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 import org.spongepowered.asm.mixin.injection.At
+import kotlin.reflect.KClass
 
 class ValidatorResult(
     val schemas: List<Schema>,
@@ -37,7 +38,7 @@ sealed class Desc(
     classDecl: KSPClassDecl,
     receiverType: KSPType,
     val parameters: List<FunctionTypeParameter>,
-    val returnType: KSPType?,
+    returnType: KSPType?,
     val isStatic: Boolean,
     val makePublic: Boolean,
     val removeFinal: Boolean,
@@ -171,18 +172,39 @@ class CallHook(
     ordinals: List<Int>,
 ) : HookModel(name, desc, returnType, parameters, ordinals), HookWithTarget
 
-sealed interface Literal
-class ZeroLiteral(val conditions: List<Zero.Condition>) : Literal
-class IntLiteral(val value: Int) : Literal
-class FloatLiteral(val value: Float) : Literal
-class LongLiteral(val value: Long) : Literal
-class DoubleLiteral(val value: Double) : Literal
-class StringLiteral(val value: String) : Literal
+sealed interface Literal {
+    val kClass: KClass<*>?
+}
+
+class ZeroLiteral(val conditions: List<Zero.Condition>) : IntLiteral(0)
+open class IntLiteral(val value: Int) : Literal {
+    override val kClass: KClass<*> = Int::class
+}
+
+class FloatLiteral(val value: Float) : Literal {
+    override val kClass: KClass<*> = Float::class
+}
+
+class LongLiteral(val value: Long) : Literal {
+    override val kClass: KClass<*> = Long::class
+}
+
+class DoubleLiteral(val value: Double) : Literal {
+    override val kClass: KClass<*> = Double::class
+}
+
+class StringLiteral(val value: String) : Literal {
+    override val kClass: KClass<*> = String::class
+}
+
 class ClassLiteral(classDecl: KSPClassDecl) : Literal {
+    override val kClass: KClass<*> = KClass::class
     val className: IrClassName = classDecl.asIr()
 }
 
-object NullLiteral : Literal
+object NullLiteral : Literal {
+    override val kClass: KClass<*>? = null
+}
 
 class FieldGetHook(
     name: String,

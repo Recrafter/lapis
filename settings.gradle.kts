@@ -11,12 +11,12 @@ pluginManagement {
 }
 
 plugins {
-    id("io.github.diskria.projektor.settings") version "5.+"
-    id("io.github.recrafter.recipe") version "1.2.2"
+    id("io.github.diskria.projektor.settings") version "6.+"
+    id("io.github.recrafter.recipe") version "1.2.6"
 }
 
 projekt {
-    version = "0.8.4"
+    version = "0.8.5"
     license = MIT
     publish = setOf(MAVEN_CENTRAL)
 
