@@ -5,7 +5,7 @@ import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.layers.lowering.asIr
 
-class IrClassName(override val kotlin: KPClassType) : IrTypeName(kotlin) {
+class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
 
     val packageName: String = kotlin.packageName
     val simpleName: String = kotlin.simpleName
@@ -14,14 +14,14 @@ class IrClassName(override val kotlin: KPClassType) : IrTypeName(kotlin) {
     val binaryName: String get() = java.binaryName
     val internalName: String get() = java.internalName
 
-    override val java: JPClassType by lazy {
-        box().javaPrimitiveType as? JPClassType ?: when (kotlin) {
+    override val java: JPClassName by lazy {
+        box().javaPrimitiveType as? JPClassName ?: when (kotlin) {
             KPAny -> JPObject
             KPString -> JPString
             KPList -> JPList
             KPSet -> JPSet
             KPMap -> JPMap
-            else -> JPClassType.get(
+            else -> JPClassName.get(
                 packageName,
                 kotlin.simpleNames.first(),
                 *kotlin.simpleNames.drop(1).toTypedArray()
@@ -32,11 +32,37 @@ class IrClassName(override val kotlin: KPClassType) : IrTypeName(kotlin) {
     fun nested(name: String): IrClassName =
         kotlin.nestedClass(name).asIr()
 
-    fun generic(vararg argumentTypeNames: IrTypeName?): IrGenericTypeName =
+    fun parameterizedBy(vararg argumentTypeNames: IrTypeName?): IrParameterizedTypeName =
         kotlin.parameterizedBy(argumentTypeNames.map { it?.kotlin.orUnit() }).asIr()
 
     companion object {
         fun of(packageName: String, vararg names: String): IrClassName =
-            KPClassType(packageName, *names).asIr()
+            KPClassName(packageName, *names).asIr()
+
+        fun fromBinaryName(binaryName: String): IrClassName {
+            val mainPart = binaryName.substringBefore('$')
+            val nestedParts = if (binaryName.contains('$')) {
+                binaryName.substringAfter('$').split('$')
+            } else {
+                emptyList()
+            }
+
+            val lastDotIndex = mainPart.lastIndexOf('.').takeIf { it != -1 }
+
+            val packageName = if (lastDotIndex != null) {
+                mainPart.substring(0, lastDotIndex)
+            } else {
+                ""
+            }
+
+            val topLevelClassName = if (lastDotIndex != null) {
+                mainPart.substring(lastDotIndex + 1)
+            } else {
+                mainPart
+            }
+
+            val allNames = listOf(topLevelClassName) + nestedParts
+            return of(packageName, *allNames.toTypedArray())
+        }
     }
 }

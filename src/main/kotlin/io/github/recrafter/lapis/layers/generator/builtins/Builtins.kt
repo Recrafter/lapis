@@ -4,9 +4,12 @@ import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ksp.KSPCodeGenerator
 import io.github.recrafter.lapis.extensions.ksp.KSPDependencies
-import io.github.recrafter.lapis.layers.lowering.IrDesc
-import io.github.recrafter.lapis.layers.lowering.IrDescWrapper
+import io.github.recrafter.lapis.layers.generator.KSuppressWarning
+import io.github.recrafter.lapis.layers.lowering.models.IrDesc
+import io.github.recrafter.lapis.layers.lowering.models.IrDescWrapper
 import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+
+typealias BuiltinTyper = (Builtin) -> IrClassName
 
 class Builtins(
     generatedPackageName: String,
@@ -15,7 +18,8 @@ class Builtins(
     var isGenerated: Boolean = false
         private set
 
-    private val rootClassName: IrClassName = IrClassName.of(generatedPackageName, LapisMeta.NAME)
+    private val rootClassName: IrClassName =
+        IrClassName.of(generatedPackageName, LapisMeta.NAME)
 
     fun generate() {
         if (isGenerated) {
@@ -23,10 +27,13 @@ class Builtins(
         }
         buildKotlinFile(rootClassName) {
             suppressWarnings(
-                KWarning.RedundantVisibilityModifier,
-                KWarning.ObjectInheritsException,
-                KWarning.JavaIoSerializableObjectMustHaveReadResolve,
+                KSuppressWarning.RedundantVisibilityModifier,
+                KSuppressWarning.ObjectInheritsException,
+                KSuppressWarning.JavaIoSerializableObjectMustHaveReadResolve,
             )
+            TypeAliasBuiltin.entries.forEach {
+                addTypeAlias(it.generate(::get))
+            }
             addType(buildKotlinObject(LapisMeta.NAME) {
                 addTypes(
                     Builtin.entries.map { it.generate(::get) } + DescBuiltin.entries.map { it.generate(::get) }
@@ -35,6 +42,9 @@ class Builtins(
         }.writeTo(codeGenerator, KSPDependencies.ALL_FILES)
         isGenerated = true
     }
+
+    operator fun get(builtin: TypeAliasBuiltin): IrClassName =
+        IrClassName.of(rootClassName.packageName, builtin.name)
 
     operator fun get(builtin: Builtin): IrClassName =
         rootClassName.nested(builtin.name)

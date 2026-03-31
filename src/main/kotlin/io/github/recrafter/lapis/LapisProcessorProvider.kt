@@ -6,25 +6,25 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import io.github.recrafter.lapis.extensions.elements
 import io.github.recrafter.lapis.extensions.quoted
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.serialDescriptor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 
-@OptIn(ExperimentalSerializationApi::class)
 @AutoService(SymbolProcessorProvider::class)
 class LapisProcessorProvider : SymbolProcessorProvider {
 
-    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
-        LapisProcessor(
-            parseOptions(environment.options),
+    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
+        val logger = LapisLogger(environment.logger)
+        return LapisProcessor(
+            parseOptions(environment.options, logger),
             environment.codeGenerator,
-            environment.logger,
+            logger,
         )
+    }
 
-    private fun parseOptions(options: Map<String, String>): Options {
+    private fun parseOptions(options: Map<String, String>, logger: LapisLogger): Options {
         val processorOptions = options
             .filterKeys { it.startsWith(ARGUMENT_PREFIX) }
             .mapKeys { it.key.removeArgumentPrefix() }
@@ -32,17 +32,27 @@ class LapisProcessorProvider : SymbolProcessorProvider {
         val descriptorElements = serialDescriptor<Options>().elements
         val existingOptions = descriptorElements.map { it.name }.toSet()
 
-        val unknownOptions = processorOptions.keys - existingOptions
-        require(unknownOptions.isEmpty()) {
-            "Unknown ${LapisMeta.NAME} options: ${unknownOptions.joinToString { it.withArgumentPrefix().quoted() }}. " +
-                "Existing options: ${existingOptions.joinToString { it.withArgumentPrefix().quoted() }}."
+        val unknownKeys = processorOptions.keys - existingOptions
+        if (unknownKeys.isNotEmpty()) {
+            logger.fatal(
+                buildString {
+                    append("Unknown options: ${unknownKeys.joinToString { it.withArgumentPrefix() }}.")
+                    appendLine()
+                    append("Existing options: ${existingOptions.joinToString { it.withArgumentPrefix() }}.")
+                }
+            )
         }
 
-        val requiredOptions = descriptorElements.filter { !it.isOptional }.map { it.name }.toSet()
-        val missingOptions = requiredOptions - processorOptions.keys
-        require(missingOptions.isEmpty()) {
-            "Missing ${LapisMeta.NAME} options: ${missingOptions.joinToString { it.withArgumentPrefix().quoted() }}. " +
-                "Required options: ${requiredOptions.joinToString { it.withArgumentPrefix().quoted() }}."
+        val requiredKeys = descriptorElements.filter { !it.isOptional }.map { it.name }.toSet()
+        val missingKeys = requiredKeys - processorOptions.keys
+        if (missingKeys.isNotEmpty()) {
+            logger.fatal(
+                buildString {
+                    append("Missing options: ${missingKeys.joinToString { it.withArgumentPrefix() }}.")
+                    appendLine()
+                    append("Required options: ${requiredKeys.joinToString { it.withArgumentPrefix() }}.")
+                }
+            )
         }
 
         return Json.decodeFromJsonElement(
@@ -55,7 +65,7 @@ class LapisProcessorProvider : SymbolProcessorProvider {
     }
 
     private fun String.withArgumentPrefix(): String =
-        ARGUMENT_PREFIX + this
+        (ARGUMENT_PREFIX + this).quoted()
 
     private fun String.removeArgumentPrefix(): String =
         removePrefix(ARGUMENT_PREFIX)

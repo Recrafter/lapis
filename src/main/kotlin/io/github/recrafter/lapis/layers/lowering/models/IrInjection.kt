@@ -1,0 +1,141 @@
+package io.github.recrafter.lapis.layers.lowering.models
+
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+
+sealed class IrInjection(
+    val name: String,
+    val methodMixinRef: String,
+    val returnTypeName: IrTypeName?,
+    val parameters: List<IrInjectionParameter>,
+    val hookArguments: List<IrHookArgument>,
+    val isStatic: Boolean,
+    val ordinal: Int?,
+)
+
+sealed interface IrTargetInjection {
+    val targetMixinRef: String
+    val isStaticTarget: Boolean
+}
+
+sealed interface IrInjectInjection
+
+class IrMethodHeadInjection(
+    name: String,
+    methodMixinRef: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, null, parameters, hookArguments, isStatic, null), IrInjectInjection
+
+class IrConstructorHeadInjection(
+    name: String,
+    methodMixinRef: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    val atArgs: List<Pair<String, String>>,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, null, parameters, hookArguments, isStatic, null), IrInjectInjection
+
+class IrWrapMethodInjection(
+    name: String,
+    methodMixinRef: String,
+    override val isStaticTarget: Boolean,
+    returnTypeName: IrTypeName?,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, returnTypeName, parameters, hookArguments, isStatic, null), IrTargetInjection {
+    override val targetMixinRef: String = methodMixinRef
+}
+
+class IrReturnInjection(
+    name: String,
+    methodMixinRef: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    ordinal: Int?,
+    val isTail: Boolean,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, null, parameters, hookArguments, isStatic, ordinal), IrInjectInjection
+
+class IrModifyVariableInjection(
+    name: String,
+    methodMixinRef: String,
+    returnTypeName: IrTypeName?,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    val local: IrLocal,
+    val isSet: Boolean,
+    ordinal: Int?,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, returnTypeName, parameters, hookArguments, isStatic, ordinal)
+
+class IrModifyReturnValueInjection(
+    name: String,
+    methodMixinRef: String,
+    returnTypeName: IrTypeName?,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    ordinal: Int?,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, returnTypeName, parameters, hookArguments, isStatic, ordinal)
+
+class IrWrapOperationInjection(
+    name: String,
+    methodMixinRef: String,
+    returnTypeName: IrTypeName?,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    override val targetMixinRef: String,
+    override val isStaticTarget: Boolean,
+    val isConstructorCall: Boolean,
+    ordinal: Int?,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, returnTypeName, parameters, hookArguments, isStatic, ordinal), IrTargetInjection
+
+class IrModifyExpressionValueInjection(
+    name: String,
+    methodMixinRef: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    val constantTypeName: IrTypeName,
+    val atArgs: List<Pair<String, String>>,
+    ordinal: Int?,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, constantTypeName, parameters, hookArguments, isStatic, ordinal)
+
+class IrFieldGetInjection(
+    name: String,
+    methodMixinRef: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    override val targetMixinRef: String,
+    override val isStaticTarget: Boolean,
+    ordinal: Int?,
+    fieldTypeName: IrTypeName,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, fieldTypeName, parameters, hookArguments, isStatic, ordinal), IrTargetInjection
+
+class IrFieldSetInjection(
+    name: String,
+    methodMixinRef: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    override val targetMixinRef: String,
+    override val isStaticTarget: Boolean,
+    ordinal: Int?,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, null, parameters, hookArguments, isStatic, ordinal), IrTargetInjection
+
+class IrArrayGetInjection(
+    name: String,
+    methodMixinRef: String,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    override val targetMixinRef: String,
+    override val isStaticTarget: Boolean,
+    ordinal: Int?,
+    componentTypeName: IrTypeName,
+    isStatic: Boolean,
+) : IrInjection(name, methodMixinRef, componentTypeName, parameters, hookArguments, isStatic, ordinal),
+    IrTargetInjection

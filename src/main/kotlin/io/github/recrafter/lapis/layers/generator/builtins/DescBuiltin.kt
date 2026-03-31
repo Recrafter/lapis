@@ -1,315 +1,484 @@
 package io.github.recrafter.lapis.layers.generator.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
-import io.github.recrafter.lapis.extensions.capitalize
+import io.github.recrafter.lapis.extensions.InternalPrefix.ARGUMENT
+import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.layers.generator.builders.IrKotlinCodeBlockBuilder
-import io.github.recrafter.lapis.layers.generator.withInternalPrefix
-import io.github.recrafter.lapis.layers.lowering.*
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.extensions.withInternalPrefix
+import io.github.recrafter.lapis.layers.lowering.IrModifier
+import io.github.recrafter.lapis.layers.lowering.asIr
+import io.github.recrafter.lapis.layers.lowering.asIrTypeName
+import io.github.recrafter.lapis.layers.lowering.models.*
+import io.github.recrafter.lapis.layers.lowering.types.IrLambdaTypeName
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
-import io.github.recrafter.lapis.layers.lowering.types.IrVariableTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrTypeVariableName
 import io.github.recrafter.lapis.layers.lowering.types.orVoid
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
-sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String) {
+sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val builtin: Builtin) {
 
-    fun generate(typer: (Builtin) -> IrClassName): KPClass =
+    fun generate(typer: BuiltinTyper): KPClass =
         buildKotlinInterface(name) {
             setModifiers(IrModifier.PUBLIC)
-            setVariableTypes(IrVariableTypeName.of("D", typer(Builtin.Desc).generic(KPStar.asIr())))
+            setVariableTypes(
+                IrTypeVariableName.of(
+                    when (builtin) {
+                        Builtin.Field -> "F"
+                        Builtin.Callable -> "C"
+                        Builtin.Method -> "M"
+                        else -> lapisError("Desc builtin must be field or method")
+                    },
+                    typer(builtin).parameterizedBy(KPStar.asIr())
+                )
+            )
         }
 
-    abstract fun generateWrapper(dest: KPFileBuilder, wrapper: W, typer: (Builtin) -> IrClassName)
+    abstract fun generateWrapper(dest: KPFileBuilder, wrapper: W, typer: BuiltinTyper)
 
-    data object Call : DescBuiltin<IrInvokableDesc, IrDescCallWrapper>("Call") {
+    data object FieldGet : DescBuiltin<IrFieldDesc, IrDescFieldGetWrapper>("FieldGet", Builtin.Field) {
 
-        override fun generateWrapper(
-            dest: KPFileBuilder, wrapper: IrDescCallWrapper, typer: (Builtin) -> IrClassName
-        ) {
-            val operationParameterName = "operation".withInternalPrefix()
-            val receiverParameterName = "receiver".withInternalPrefix()
-            val invokeWithReceiverParameterName = "invokeWithReceiver".withInternalPrefix()
+        override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescFieldGetWrapper, typer: BuiltinTyper) {
+            val receiverParameter = wrapper.receiverTypeName?.let {
+                IrParameter("receiver".withInternalPrefix(), it)
+            }
+            val operationParameter = IrParameter(
+                "operation".withInternalPrefix(),
+                Operation::class.asIr().parameterizedBy(wrapper.fieldTypeName)
+            )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(buildList {
-                    wrapper.receiverTypeName?.let {
-                        add(IrParameter(receiverParameterName, it))
-                        add(IrParameter(invokeWithReceiverParameterName, Boolean::class.asIr()))
-                    }
-                    addAll(wrapper.parameters.mapIndexed { index, parameter ->
-                        val name = parameter.name ?: index.toString()
-                        IrParameter(name.withInternalPrefix("argument"), parameter.typeName)
-                    })
-                    add(
-                        IrParameter(
-                            operationParameterName,
-                            Operation::class.asIr().generic(wrapper.returnTypeName.orVoid())
-                        )
-                    )
-                })
+                setConstructor(listOfNotNull(receiverParameter, operationParameter), IrModifier.PUBLIC)
                 addSuperInterface(wrapper.superClassTypeName)
             })
-            dest.addProperties(wrapper.parameters.mapNotNull { parameter ->
-                val name = parameter.name ?: return@mapNotNull null
-                buildKotlinProperty(name, parameter.typeName) {
-                    setReceiverType(wrapper.superClassTypeName)
-                    setGetter {
-                        setJvmName(wrapper.className.simpleName + "_get" + name.capitalize())
-                        setModifiers(IrModifier.INLINE)
-                        setBody {
-                            return_("(this as %T).%L") {
-                                arg(wrapper.className)
-                                arg(name.withInternalPrefix("argument"))
-                            }
-                        }
-                    }
-                }
-            })
-            wrapper.receiverTypeName?.let { returnType ->
-                dest.addFunction(buildKotlinFunction("getReceiver") {
-                    setJvmName(wrapper.className.simpleName + "_getReceiver")
+            val getReceiverFunction = receiverParameter?.let {
+                buildKotlinFunction("getReceiver", jvmNamespace = wrapper.className) {
                     setModifiers(IrModifier.INLINE)
                     setReceiverType(wrapper.superClassTypeName)
-                    setReturnType(returnType)
+                    setReturnType(receiverParameter.typeName)
                     setBody {
-                        return_("(this as %T).%L") {
+                        return_("(this as %T).%N") {
                             arg(wrapper.className)
-                            arg(receiverParameterName)
+                            arg(receiverParameter)
                         }
                     }
-                })
+                }
             }
-            dest.addFunction(buildKotlinFunction("invoke") {
-                setJvmName(wrapper.className.simpleName + "_invoke")
+            getReceiverFunction?.let { dest.addFunction(it) }
+
+            dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(wrapper.superClassTypeName)
-                wrapper.parameters.forEach { parameter ->
-                    val name = parameter.name ?: return@forEach
-                    addParameter(buildKotlinParameter(name, parameter.typeName) {
-                        defaultValue(buildKotlinCodeBlock("this.%L") {
-                            arg(name)
+                val receiverParameter = getReceiverFunction?.let {
+                    buildKotlinParameter("receiver", wrapper.receiverTypeName) {
+                        defaultValue(buildKotlinCodeBlock("%N()") {
+                            arg(getReceiverFunction)
                         })
-                    })
+                    }
                 }
-                setReturnType(wrapper.returnTypeName)
-                setBody {
-                    code("this as %T") {
-                        arg(wrapper.className)
-                    }
-
-                    fun callOperation(parameters: List<String>) {
-                        val format = "%L.%L(%L)"
-                        val args: IrKotlinCodeBlockBuilder.Arguments.() -> Unit = {
-                            arg(operationParameterName)
-                            arg(Operation<*>::call)
-                            arg(parameters.joinToString())
-                        }
-                        if (wrapper.returnTypeName != null) {
-                            return_(format, args)
-                        } else {
-                            code(format, args)
-                        }
-                    }
-
-                    val parameterNames = wrapper.parameters.mapIndexed { index, it ->
-                        it.name ?: index.toString().withInternalPrefix("argument")
-                    }
-                    if (wrapper.receiverTypeName != null) {
-                        if_(buildKotlinCodeBlock(invokeWithReceiverParameterName)) {
-                            callOperation(listOf(receiverParameterName) + parameterNames)
-                            if (wrapper.returnTypeName == null) {
-                                return_()
-                            }
-                        }
-                    }
-                    callOperation(parameterNames)
-                }
-            })
-        }
-    }
-
-    data object FieldGet : DescBuiltin<IrFieldDesc, IrDescFieldGetWrapper>("FieldGet") {
-
-        override fun generateWrapper(
-            dest: KPFileBuilder, wrapper: IrDescFieldGetWrapper, typer: (Builtin) -> IrClassName
-        ) {
-            val receiverParameterName = "receiver".withInternalPrefix()
-            val operationParameterName = "operation".withInternalPrefix()
-            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(buildList {
-                    wrapper.receiverTypeName?.let { add(IrParameter(receiverParameterName, it)) }
-                    add(IrParameter(operationParameterName, Operation::class.asIr().generic(wrapper.fieldTypeName)))
-                })
-                addSuperInterface(wrapper.superClassTypeName)
-            })
-            wrapper.receiverTypeName?.let {
-                dest.addProperty(buildKotlinProperty("receiver", it) {
-                    setReceiverType(wrapper.superClassTypeName)
-                    setGetter {
-                        setJvmName(wrapper.className.simpleName + "_receiver")
-                        setModifiers(IrModifier.INLINE)
-                        setBody {
-                            return_("(this as %T).%L") {
-                                arg(wrapper.className)
-                                arg(receiverParameterName)
-                            }
-                        }
-                    }
-                })
-            }
-            dest.addFunction(buildKotlinFunction("get") {
-                setJvmName(wrapper.className.simpleName + "_get")
-                setModifiers(IrModifier.INLINE)
-                setReceiverType(wrapper.superClassTypeName)
-                wrapper.receiverTypeName?.let {
-                    addParameter(buildKotlinParameter("receiver", it) {
-                        defaultValue(buildKotlinCodeBlock("this.%L") {
-                            arg("receiver")
-                        })
-                    })
-                }
+                receiverParameter?.let { addParameter(it) }
                 setReturnType(wrapper.fieldTypeName)
                 setBody {
                     return_(buildString {
-                        append("(this as %T).%L.%L(")
-                        if (wrapper.receiverTypeName != null) {
-                            append("%L")
-                        }
-                        append(")")
-                    }) {
-                        arg(wrapper.className)
-                        arg(operationParameterName)
-                        arg(Operation<*>::call)
-                        if (wrapper.receiverTypeName != null) {
-                            arg("receiver")
-                        }
-                    }
-                }
-            })
-        }
-    }
-
-    data object FieldWrite : DescBuiltin<IrFieldDesc, IrDescFieldWriteWrapper>("FieldWrite") {
-
-        override fun generateWrapper(
-            dest: KPFileBuilder, wrapper: IrDescFieldWriteWrapper, typer: (Builtin) -> IrClassName
-        ) {
-            val receiverParameterName = "receiver".withInternalPrefix()
-            val valueParameterName = "value".withInternalPrefix()
-            val operationParameterName = "operation".withInternalPrefix()
-            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(buildList {
-                    wrapper.receiverTypeName?.let { add(IrParameter(receiverParameterName, it)) }
-                    add(IrParameter(valueParameterName, wrapper.fieldTypeName))
-                    add(IrParameter(operationParameterName, Operation::class.asIr().generic(IrTypeName.VOID)))
-                })
-                addSuperInterface(wrapper.superClassTypeName)
-            })
-            wrapper.receiverTypeName?.let {
-                dest.addProperty(buildKotlinProperty("receiver", it) {
-                    setReceiverType(wrapper.superClassTypeName)
-                    setGetter {
-                        setJvmName(wrapper.className.simpleName + "_receiver")
-                        setModifiers(IrModifier.INLINE)
-                        setBody {
-                            return_("(this as %T).%L") {
-                                arg(wrapper.className)
-                                arg(receiverParameterName)
-                            }
-                        }
-                    }
-                })
-            }
-            dest.addProperty(buildKotlinProperty("value", wrapper.fieldTypeName) {
-                setReceiverType(wrapper.superClassTypeName)
-                setGetter {
-                    setJvmName(wrapper.className.simpleName + "_value")
-                    setModifiers(IrModifier.INLINE)
-                    setBody {
-                        return_("(this as %T).%L") {
-                            arg(wrapper.className)
-                            arg(valueParameterName)
-                        }
-                    }
-                }
-            })
-            dest.addFunction(buildKotlinFunction("set") {
-                setJvmName(wrapper.className.simpleName + "_set")
-                setModifiers(IrModifier.INLINE)
-                setReceiverType(wrapper.superClassTypeName)
-                addParameter(buildKotlinParameter("value", wrapper.fieldTypeName) {
-                    defaultValue(buildKotlinCodeBlock("this.%L") {
-                        arg("value")
-                    })
-                })
-                wrapper.receiverTypeName?.let {
-                    addParameter(buildKotlinParameter("receiver", it) {
-                        defaultValue(buildKotlinCodeBlock("this.%L") {
-                            arg("receiver")
-                        })
-                    })
-                }
-                setBody {
-                    code(buildString {
-                        append("(this as %T).%L.%L(")
-                        if (wrapper.receiverTypeName != null) {
-                            append("%L, ")
-                        }
-                        append("%L")
-                        append(")")
-                    }) {
-                        arg(wrapper.className)
-                        arg(operationParameterName)
-                        arg(Operation<*>::call)
-                        if (wrapper.receiverTypeName != null) {
-                            arg("receiver")
-                        }
-                        arg("value")
-                    }
-                }
-            })
-        }
-    }
-
-    data object Cancel : DescBuiltin<IrInvokableDesc, IrDescCancelWrapper>("Cancel") {
-
-        override fun generateWrapper(
-            dest: KPFileBuilder, wrapper: IrDescCancelWrapper, typer: (Builtin) -> IrClassName
-        ) {
-            val callbackParameterName = "callback".withInternalPrefix()
-            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(buildList {
-                    add(
-                        IrParameter(
-                        callbackParameterName,
-                        wrapper.returnTypeName
-                            ?.let { CallbackInfoReturnable::class.asIr().generic(it) }
-                            ?: CallbackInfo::class.asIr()
-                    ))
-                })
-                addSuperInterface(wrapper.superClassTypeName)
-            })
-            dest.addFunction(buildKotlinFunction("invoke") {
-                setJvmName(wrapper.className.simpleName + "_invoke")
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
-                setReceiverType(wrapper.superClassTypeName)
-                setReturnType(KPNothing.asIr())
-                val returnValueParameter = wrapper.returnTypeName?.let {
-                    addParameter(IrParameter("returnValue", it))
-                }
-                setBody {
-                    code("(this as %T)") {
-                        arg(wrapper.className)
-                    }
-                    code(buildString {
-                        append("%L.%L(")
-                        if (returnValueParameter != null) {
+                        append("(this as %T).%N.%L(")
+                        if (receiverParameter != null) {
                             append("%N")
                         }
                         append(")")
                     }) {
-                        arg(callbackParameterName)
+                        arg(wrapper.className)
+                        arg(operationParameter)
+                        arg(Operation<*>::call)
+                        receiverParameter?.let { arg(it) }
+                    }
+                }
+            })
+        }
+    }
+
+    data object FieldSet : DescBuiltin<IrFieldDesc, IrDescFieldSetWrapper>("FieldSet", Builtin.Field) {
+
+        override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescFieldSetWrapper, typer: BuiltinTyper) {
+            val receiverParameter = wrapper.receiverTypeName?.let {
+                IrParameter(
+                    "receiver".withInternalPrefix(),
+                    it
+                )
+            }
+            val valueParameter = IrParameter(
+                "value".withInternalPrefix(),
+                wrapper.fieldTypeName
+            )
+            val operationParameter = IrParameter(
+                "operation".withInternalPrefix(),
+                Operation::class.asIr().parameterizedBy(IrTypeName.VOID)
+            )
+            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
+                setConstructor(listOfNotNull(receiverParameter, valueParameter, operationParameter), IrModifier.PUBLIC)
+                addSuperInterface(wrapper.superClassTypeName)
+            })
+            val valueProperty = buildKotlinProperty("value", wrapper.fieldTypeName, jvmNamespace = wrapper.className) {
+                setReceiverType(wrapper.superClassTypeName)
+                setGetter {
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(valueParameter)
+                        }
+                    }
+                }
+            }
+            dest.addProperty(valueProperty)
+
+            val getReceiverFunction = receiverParameter?.let {
+                buildKotlinFunction("getReceiver", jvmNamespace = wrapper.className) {
+                    setModifiers(IrModifier.INLINE)
+                    setReceiverType(wrapper.superClassTypeName)
+                    setReturnType(receiverParameter.typeName)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(receiverParameter)
+                        }
+                    }
+                }
+            }
+            getReceiverFunction?.let { dest.addFunction(it) }
+
+            dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
+                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                setReceiverType(wrapper.superClassTypeName)
+                val valueParameter = buildKotlinParameter("value", wrapper.fieldTypeName) {
+                    defaultValue(buildKotlinCodeBlock("this.%N") {
+                        arg(valueProperty)
+                    })
+                }
+                addParameter(valueParameter)
+
+                val receiverParameter = getReceiverFunction?.let {
+                    buildKotlinParameter("receiver", wrapper.receiverTypeName) {
+                        defaultValue(buildKotlinCodeBlock("%N()") {
+                            arg(getReceiverFunction)
+                        })
+                    }
+                }?.also { addParameter(it) }
+                setBody {
+                    code_(buildString {
+                        append("(this as %T).%N.%L(")
+                        if (receiverParameter != null) {
+                            append("%N, ")
+                        }
+                        append("%N)")
+                    }) {
+                        arg(wrapper.className)
+                        arg(operationParameter)
+                        arg(Operation<*>::call)
+                        receiverParameter?.let { arg(it) }
+                        arg(valueParameter)
+                    }
+                }
+            })
+        }
+    }
+
+    data object ArrayGet : DescBuiltin<IrFieldDesc, IrDescArrayGetWrapper>("ArrayGet", Builtin.Field) {
+
+        override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescArrayGetWrapper, typer: BuiltinTyper) {
+            val arrayParameter = IrParameter("array".withInternalPrefix(), wrapper.arrayTypeName)
+            val indexParameter = IrParameter("index".withInternalPrefix(), KPInt.asIrTypeName())
+            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
+                setConstructor(listOf(arrayParameter, indexParameter), IrModifier.PUBLIC)
+                addSuperInterface(wrapper.superClassTypeName)
+            })
+            val arrayProperty = buildKotlinProperty("array", wrapper.arrayTypeName, jvmNamespace = wrapper.className) {
+                setReceiverType(wrapper.superClassTypeName)
+                setGetter {
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(arrayParameter)
+                        }
+                    }
+                }
+            }
+            dest.addProperty(arrayProperty)
+
+            val indexProperty = buildKotlinProperty("index", KPInt.asIrTypeName(), jvmNamespace = wrapper.className) {
+                setReceiverType(wrapper.superClassTypeName)
+                setGetter {
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(indexParameter)
+                        }
+                    }
+                }
+            }
+            dest.addProperty(indexProperty)
+
+            dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
+                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                setReceiverType(wrapper.superClassTypeName)
+                val arrayParameter = buildKotlinParameter("array", wrapper.arrayTypeName) {
+                    defaultValue(buildKotlinCodeBlock("this.%N") {
+                        arg(arrayProperty)
+                    })
+                }
+                val indexParameter = buildKotlinParameter("index", KPInt.asIrTypeName()) {
+                    defaultValue(buildKotlinCodeBlock("this.%N") {
+                        arg(indexProperty)
+                    })
+                }
+                addParameters(listOf(arrayParameter, indexParameter))
+                setReturnType(wrapper.arrayComponentTypeName)
+                setBody {
+                    return_("%N[%N]") {
+                        arg(arrayParameter)
+                        arg(indexParameter)
+                    }
+                }
+            })
+        }
+    }
+
+    data object Body : DescBuiltin<IrInvokableDesc, IrDescBodyWrapper>("Body", Builtin.Method) {
+
+        override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescBodyWrapper, typer: BuiltinTyper) {
+            val namedParameters = wrapper.parameters.mapNotNull { parameter ->
+                parameter.name?.let { IrParameter(parameter.name, parameter.typeName) }
+            }
+            val argumentParameters = wrapper.parameters.mapIndexed { index, parameter ->
+                val name = parameter.name ?: index.toString()
+                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName)
+            }
+            val operationParameter = IrParameter(
+                "operation".withInternalPrefix(),
+                Operation::class.asIr().parameterizedBy(wrapper.returnTypeName.orVoid())
+            )
+            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
+                setConstructor(argumentParameters + operationParameter, IrModifier.PUBLIC)
+                addSuperInterface(wrapper.superClassTypeName)
+            })
+            dest.addProperties(namedParameters.map { parameter ->
+                buildKotlinProperty(parameter.name, parameter.typeName, jvmNamespace = wrapper.className) {
+                    setReceiverType(wrapper.superClassTypeName)
+                    setGetter {
+                        setModifiers(IrModifier.INLINE)
+                        setBody {
+                            return_("(this as %T).%L") {
+                                arg(wrapper.className)
+                                arg(parameter.name.withInternalPrefix(ARGUMENT))
+                            }
+                        }
+                    }
+                }
+            })
+            dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
+                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                setReceiverType(wrapper.superClassTypeName)
+                addParameters(namedParameters.map { parameter ->
+                    buildKotlinParameter(parameter.name, parameter.typeName) {
+                        defaultValue(buildKotlinCodeBlock("this.%N") {
+                            arg(parameter)
+                        })
+                    }
+                })
+                setReturnType(wrapper.returnTypeName)
+                setBody {
+                    code_(
+                        format = buildString {
+                            append("(this as %T).%N.%L(")
+                            if (namedParameters.isNotEmpty()) {
+                                append(namedParameters.joinToString { "%N" })
+                            }
+                            append(")")
+                        },
+                        isReturn = wrapper.returnTypeName != null
+                    ) {
+                        arg(wrapper.className)
+                        arg(operationParameter)
+                        arg(Operation<*>::call)
+                        namedParameters.forEach { arg(it) }
+                    }
+                }
+            })
+        }
+    }
+
+    data object Call : DescBuiltin<IrInvokableDesc, IrDescCallWrapper>("Call", Builtin.Callable) {
+
+        override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescCallWrapper, typer: BuiltinTyper) {
+            val receiverParameter = wrapper.receiverTypeName?.let {
+                IrParameter(
+                    "receiver".withInternalPrefix(),
+                    it
+                )
+            }
+            val namedParameters = wrapper.parameters.mapNotNull { parameter ->
+                parameter.name?.let { IrParameter(parameter.name, parameter.typeName) }
+            }
+            val argumentParameters = wrapper.parameters.mapIndexed { index, parameter ->
+                val name = parameter.name ?: index.toString()
+                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName)
+            }
+            val operationParameter = IrParameter(
+                "operation".withInternalPrefix(),
+                Operation::class.asIr().parameterizedBy(wrapper.returnTypeName.orVoid())
+            )
+            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
+                setConstructor(
+                    listOfNotNull(receiverParameter) + argumentParameters + operationParameter,
+                    IrModifier.PUBLIC
+                )
+                addSuperInterface(wrapper.superClassTypeName)
+            })
+            dest.addProperties(namedParameters.map { parameter ->
+                buildKotlinProperty(parameter.name, parameter.typeName, jvmNamespace = wrapper.className) {
+                    setReceiverType(wrapper.superClassTypeName)
+                    setGetter {
+                        setModifiers(IrModifier.INLINE)
+                        setBody {
+                            return_("(this as %T).%L") {
+                                arg(wrapper.className)
+                                arg(parameter.name.withInternalPrefix(ARGUMENT))
+                            }
+                        }
+                    }
+                }
+            })
+            val getReceiverFunction = receiverParameter?.let {
+                buildKotlinFunction("getReceiver", jvmNamespace = wrapper.className) {
+                    setModifiers(IrModifier.INLINE)
+                    setReceiverType(wrapper.superClassTypeName)
+                    setReturnType(receiverParameter.typeName)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(receiverParameter)
+                        }
+                    }
+                }
+            }?.also { dest.addFunction(it) }
+            val namedArgumentParameters = namedParameters.map { parameter ->
+                buildKotlinParameter(parameter) {
+                    defaultValue(buildKotlinCodeBlock("this.%N") {
+                        arg(parameter)
+                    })
+                }
+            }
+            dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
+                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                setReceiverType(wrapper.superClassTypeName)
+                addParameters(namedArgumentParameters)
+                setReturnType(wrapper.returnTypeName)
+                setBody {
+                    code_(
+                        format = buildString {
+                            append("(this as %T).%N.%L(")
+                            getReceiverFunction?.let { append("%N()") }
+                            if (namedParameters.isNotEmpty()) {
+                                append(namedParameters.joinToString(prefix = ", ") { "%N" })
+                            }
+                            append(")")
+                        },
+                        isReturn = wrapper.returnTypeName != null
+                    ) {
+                        arg(wrapper.className)
+                        arg(operationParameter)
+                        arg(Operation<*>::call)
+                        getReceiverFunction?.let { arg(it) }
+                        namedParameters.forEach { arg(it) }
+                    }
+                }
+            })
+            val receiverTypeName = wrapper.receiverTypeName ?: return
+            dest.addFunction(buildKotlinFunction("call", jvmNamespace = wrapper.className) {
+                setModifiers(IrModifier.INLINE)
+                setReceiverType(wrapper.superClassTypeName)
+                val receiverParameter = IrParameter("_receiver", receiverTypeName)
+                setContextParameters(listOf(receiverParameter))
+                addParameters(namedArgumentParameters)
+                setReturnType(wrapper.returnTypeName)
+                setBody {
+                    code_(
+                        format = buildString {
+                            append("(this as %T).%N.%L(")
+                            append("%N")
+                            if (argumentParameters.isNotEmpty()) {
+                                append(argumentParameters.joinToString(prefix = ", ") { "%N" })
+                            }
+                            append(")")
+                        },
+                        isReturn = wrapper.returnTypeName != null
+                    ) {
+                        arg(wrapper.className)
+                        arg(operationParameter)
+                        arg(Operation<*>::call)
+                        arg(receiverParameter)
+                        argumentParameters.forEach { arg(it) }
+                    }
+                }
+            })
+            dest.addFunction(buildKotlinFunction("withReceiver", jvmNamespace = wrapper.className) { functionName ->
+                setModifiers(IrModifier.INLINE)
+                setReceiverType(wrapper.superClassTypeName)
+                val receiverParameter = buildKotlinParameter("receiver", receiverTypeName)
+                addParameter(receiverParameter)
+                val blockType = IrLambdaTypeName.of(
+                    receiverTypeName = wrapper.superClassTypeName,
+                    returnTypeName = wrapper.returnTypeName,
+                    contextParameters = listOf(receiverTypeName),
+                )
+                val blockParameter = buildKotlinParameter("block", blockType)
+                addParameter(blockParameter)
+                setReturnType(wrapper.returnTypeName)
+                setBody {
+                    with_(buildKotlinCodeBlock("%N") { arg(receiverParameter) }) {
+                        code_(
+                            format = "%N(this@%L)",
+                            isReturn = wrapper.returnTypeName != null
+                        ) {
+                            arg(blockParameter)
+                            arg(functionName)
+                        }
+                    }
+                }
+            })
+        }
+    }
+
+    data object Cancel : DescBuiltin<IrInvokableDesc, IrDescCancelWrapper>("Cancel", Builtin.Method) {
+
+        override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescCancelWrapper, typer: BuiltinTyper) {
+            val callbackParameter = IrParameter(
+                "callback".withInternalPrefix(),
+                wrapper.returnTypeName
+                    ?.let { CallbackInfoReturnable::class.asIr().parameterizedBy(it) }
+                    ?: CallbackInfo::class.asIr()
+            )
+            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
+                setConstructor(listOf(callbackParameter), IrModifier.PUBLIC)
+                addSuperInterface(wrapper.superClassTypeName)
+            })
+            dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
+                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                setReceiverType(wrapper.superClassTypeName)
+                setReturnType(KPNothing.asIr())
+                val returnValueParameter = wrapper.returnTypeName
+                    ?.let { IrParameter("returnValue", it) }
+                    ?.also { addParameter(it) }
+                setBody {
+                    code_("(this as %T)") {
+                        arg(wrapper.className)
+                    }
+                    code_(buildString {
+                        append("%N.%L(")
+                        returnValueParameter?.let { append("%N") }
+                        append(")")
+                    }) {
+                        arg(callbackParameter)
                         arg(
                             if (returnValueParameter != null) CallbackInfoReturnable<*>::setReturnValue
                             else CallbackInfo::cancel
@@ -325,6 +494,6 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String) {
     }
 
     companion object {
-        val entries: Array<DescBuiltin<*, *>> get() = arrayOf(Call, FieldGet, FieldWrite, Cancel)
+        val entries: Array<DescBuiltin<*, *>> = arrayOf(FieldGet, FieldSet, ArrayGet, Body, Call, Cancel)
     }
 }

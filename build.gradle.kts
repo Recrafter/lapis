@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.projektor)
@@ -6,19 +7,12 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.ksp.api)
-    implementation(libs.psi.api)
-
-    implementation(libs.mixin)
-    implementation(libs.mixin.extras)
-
+    implementation(libs.bundles.ksp)
+    implementation(libs.bundles.mixins)
     implementation(libs.bundles.asm)
+    implementation(libs.bundles.poets)
 
     implementation(libs.lapis.annotations)
-
-    implementation(libs.kotlin.poet)
-    implementation(libs.java.poet)
-
     implementation(libs.kotlin.serialization.json)
 
     ksp(libs.auto.service)
@@ -28,5 +22,11 @@ dependencies {
 projekt {
     kotlinLibrary {
         jvmTarget = JvmTarget.JVM_1_8
+    }
+}
+
+tasks {
+    withType<KotlinCompile>().configureEach {
+        compilerOptions.freeCompilerArgs.add("-Xcontext-parameters")
     }
 }

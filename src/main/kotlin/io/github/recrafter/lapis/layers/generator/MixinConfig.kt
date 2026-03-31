@@ -48,7 +48,7 @@ data class MixinConfig(
         fun of(mixinPackage: String, qualifiedNames: Map<Side, List<String>>): MixinConfig =
             MixinConfig(
                 isRequired = true,
-                minVersion = "0.5.7", // Unique
+                minVersion = "0.8.6", // Specifiers
                 extrasConfig = ExtrasConfig(
                     minVersion = "0.4.0" // WrapMethod
                 ),

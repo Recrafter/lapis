@@ -1,10 +1,15 @@
 package io.github.recrafter.lapis.layers.parser
 
 import io.github.recrafter.lapis.annotations.*
-import io.github.recrafter.lapis.extensions.ksp.*
-import io.github.recrafter.lapis.layers.JavaMemberKind
-import io.github.recrafter.lapis.layers.validator.KSPSource
-import kotlin.reflect.KClass
+import io.github.recrafter.lapis.extensions.ks.KSAnnotated
+import io.github.recrafter.lapis.extensions.ks.KSClassDecl
+import io.github.recrafter.lapis.extensions.ks.KSSymbol
+import io.github.recrafter.lapis.extensions.ks.KSType
+
+class ParserPrepareResult(
+    val schemaClassDecls: List<KSClassDecl>,
+    val patchClassDecls: List<KSClassDecl>,
+)
 
 class ParserResult(
     val schemas: List<ParsedSchema>,
@@ -12,163 +17,198 @@ class ParserResult(
 )
 
 class ParsedSchema(
-    override val source: KSPAnnotated,
+    override val symbol: KSAnnotated,
 
-    val classDecl: KSPClassDecl?,
-    val targetClassDecl: KSPClassDecl?,
-    val access: String?,
+    val classDecl: KSClassDecl?,
+    val targetClassDecl: KSClassDecl?,
+    val targetBinaryName: String?,
     val hasAccess: Boolean,
     val isMarkedAsFinal: Boolean,
     val descriptors: List<ParsedDesc>,
     val nestedSchemas: List<ParsedSchema>,
-) : KSPSource(source)
+) : SymbolSource(symbol)
 
 class ParsedDesc(
-    source: KSPSymbol,
+    symbol: KSSymbol,
 
     val name: String?,
-    val classDecl: KSPClassDecl?,
-    val memberKinds: List<JavaMemberKind>,
+    val classDecl: KSClassDecl,
     val hasStaticAnnotation: Boolean,
     val hasAccessAnnotation: Boolean,
     val isMarkedAsFinal: Boolean,
+    val superClassDecl: KSClassDecl?,
+    val generic: ParsedDescGeneric?,
+    val callable: ParsedDescCallable?,
+) : SymbolSource(symbol)
 
-    val isFunctionType: Boolean,
-    val hasReceiver: Boolean,
-    val functionTypeReceiverName: String?,
-    val receiverType: KSPType?,
-    val parameters: List<ParsedFunctionTypeParameter>,
-    val returnType: KSPType?,
+sealed interface ParsedDescGeneric
 
-    val callableReference: ParsedCallableReference?,
+class ParsedFunctionTypeDescGeneric(
+    val receiverType: KSType?,
+    val parameters: List<ParsedParameter>,
+    val returnType: KSType?,
+) : ParsedDescGeneric
 
-    val superClassDecl: KSPClassDecl?,
-) : KSPSource(source)
+class ParsedTypeDescGeneric(
+    val type: KSType?,
+    val arrayComponentType: KSType?,
+) : ParsedDescGeneric
 
-class ParsedCallableReference(
-    val left: String?,
-    val right: String?,
+sealed class ParsedDescCallable(
+    val receiverClassDecl: KSClassDecl?,
 )
 
+class ParsedFieldDescCallable(
+    receiverClassDecl: KSClassDecl?,
+    val name: String?,
+    val type: KSType?,
+) : ParsedDescCallable(receiverClassDecl)
+
+class ParsedMethodDescCallable(
+    receiverClassDecl: KSClassDecl?,
+    val name: String?,
+    val parameters: List<ParsedParameter>,
+    val returnType: KSType?,
+) : ParsedDescCallable(receiverClassDecl)
+
+class ParsedConstructorDescCallable(
+    receiverClassDecl: KSClassDecl?,
+    val parameters: List<ParsedParameter>,
+    val returnType: KSType?,
+) : ParsedDescCallable(receiverClassDecl)
+
 class ParsedPatch(
-    override val source: KSPAnnotated,
+    override val symbol: KSAnnotated,
 
     val name: String?,
     val side: Side?,
-    val classDecl: KSPClassDecl?,
+    val classDecl: KSClassDecl?,
 
-    val superClassDecl: KSPClassDecl?,
-    val superGenericClassDecl: KSPClassDecl?,
+    val superClassDecl: KSClassDecl?,
+    val superGenericClassDecl: KSClassDecl?,
 
-    val schemaClassDecl: KSPClassDecl?,
+    val schemaClassDecl: KSClassDecl?,
 
     val properties: List<ParsedPatchProperty>,
     val functions: List<ParsedPatchFunction>,
-) : KSPSource(source)
+) : SymbolSource(symbol)
 
 class ParsedPatchProperty(
-    source: KSPSymbol,
+    symbol: KSSymbol,
 
     val name: String,
-    val type: KSPType,
+    val type: KSType,
     isPublic: Boolean,
     isAbstract: Boolean,
     isExtension: Boolean,
     val isMutable: Boolean,
-) : KSPSource(source) {
+) : SymbolSource(symbol) {
     val isShared: Boolean = isPublic && !isAbstract && !isExtension
 }
 
 class ParsedPatchFunction(
-    source: KSPSymbol,
+    symbol: KSSymbol,
 
     val name: String,
     val parameters: List<ParsedPatchFunctionParameter>,
-    val returnType: KSPType?,
+    val returnType: KSType?,
     val hasTypeParameters: Boolean,
 
     isPublic: Boolean,
     isAbstract: Boolean,
     isExtension: Boolean,
 
+    val fromCompanionObject: Boolean,
+
     val hasHookAnnotation: Boolean,
-    val hookDescClassDecl: KSPClassDecl?,
-    val hookAt: Hook.At?,
+    val hookDescClassDecl: KSClassDecl?,
+    val hookAt: At?,
 
     val hasAtConstructorHeadAnnotation: Boolean,
-    val atConstructorHeadPhase: AtConstructorHead.Phase?,
+    val atConstructorHeadPhase: ConstructorHeadPhase?,
+
+    val hasAtLocalAnnotation: Boolean,
+    val atLocalOp: Op?,
+    val atLocalType: KSType?,
+    val atLocalName: String?,
+    val atLocalOrdinal: Int?,
+    val atLocalOpOrdinals: List<Int>,
+
+    val hasAtInstanceofAnnotation: Boolean,
+    val atInstanceofType: KSClassDecl?,
+    val atInstanceofOrdinals: List<Int>,
+
+    val hasAtReturnAnnotation: Boolean,
+    val atReturnOrdinals: List<Int>,
 
     val hasAtLiteralAnnotation: Boolean,
     val atLiteralArguments: List<ParsedAnnotationArgumentVariant>,
-    val atLiteralZeroConditions: List<Zero.Condition>,
+    val atLiteralZeroConditions: List<ZeroCondition>,
     val atLiteralInt: Int?,
     val atLiteralFloat: Float?,
     val atLiteralLong: Long?,
     val atLiteralDouble: Double?,
     val atLiteralString: String?,
-    val atLiteralClass: KClass<*>?,
     val atLiteralOrdinals: List<Int>,
 
-    val hasAtLocalAnnotation: Boolean,
-    val atLocalOp: AtLocal.Op?,
-    val atLocalType: KSPClassDecl?,
-    val atLocalOrdinal: Int?,
-
-    val hasAtInstanceofAnnotation: Boolean,
-    val atInstanceofType: KSPClassDecl?,
-    val atInstanceofOrdinals: List<Int>,
-
-    val hasAtReturnAnnotation: Boolean,
-    val atReturnLast: Boolean,
-    val atReturnOrdinals: List<Int>,
-
     val hasAtFieldAnnotation: Boolean,
-    val atFieldOp: AtField.Op?,
-    val atFieldDescClassDecl: KSPClassDecl?,
+    val atFieldOp: Op?,
+    val atFieldDescClassDecl: KSClassDecl?,
     val atFieldOrdinals: List<Int>,
 
     val hasAtArrayAnnotation: Boolean,
-    val atArrayOp: AtArray.Op?,
-    val atArrayDescClassDecl: KSPClassDecl?,
+    val atArrayOp: Op?,
+    val atArrayDescClassDecl: KSClassDecl?,
     val atArrayOrdinals: List<Int>,
 
     val hasAtCallAnnotation: Boolean,
-    val atCallDescClassDecl: KSPClassDecl?,
+    val atCallDescClassDecl: KSClassDecl?,
     val atCallOrdinals: List<Int>,
-) : KSPSource(source) {
+) : SymbolSource(symbol) {
+
     val isShared: Boolean = isPublic && !isAbstract && !isExtension
+
+    fun hasOrdinals(): Boolean {
+        val allOrdinals = atLocalOpOrdinals + atInstanceofOrdinals + atReturnOrdinals + atLiteralOrdinals +
+            atFieldOrdinals + atArrayOrdinals + atCallOrdinals
+        return allOrdinals.isNotEmpty()
+    }
 }
 
 data class ParsedAnnotationArgumentVariant(
     val name: String?,
-    val type: KSPType?,
+    val type: KSType?,
     val value: Any?,
 )
 
 class ParsedPatchFunctionParameter(
-    source: KSPSymbol,
+    symbol: KSSymbol,
 
     val name: String?,
-    val type: KSPType?,
+    val type: KSType?,
+    val hasDefaultArgument: Boolean,
 
     val hasOriginAnnotation: Boolean,
-    val originGenericClassDecl: KSPClassDecl?,
+    val originGenericClassDecl: KSClassDecl?,
 
     val hasCancelAnnotation: Boolean,
-    val cancelGenericClassDecl: KSPClassDecl?,
+    val cancelGenericClassDecl: KSClassDecl?,
+
+    val hasOrdinalAnnotation: Boolean,
 
     val hasParamAnnotation: Boolean,
     val paramName: String?,
 
     val hasLocalAnnotation: Boolean,
+    val localName: String?,
     val localOrdinal: Int?,
 
     val hasShareAnnotation: Boolean,
     val shareKey: String?,
     val isShareExported: Boolean,
-) : KSPSource(source)
+) : SymbolSource(symbol)
 
-class ParsedFunctionTypeParameter(
-    val type: KSPType,
+class ParsedParameter(
+    val type: KSType,
     val name: String?,
 )

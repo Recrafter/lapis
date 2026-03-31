@@ -5,12 +5,13 @@ import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.asIr
+import io.github.recrafter.lapis.layers.lowering.asIrTypeName
 
 open class IrTypeName(
-    open val kotlin: KPType,
+    open val kotlin: KPTypeName,
     val boxed: Boolean = kotlin.isNullable,
 ) {
-    val javaPrimitiveType: JPType? by lazy {
+    val javaPrimitiveType: JPTypeName? by lazy {
         when (makeNotNullable().kotlin) {
             KPUnit -> JPVoid
             KPBoolean -> JPBoolean
@@ -28,21 +29,14 @@ open class IrTypeName(
         }
     }
 
-    open val java: JPType by lazy {
+    open val java: JPTypeName by lazy {
         javaPrimitiveType ?: javaArrayType ?: when (val kotlin = kotlin) {
-            is KPClassType -> kotlin.asIr().java
-            is KPGenericType -> kotlin.asIr().java
-            is KPWildcardType -> kotlin.asIr().java
-            is KPVariableType -> kotlin.asIr().java
-            is KPFunctionType -> lapisError(
-                "Function type ${kotlin.toString().quoted()} is not supported, " +
-                    "but was leaked into IR"
-            )
-
-            is KPDynamicType -> lapisError(
-                "Dynamic type ${kotlin.toString().quoted()} is not supported, " +
-                    "but was leaked into IR"
-            )
+            is KPClassName -> kotlin.asIr().java
+            is KPParameterizedTypeName -> kotlin.asIr().java
+            is KPWildcardTypeName -> kotlin.asIr().java
+            is KPTypeVariableName -> kotlin.asIr().java
+            is KPLambdaTypeName -> kotlin.asIr().java
+            is KPDynamic -> kotlin.asIr().java
         }
     }
 
@@ -51,7 +45,7 @@ open class IrTypeName(
         else javaPrimitiveType == JPLong || javaPrimitiveType == JPDouble
     }
 
-    private val javaArrayType: JPArrayType? by lazy {
+    private val javaArrayType: JPArrayTypeName? by lazy {
         val arrayComponentType = when (val kotlin = kotlin) {
             KPBooleanArray -> JPBoolean
             KPByteArray -> JPByte
@@ -62,14 +56,14 @@ open class IrTypeName(
             KPFloatArray -> JPFloat
             KPDoubleArray -> JPDouble
             else -> {
-                if (kotlin is KPGenericType && kotlin.rawType == KPArray) {
-                    kotlin.typeArguments.singleOrNull()?.asIr()?.java
+                if (kotlin is KPParameterizedTypeName && kotlin.rawType == KPArray) {
+                    kotlin.typeArguments.singleOrNull()?.asIrTypeName()?.java
                 } else {
                     return@lazy null
                 }
             }
         }
-        JPArrayType.of(arrayComponentType)
+        JPArrayTypeName.of(arrayComponentType)
     }
 
     fun box(): IrTypeName =

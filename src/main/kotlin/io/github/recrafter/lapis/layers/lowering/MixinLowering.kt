@@ -1,26 +1,28 @@
 package io.github.recrafter.lapis.layers.lowering
 
 import com.squareup.kotlinpoet.asClassName
+import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
-import io.github.recrafter.lapis.extensions.common.castOrNull
+import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.generator.builtins.Builtins
 import io.github.recrafter.lapis.layers.generator.builtins.DescBuiltin
+import io.github.recrafter.lapis.layers.lowering.models.*
 import io.github.recrafter.lapis.layers.lowering.types.*
 import io.github.recrafter.lapis.layers.validator.*
+import org.spongepowered.asm.mixin.injection.Constant
 import kotlin.reflect.KClass
 
 class MixinLowering(
     private val options: Options,
     private val builtins: Builtins,
+    private val logger: LapisLogger,
 ) {
-    private val descByQualifiedName: MutableMap<String, IrDesc> = mutableMapOf()
-    private val patches: MutableList<Patch> = mutableListOf()
+    private val mixins: MutableList<IrMixin> = mutableListOf()
 
     fun lower(validatorResult: ValidatorResult): IrResult {
-        patches += validatorResult.patches
+        mixins += validatorResult.patches.map { lowerMixin(it) }
         return IrResult(
             schemas = validatorResult.schemas.map { schema ->
                 IrSchema(
@@ -30,42 +32,21 @@ class MixinLowering(
                     removeFinal = schema.isMarkedAsFinal,
                     className = schema.className,
                     targetClassName = schema.targetClassName,
-                    descriptors = schema.descriptors.map { desc ->
-                        lowerDesc(desc).also { irDesc -> descByQualifiedName[desc.className.qualifiedName] = irDesc }
-                    },
+                    descriptors = schema.descriptors.map { desc -> lowerDesc(desc) },
                 )
             },
-            mixins = patches.map { lowerMixin(it) },
+            mixins = mixins,
         )
     }
 
     private fun lowerDesc(desc: Desc): IrDesc =
         when (desc) {
             is InvokableDesc -> {
-                val callWrapper = IrDescCallWrapper(
-                    className = IrClassName.of(
-                        options.generatedPackageName,
-                        DescBuiltin.Call.name.withQualifiedNamePrefix(desc.className)
-                    ),
-                    superClassTypeName = builtins[DescBuiltin.Call].generic(desc.className),
-                    receiverTypeName = if (desc.isStatic) null else desc.receiverTypeName,
-                    parameters = desc.parameters.map { it.asIr() },
-                    returnTypeName = desc.returnTypeName,
-                )
-                val cancelWrapper = IrDescCancelWrapper(
-                    className = IrClassName.of(
-                        options.generatedPackageName,
-                        DescBuiltin.Cancel.name.withQualifiedNamePrefix(desc.className)
-                    ),
-                    superClassTypeName = builtins[DescBuiltin.Cancel].generic(desc.className),
-                    parameters = desc.parameters.map { it.asIr() },
-                    returnTypeName = desc.returnTypeName
-                )
                 if (desc is ConstructorDesc) {
                     IrConstructorDesc(
                         makePublic = desc.makePublic,
-                        callWrapper = callWrapper,
-                        cancelWrapper = cancelWrapper,
+                        callWrapper = findOriginDescWrapper(desc.className),
+                        cancelWrapper = findCancelDescWrapper(desc.className),
                         parameters = desc.parameters.map { it.asIr() },
                         returnTypeName = desc.className,
                     )
@@ -75,8 +56,9 @@ class MixinLowering(
                         removeFinal = desc.removeFinal,
                         name = desc.name,
                         targetName = desc.targetName,
-                        callWrapper = callWrapper,
-                        cancelWrapper = cancelWrapper,
+                        bodyWrapper = findOriginDescWrapper(desc.className),
+                        callWrapper = findOriginDescWrapper(desc.className),
+                        cancelWrapper = findCancelDescWrapper(desc.className),
                         parameters = desc.parameters.map { it.asIr() },
                         returnTypeName = desc.returnTypeName,
                     )
@@ -84,31 +66,14 @@ class MixinLowering(
             }
 
             is FieldDesc -> {
-                val fieldGetWrapper = IrDescFieldGetWrapper(
-                    className = IrClassName.of(
-                        options.generatedPackageName,
-                        DescBuiltin.FieldGet.name.withQualifiedNamePrefix(desc.className)
-                    ),
-                    superClassTypeName = builtins[DescBuiltin.FieldGet].generic(desc.className),
-                    receiverTypeName = if (desc.isStatic) null else desc.receiverTypeName,
-                    fieldTypeName = desc.fieldTypeName,
-                )
-                val fieldWriteWrapper = IrDescFieldWriteWrapper(
-                    className = IrClassName.of(
-                        options.generatedPackageName,
-                        DescBuiltin.FieldWrite.name.withQualifiedNamePrefix(desc.className)
-                    ),
-                    superClassTypeName = builtins[DescBuiltin.FieldWrite].generic(desc.className),
-                    receiverTypeName = if (desc.isStatic) null else desc.receiverTypeName,
-                    fieldTypeName = desc.fieldTypeName,
-                )
                 IrFieldDesc(
                     makePublic = desc.makePublic,
                     removeFinal = desc.removeFinal,
                     name = desc.name,
                     targetName = desc.targetName,
-                    fieldGetWrapper = fieldGetWrapper,
-                    fieldWriteWrapper = fieldWriteWrapper,
+                    fieldGetWrapper = findOriginDescWrapper(desc.className),
+                    fieldSetWrapper = findOriginDescWrapper(desc.className),
+                    arrayGetWrapper = findOriginDescWrapper(desc.className),
                     typeName = desc.fieldTypeName,
                 )
             }
@@ -171,67 +136,169 @@ class MixinLowering(
         )
     }
 
-    private fun lowerInjections(hook: HookModel): List<IrInjection> {
+    private fun lowerInjections(hook: DomainHook): List<IrInjection> {
         val parameters = buildList {
-            if (hook is HookWithTarget) {
-                if (hook !is BodyHook && !hook.targetDesc.isStatic) {
-                    add(IrInjectionReceiverParameter(hook.targetDesc.receiverTypeName))
-                }
-                if (hook is FieldWriteHook) {
-                    add(IrInjectionArgumentParameter("fieldValue", 0, hook.typeName))
-                }
-                addAll(hook.targetDesc.parameters.mapIndexed { index, parameter ->
-                    IrInjectionArgumentParameter(parameter.name, index, parameter.typeName)
-                })
-                add(
-                    IrInjectionOperationParameter(
-                        if (hook is FieldWriteHook) IrTypeName.VOID
-                        else hook.targetDesc.returnTypeName
+            when {
+                hook.isInjectBased -> {
+                    addAll(hook.desc.parameters.mapIndexed { index, parameter ->
+                        IrInjectionArgumentParameter(parameter.name, index, parameter.typeName)
+                    })
+                    add(
+                        IrInjectionCallbackParameter(
+                            if (hook is ConstructorHeadHook) null
+                            else hook.desc.returnTypeName
+                        )
                     )
-                )
-            } else if (hook is LiteralHook) {
-                add(IrInjectionValueParameter(hook.typeName))
+                }
+
+                hook is HookWithTarget -> {
+                    if (hook !is BodyHook && !hook.targetDesc.isStatic) {
+                        add(IrInjectionReceiverParameter(hook.targetDesc.receiverTypeName))
+                    }
+                    if (hook is FieldSetHook) {
+                        add(IrInjectionArgumentParameter("value", 0, hook.typeName))
+                    }
+                    addAll(hook.targetDesc.parameters.mapIndexed { index, parameter ->
+                        IrInjectionArgumentParameter(parameter.name, index, parameter.typeName)
+                    })
+                    add(
+                        IrInjectionOperationParameter(
+                            if (hook is FieldSetHook) IrTypeName.VOID
+                            else hook.targetDesc.returnTypeName
+                        )
+                    )
+                }
+
+                hook is LiteralHook -> {
+                    add(IrInjectionValueParameter(hook.typeName))
+                }
+
+                hook is ArrayHook -> {
+                    add(IrInjectionArgumentParameter("array", 0, hook.typeName))
+                    add(IrInjectionArgumentParameter("index", 1, KPInt.asIrTypeName()))
+                }
+
+                hook is ReturnHook && !hook.isInjectBased -> {
+                    val returnTypeName = hook.returnTypeName ?: lapisError("Return type not found")
+                    add(IrInjectionValueParameter(returnTypeName))
+                }
+
+                hook is LocalHook -> {
+                    add(IrInjectionValueParameter(hook.typeName))
+                }
             }
-            addAll(hook.parameters.flatMap { lowerInjectionParameter(hook, it) })
+            if (!hook.isInjectBased && hook.parameters.any { it is HookCancelParameter }) {
+                add(IrInjectionCallbackParameter(hook.desc.returnTypeName))
+            }
+            addAll(
+                hook.parameters.mapNotNull { lowerInjectionLocalBasedParameter(hook, it) }.sortedWith(
+                    compareBy<IrInjectionLocalBasedParameter> { parameter ->
+                        when (parameter) {
+                            is IrInjectionParamParameter -> 0
+                            is IrInjectionLocalParameter -> if (parameter.local is IrNamedLocal) 1 else 2
+                        }
+                    }.thenBy { parameter ->
+                        (parameter as? IrInjectionParamParameter)?.localIndex
+                    }.thenBy { parameter ->
+                        ((parameter as? IrInjectionLocalParameter)?.local as? IrPositionalLocal)?.ordinal
+                    }
+                )
+            )
         }
-        return hook.ordinals.map { ordinal ->
+        val hookArguments = hook.parameters.map { lowerHookArgument(it) }
+        return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
             when (hook) {
+                is MethodHeadHook -> IrMethodHeadInjection(
+                    name = hook.name,
+                    methodMixinRef = hook.desc.getMixinRef(),
+                    parameters = parameters,
+                    hookArguments = hookArguments,
+                    isStatic = hook.desc.isStatic,
+                )
+
+                is ConstructorHeadHook -> IrConstructorHeadInjection(
+                    name = hook.name,
+                    methodMixinRef = hook.desc.getMixinRef(),
+                    parameters = parameters,
+                    hookArguments = hookArguments,
+                    atArgs = listOf(
+                        "enforce" to when (hook.phase) {
+                            ConstructorHeadPhase.PreBody -> "PRE_BODY"
+                            ConstructorHeadPhase.PostDelegate -> "POST_DELEGATE"
+                            ConstructorHeadPhase.PostInit -> "POST_INIT"
+                        }
+                    ),
+                    isStatic = hook.desc.isStatic,
+                )
+
                 is BodyHook -> IrWrapMethodInjection(
                     name = hook.name,
                     methodMixinRef = hook.targetDesc.getMixinRef(),
-                    isStatic = hook.targetDesc.isStatic,
+                    isStaticTarget = hook.targetDesc.isStatic,
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
-                    hookArguments = hook.parameters.map { lowerHookArgument(it) },
+                    hookArguments = hookArguments,
+                    isStatic = hook.desc.isStatic,
                 )
 
-                is CallHook -> IrWrapOperationInjection(
+                is TailHook -> IrReturnInjection(
+                    name = hook.name,
+                    methodMixinRef = hook.desc.getMixinRef(),
+                    parameters = parameters,
+                    hookArguments = hookArguments,
+                    ordinal = null,
+                    isTail = true,
+                    isStatic = hook.desc.isStatic,
+                )
+
+                is LocalHook -> IrModifyVariableInjection(
                     name = hook.name,
                     methodMixinRef = hook.desc.getMixinRef(),
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
-                    hookArguments = hook.parameters.map { lowerHookArgument(it) },
-                    targetMixinRef = hook.targetDesc.getMixinRef(isTarget = true),
-                    isStatic = hook.targetDesc.isStatic,
+                    hookArguments = hookArguments,
+                    local = lowerLocal(hook.local, hook.desc, hook.typeName),
+                    isSet = hook.isSet,
                     ordinal = ordinal,
+                    isStatic = hook.desc.isStatic,
                 )
+
+                is ReturnHook -> {
+                    if (hook.isInjectBased) {
+                        IrReturnInjection(
+                            name = hook.name,
+                            methodMixinRef = hook.desc.getMixinRef(),
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            ordinal = ordinal,
+                            isTail = false,
+                            isStatic = hook.desc.isStatic,
+                        )
+                    } else {
+                        IrModifyReturnValueInjection(
+                            name = hook.name,
+                            methodMixinRef = hook.desc.getMixinRef(),
+                            returnTypeName = hook.returnTypeName,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            ordinal = ordinal,
+                            isStatic = hook.desc.isStatic,
+                        )
+                    }
+                }
 
                 is LiteralHook -> {
                     val args = when (val literal = hook.literal) {
                         is ZeroLiteral -> {
-                            TODO()
-//                            val expandZeroConditions = literal.conditions.map {
-//                                when (it) {
-//                                    `<` -> Constant.Condition.LESS_THAN_ZERO
-//                                    `<=` -> Constant.Condition.LESS_THAN_OR_EQUAL_TO_ZERO
-//                                    `>=` -> Constant.Condition.GREATER_THAN_OR_EQUAL_TO_ZERO
-//                                    `>` -> Constant.Condition.GREATER_THAN_ZERO
-//                                }
-//                            }
-//                            listOf(
-//                                "intValue" to "0",
-//                                "expandZeroConditions" to expandZeroConditions.joinToString(",")
-//                            )
+                            val mixinConditions = literal.conditions.map {
+                                Constant.Condition.entries[it.ordinal]
+                            }
+                            buildList {
+                                add("intValue" to "0")
+                                if (mixinConditions.isNotEmpty()) {
+                                    add("expandZeroConditions" to mixinConditions.joinToString(","))
+                                }
+                            }
                         }
 
                         is IntLiteral -> listOf("intValue" to literal.value.toString())
@@ -246,10 +313,11 @@ class MixinLowering(
                         name = hook.name,
                         methodMixinRef = hook.desc.getMixinRef(),
                         parameters = parameters,
-                        hookArguments = hook.parameters.map { lowerHookArgument(it) },
+                        hookArguments = hookArguments,
                         constantTypeName = hook.typeName,
-                        args = args,
+                        atArgs = args,
                         ordinal = ordinal,
+                        isStatic = hook.desc.isStatic,
                     )
                 }
 
@@ -257,77 +325,225 @@ class MixinLowering(
                     name = hook.name,
                     methodMixinRef = hook.desc.getMixinRef(),
                     parameters = parameters,
-                    hookArguments = hook.parameters.map { lowerHookArgument(it) },
+                    hookArguments = hookArguments,
                     targetMixinRef = hook.targetDesc.getMixinRef(isTarget = true),
-                    isStatic = hook.targetDesc.isStatic,
+                    isStaticTarget = hook.targetDesc.isStatic,
                     fieldTypeName = hook.typeName,
                     ordinal = ordinal,
+                    isStatic = hook.desc.isStatic,
                 )
 
-                is FieldWriteHook -> IrFieldWriteInjection(
+                is FieldSetHook -> IrFieldSetInjection(
                     name = hook.name,
                     methodMixinRef = hook.desc.getMixinRef(),
                     parameters = parameters,
-                    hookArguments = hook.parameters.map { lowerHookArgument(it) },
+                    hookArguments = hookArguments,
                     targetMixinRef = hook.targetDesc.getMixinRef(isTarget = true),
-                    isStatic = hook.targetDesc.isStatic,
+                    isStaticTarget = hook.targetDesc.isStatic,
                     ordinal = ordinal,
+                    isStatic = hook.desc.isStatic,
+                )
+
+                is ArrayHook -> IrArrayGetInjection(
+                    name = hook.name,
+                    methodMixinRef = hook.desc.getMixinRef(),
+                    parameters = parameters,
+                    hookArguments = hookArguments,
+                    targetMixinRef = hook.targetDesc.getMixinRef(isTarget = true),
+                    isStaticTarget = hook.targetDesc.isStatic,
+                    ordinal = ordinal,
+                    componentTypeName = hook.componentTypeName,
+                    isStatic = hook.desc.isStatic,
+                )
+
+                is CallHook -> IrWrapOperationInjection(
+                    name = hook.name,
+                    methodMixinRef = hook.desc.getMixinRef(),
+                    returnTypeName = hook.returnTypeName,
+                    parameters = parameters,
+                    hookArguments = hookArguments,
+                    targetMixinRef = hook.targetDesc.getMixinRef(isTarget = true),
+                    isStaticTarget = hook.targetDesc.isStatic,
+                    isConstructorCall = hook.targetDesc is ConstructorDesc,
+                    ordinal = ordinal,
+                    isStatic = hook.desc.isStatic,
                 )
             }
         }
     }
 
-    private fun lowerInjectionParameter(hook: HookModel, parameter: HookParameter): List<IrInjectionParameter> =
+    private fun lowerInjectionLocalBasedParameter(
+        hook: DomainHook,
+        parameter: HookParameter
+    ): IrInjectionLocalBasedParameter? =
         when (parameter) {
-            is HookOriginParameter -> emptyList()
-            is HookCancelParameter -> listOf(IrInjectionCallbackParameter(hook.desc.returnTypeName))
-            is HookParamParameter -> buildList {
-                var currentSlot = if (hook.desc.isStatic) 0 else 1
-                addAll(hook.desc.parameters.mapIndexed { index, parameter ->
-                    val typeName = parameter.typeName
-                    val irParameter = IrInjectionParamParameter(parameter.name, index, typeName, currentSlot)
-                    currentSlot += if (typeName.is64bit) 2 else 1
-                    return@mapIndexed irParameter
-                })
+            is HookParamParameter -> {
+                if (hook.isInjectBased) {
+                    return null
+                }
+                val initialSlot = if (hook.desc.isStatic) 0 else 1
+                val descParameter = hook.desc.parameters[parameter.index]
+                val slotOffset = hook.desc.parameters.take(parameter.index).sumOf {
+                    if (it.typeName.is64bit) 2
+                    else 1
+                }
+                IrInjectionParamParameter(
+                    name = descParameter.name,
+                    index = parameter.index,
+                    typeName = descParameter.typeName,
+                    localIndex = initialSlot + slotOffset,
+                )
             }
 
             is HookLocalParameter -> {
-                val signatureOffset = buildList {
-                    if (!hook.desc.isStatic) {
-                        add(hook.desc.receiverTypeName)
+                val irLocal = when (val local = parameter.local) {
+                    is NamedLocal -> IrNamedLocal(local.name)
+                    is PositionalLocal -> {
+                        val paramsOffset = buildList {
+                            if (!hook.desc.isStatic) {
+                                add(hook.desc.receiverTypeName)
+                            }
+                            addAll(hook.desc.parameters.map { it.typeName })
+                        }.count { it == parameter.typeName }
+                        IrPositionalLocal(paramsOffset + local.ordinal)
                     }
-                    addAll(hook.desc.parameters.map { it.typeName })
-                }.count { it == parameter.typeName }
-                listOf(
-                    IrInjectionLocalParameter(
-                        parameter.name,
-                        parameter.typeName,
-                        signatureOffset + parameter.ordinal
-                    )
-                )
+                }
+                IrInjectionLocalParameter(parameter.name, parameter.typeName, irLocal)
+            }
+
+            else -> null
+        }
+
+    private fun lowerLocal(local: DomainLocal, desc: Desc, typeName: IrTypeName) =
+        when (local) {
+            is NamedLocal -> IrNamedLocal(local.name)
+            is PositionalLocal -> {
+                val paramsOffset = buildList {
+                    if (!desc.isStatic) {
+                        add(desc.receiverTypeName)
+                    }
+                    addAll(desc.parameters.map { it.typeName })
+                }.count { it == typeName }
+                IrPositionalLocal(paramsOffset + local.ordinal)
             }
         }
 
     private fun lowerHookArgument(parameter: HookParameter): IrHookArgument =
         when (parameter) {
             is HookOriginValueParameter -> IrHookOriginValueArgument()
-            is HookOriginCallParameter -> {
-                IrHookOriginDescCallWrapperArgument(findDesc<IrInvokableDesc>(parameter.desc.className).callWrapper)
+
+            is HookOriginDescBodyParameter -> {
+                val desc = parameter.desc
+                val wrapper = IrDescBodyWrapper(
+                    className = IrClassName.of(
+                        options.generatedPackageName,
+                        DescBuiltin.Body.name.withQualifiedNamePrefix(desc.className)
+                    ),
+                    descClassName = desc.className,
+                    builtin = builtins[DescBuiltin.Body],
+                    parameters = desc.parameters.map { it.asIr() },
+                    returnTypeName = desc.returnTypeName,
+                )
+                IrHookOriginDescBodyWrapperArgument(wrapper)
+            }
+
+            is HookOriginDescFieldGetParameter -> {
+                val desc = parameter.desc
+                val wrapper = IrDescFieldGetWrapper(
+                    className = IrClassName.of(
+                        options.generatedPackageName,
+                        DescBuiltin.FieldGet.name.withQualifiedNamePrefix(desc.className)
+                    ),
+                    descClassName = desc.className,
+                    builtin = builtins[DescBuiltin.FieldGet],
+                    receiverTypeName = if (desc.isStatic) null else desc.receiverTypeName,
+                    fieldTypeName = desc.fieldTypeName,
+                )
+                IrHookOriginDescFieldGetWrapperArgument(wrapper)
+            }
+
+            is HookOriginDescFieldSetParameter -> {
+                val desc = parameter.desc
+                val wrapper = IrDescFieldSetWrapper(
+                    className = IrClassName.of(
+                        options.generatedPackageName,
+                        DescBuiltin.FieldSet.name.withQualifiedNamePrefix(desc.className)
+                    ),
+                    descClassName = desc.className,
+                    builtin = builtins[DescBuiltin.FieldSet],
+                    receiverTypeName = if (desc.isStatic) null else desc.receiverTypeName,
+                    fieldTypeName = desc.fieldTypeName,
+                )
+                IrHookOriginDescFieldSetWrapperArgument(wrapper)
+            }
+
+            is HookOriginDescArrayGetParameter -> {
+                val desc = parameter.desc
+                val wrapper = IrDescArrayGetWrapper(
+                    className = IrClassName.of(
+                        options.generatedPackageName,
+                        DescBuiltin.ArrayGet.name.withQualifiedNamePrefix(desc.className)
+                    ),
+                    descClassName = desc.className,
+                    builtin = builtins[DescBuiltin.ArrayGet],
+                    arrayTypeName = desc.fieldTypeName,
+                    arrayComponentTypeName = parameter.arrayComponentTypeName,
+                )
+                IrHookOriginDescArrayGetWrapperArgument(wrapper)
+            }
+
+            is HookOriginDescCallParameter -> {
+                val desc = parameter.desc
+                val wrapper = IrDescCallWrapper(
+                    className = IrClassName.of(
+                        options.generatedPackageName,
+                        DescBuiltin.Call.name.withQualifiedNamePrefix(desc.className)
+                    ),
+                    descClassName = desc.className,
+                    builtin = builtins[DescBuiltin.Call],
+                    receiverTypeName = if (desc.isStatic) null else desc.receiverTypeName,
+                    parameters = desc.parameters.map { it.asIr() },
+                    returnTypeName = desc.returnTypeName,
+                )
+                IrHookOriginDescCallWrapperArgument(wrapper)
             }
 
             is HookCancelParameter -> {
-                IrHookCancelArgument(findDesc<IrInvokableDesc>(parameter.desc.className).cancelWrapper)
+                val desc = parameter.desc
+                val wrapper = IrDescCancelWrapper(
+                    className = IrClassName.of(
+                        options.generatedPackageName,
+                        DescBuiltin.Cancel.name.withQualifiedNamePrefix(desc.className)
+                    ),
+                    descClassName = desc.className,
+                    builtin = builtins[DescBuiltin.Cancel],
+                    parameters = desc.parameters.map { it.asIr() },
+                    returnTypeName = if (desc is MethodDesc) desc.returnTypeName else null
+                )
+                IrHookCancelArgument(wrapper)
             }
 
+            is HookOrdinalParameter -> IrHookOrdinalArgument
             is HookParamParameter -> IrHookParamArgument(parameter.name)
-            is HookLocalParameter -> IrHookLocalArgument(parameter.name, parameter.ordinal)
+            is HookLocalParameter -> IrHookLocalArgument(parameter.name)
         }
 
-    private inline fun <reified T : IrDesc> findDesc(className: IrClassName): T {
-        val qualifiedName = className.qualifiedName
-        return descByQualifiedName[qualifiedName]?.castOrNull()
-            ?: lapisError("Desc for ${qualifiedName.quoted()} not found")
-    }
+    private inline fun <reified W : IrDescWrapper> findOriginDescWrapper(descClassName: IrClassName): W? =
+        mixins.asSequence()
+            .flatMap { it.injections }
+            .flatMap { it.hookArguments }
+            .filterIsInstance<IrHookOriginDescWrapperArgument<*>>()
+            .map { it.wrapper }
+            .filterIsInstance<W>()
+            .firstOrNull { it.descClassName == descClassName }
+
+    private fun findCancelDescWrapper(descClassName: IrClassName): IrDescCancelWrapper? =
+        mixins.asSequence()
+            .flatMap { it.injections }
+            .flatMap { it.hookArguments }
+            .filterIsInstance<IrHookCancelArgument>()
+            .map { it.wrapper }
+            .firstOrNull { it.descClassName == descClassName }
 }
 
 fun List<FunctionParameter>.asIr(): List<IrParameter> =
@@ -339,20 +555,26 @@ fun FunctionTypeParameter.asIr(): IrFunctionTypeParameter =
 fun KClass<*>.asIr(): IrClassName =
     asClassName().asIr()
 
-fun KPType.asIr(): IrTypeName =
+fun KPTypeName.asIrTypeName(): IrTypeName =
     IrTypeName(this)
 
-fun KPClassType.asIr(): IrClassName =
+fun KPClassName.asIr(): IrClassName =
     IrClassName(this)
 
-fun KPGenericType.asIr(): IrGenericTypeName =
-    IrGenericTypeName(this)
+fun KPParameterizedTypeName.asIr(): IrParameterizedTypeName =
+    IrParameterizedTypeName(this)
 
-fun KPWildcardType.asIr(): IrWildcardTypeName =
+fun KPWildcardTypeName.asIr(): IrWildcardTypeName =
     IrWildcardTypeName(this)
 
-fun KPVariableType.asIr(): IrVariableTypeName =
-    IrVariableTypeName(this)
+fun KPTypeVariableName.asIr(): IrTypeVariableName =
+    IrTypeVariableName(this)
 
-fun String.withQualifiedNamePrefix(className: IrClassName): String =
+fun KPLambdaTypeName.asIr(): IrLambdaTypeName =
+    IrLambdaTypeName(this)
+
+fun KPDynamic.asIr(): IrDynamic =
+    IrDynamic(this)
+
+private fun String.withQualifiedNamePrefix(className: IrClassName): String =
     className.qualifiedName.replace('.', '_') + "_$this"

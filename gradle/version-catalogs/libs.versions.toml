@@ -1,7 +1,6 @@
 [versions]
 projektor = "6.+"
 
-kotlin = "2.3.0"
 ksp = "2.3.6"
 
 mixin = "0.8.7"
@@ -9,10 +8,10 @@ mixin-extras = "0.5.3"
 
 asm = "9.9.1"
 
-lapis-annotations = "0.8.5"
+lapis-annotations = "0.8.6"
 
 java-poet = "0.11.0"
-kotlin-poet = "2.2.0"
+kotlin-poet = "2.3.0"
 
 kotlin-serialization-json = "1.10.0"
 
@@ -24,8 +23,8 @@ projektor = { id = "io.github.diskria.projektor", version.ref = "projektor" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [libraries]
-ksp-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
-psi-api = { group = "org.jetbrains.kotlin", name = "kotlin-compiler-embeddable", version.ref = "kotlin" }
+ks-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
+ka-api = { group = "com.google.devtools.ksp", name = "symbol-processing-aa-embeddable", version.ref = "ksp" }
 
 mixin = { group = "org.spongepowered", name = "mixin", version.ref = "mixin" }
 mixin-extras = { group = "io.github.llamalad7", name = "mixinextras-common", version.ref = "mixin-extras" }
@@ -49,4 +48,16 @@ asm = [
     "asm",
     "asm-util",
     "asm-commons",
+]
+ksp = [
+    "ks-api",
+    "ka-api",
+]
+mixins = [
+    "mixin",
+    "mixin-extras",
+]
+poets = [
+    "java-poet",
+    "kotlin-poet",
 ]

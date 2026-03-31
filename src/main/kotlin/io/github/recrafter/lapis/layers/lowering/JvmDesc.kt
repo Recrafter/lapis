@@ -1,19 +1,22 @@
 package io.github.recrafter.lapis.layers.lowering
 
 import io.github.recrafter.lapis.extensions.jp.*
+import io.github.recrafter.lapis.layers.lowering.models.IrConstructorDesc
+import io.github.recrafter.lapis.layers.lowering.models.IrInvokableDesc
+import io.github.recrafter.lapis.layers.lowering.models.IrMethodDesc
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 import io.github.recrafter.lapis.layers.validator.ConstructorDesc
 import io.github.recrafter.lapis.layers.validator.Desc
 import io.github.recrafter.lapis.layers.validator.FieldDesc
 import io.github.recrafter.lapis.layers.validator.MethodDesc
 
-class JvmDesc(private val type: JPType) {
+class JvmDesc(private val type: JPTypeName) {
 
     override fun toString(): String =
         when (type) {
-            is JPClassType -> type.typeDesc
-            is JPGenericType -> type.rawType().typeDesc
-            is JPArrayType -> "[" + type.componentType().asJvmDesc().toString()
+            is JPClassName -> type.typeDesc
+            is JPParameterizedTypeName -> type.rawType().typeDesc
+            is JPArrayTypeName -> "[" + type.componentType().asJvmDesc().toString()
             JPBoolean -> "Z"
             JPByte -> "B"
             JPShort -> "S"
@@ -25,7 +28,7 @@ class JvmDesc(private val type: JPType) {
             else -> VOID_NAME
         }
 
-    private val JPClassType.typeDesc: String
+    private val JPClassName.typeDesc: String
         get() = "L$internalName;"
 
     companion object {
@@ -41,7 +44,7 @@ class JvmDesc(private val type: JPType) {
     }
 }
 
-fun JPType.asJvmDesc(): JvmDesc =
+fun JPTypeName.asJvmDesc(): JvmDesc =
     JvmDesc(this)
 
 private const val CONSTRUCTOR_NAME: String = "<init>"
@@ -51,7 +54,6 @@ fun Desc.getMixinRef(isTarget: Boolean = false): String =
     when (this) {
         is ConstructorDesc -> buildString {
             if (!isTarget) {
-                append(JvmDesc.of(receiverTypeName))
                 append(CONSTRUCTOR_NAME)
             }
             append(

@@ -1,6 +1,6 @@
 package io.github.recrafter.lapis.extensions.jp
 
-val JPType.defaultValue: String
+val JPTypeName.defaultValue: String
     get() = when (this) {
         JPBoolean -> "false"
         JPByte, JPShort, JPInt -> "0"
@@ -11,5 +11,5 @@ val JPType.defaultValue: String
         else -> "null"
     }
 
-fun JPType?.orVoid(): JPType =
+fun JPTypeName?.orVoid(): JPTypeName =
     this ?: JPVoid

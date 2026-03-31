@@ -1,6 +1,23 @@
 package io.github.recrafter.lapis.extensions.kp
 
-fun KPFileBuilder.suppressWarnings(warnings: List<KWarning>) {
+import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
+import io.github.recrafter.lapis.extensions.ksp.KSPCodeGenerator
+import io.github.recrafter.lapis.extensions.ksp.KSPDependencies
+import io.github.recrafter.lapis.layers.generator.KSuppressWarning
+import io.github.recrafter.lapis.layers.generator.builders.Builder
+
+inline fun <reified A : Annotation> KPFileBuilder.addAnnotation(
+    useSiteTarget: UseSiteTarget? = null,
+    builder: Builder<KPAnnotationBuilder> = {}
+) {
+    addAnnotation(buildKotlinAnnotation<A>(useSiteTarget, builder))
+}
+
+fun KPFile.writeTo(codeGenerator: KSPCodeGenerator, dependencies: KSPDependencies) {
+    codeGenerator.createNewFile(dependencies, packageName, name).writer().use { writeTo(it) }
+}
+
+fun KPFileBuilder.suppressWarnings(warnings: List<KSuppressWarning>) {
     addAnnotation<Suppress> {
         setStringVarargMember(
             Suppress::names,
@@ -9,32 +26,6 @@ fun KPFileBuilder.suppressWarnings(warnings: List<KWarning>) {
     }
 }
 
-fun KPFileBuilder.suppressWarnings(vararg warnings: KWarning) {
+fun KPFileBuilder.suppressWarnings(vararg warnings: KSuppressWarning) {
     suppressWarnings(warnings.toList())
-}
-
-enum class KWarning(private val isScreamingSnake: Boolean = false) {
-
-    RedundantVisibilityModifier,
-    UnusedReceiverParameter,
-    ObjectInheritsException,
-    JavaIoSerializableObjectMustHaveReadResolve,
-    NothingToInline(isScreamingSnake = true);
-
-    val suppressionKey: String
-        get() = if (isScreamingSnake) {
-            name.toScreamingSnake()
-        } else {
-            name
-        }
-
-    private fun String.toScreamingSnake(): String =
-        buildString {
-            this@toScreamingSnake.forEachIndexed { index, char ->
-                if (char.isUpperCase() && index > 0) {
-                    append('_')
-                }
-                append(char.uppercaseChar())
-            }
-        }
 }

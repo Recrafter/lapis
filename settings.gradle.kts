@@ -15,6 +15,12 @@ plugins {
     id("io.github.recrafter.recipe") version "1.2.6"
 }
 
+dependencyResolutionManagement {
+    repositories {
+        mavenLocal()
+    }
+}
+
 projekt {
     version = "0.8.5"
     license = MIT

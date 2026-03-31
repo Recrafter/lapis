@@ -1,84 +1,87 @@
 package io.github.recrafter.lapis.extensions.jp
 
+import com.palantir.javapoet.*
 import io.github.recrafter.lapis.LapisMeta
-import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlockBuilder
+import io.github.recrafter.lapis.layers.generator.builders.Builder
+import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlock
+import io.github.recrafter.lapis.layers.lowering.models.IrParameter
 import io.github.recrafter.lapis.layers.lowering.types.IrClassName
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
-typealias JPCodeBlockBuilder = com.palantir.javapoet.CodeBlock.Builder
-typealias JPCodeBlock = com.palantir.javapoet.CodeBlock
+typealias JPCodeBlockBuilder = CodeBlock.Builder
+typealias JPCodeBlock = CodeBlock
 
-typealias JPAnnotationBuilder = com.palantir.javapoet.AnnotationSpec.Builder
-typealias JPAnnotation = com.palantir.javapoet.AnnotationSpec
+typealias JPAnnotationBuilder = AnnotationSpec.Builder
+typealias JPAnnotation = AnnotationSpec
 
-typealias JPFieldBuilder = com.palantir.javapoet.FieldSpec.Builder
-typealias JPField = com.palantir.javapoet.FieldSpec
+typealias JPFieldBuilder = FieldSpec.Builder
+typealias JPField = FieldSpec
 
-typealias JPMethodBuilder = com.palantir.javapoet.MethodSpec.Builder
-typealias JPMethod = com.palantir.javapoet.MethodSpec
+typealias JPMethodBuilder = MethodSpec.Builder
+typealias JPMethod = MethodSpec
 
-typealias JPParameterBuilder = com.palantir.javapoet.ParameterSpec.Builder
-typealias JPParameter = com.palantir.javapoet.ParameterSpec
+typealias JPParameterBuilder = ParameterSpec.Builder
+typealias JPParameter = ParameterSpec
 
-typealias JPClassBuilder = com.palantir.javapoet.TypeSpec.Builder
-typealias JPClass = com.palantir.javapoet.TypeSpec
+typealias JPClassBuilder = TypeSpec.Builder
+typealias JPClass = TypeSpec
 
-typealias JPFile = com.palantir.javapoet.JavaFile
+typealias JPFile = JavaFile
 
-typealias JPType = com.palantir.javapoet.TypeName
-typealias JPClassType = com.palantir.javapoet.ClassName
-typealias JPGenericType = com.palantir.javapoet.ParameterizedTypeName
-typealias JPWildcardType = com.palantir.javapoet.WildcardTypeName
-typealias JPVariableType = com.palantir.javapoet.TypeVariableName
-typealias JPArrayType = com.palantir.javapoet.ArrayTypeName
+typealias JPTypeName = TypeName
+typealias JPClassName = ClassName
+typealias JPParameterizedTypeName = ParameterizedTypeName
+typealias JPWildcardTypeName = WildcardTypeName
+typealias JPTypeVariableName = TypeVariableName
+typealias JPArrayTypeName = ArrayTypeName
 
 typealias JPModifier = javax.lang.model.element.Modifier
 
-val JPVoid: JPType = JPType.VOID
-val JPBoolean: JPType = JPType.BOOLEAN
-val JPByte: JPType = JPType.BYTE
-val JPShort: JPType = JPType.SHORT
-val JPInt: JPType = JPType.INT
-val JPLong: JPType = JPType.LONG
-val JPChar: JPType = JPType.CHAR
-val JPFloat: JPType = JPType.FLOAT
-val JPDouble: JPType = JPType.DOUBLE
+val JPVoid: JPTypeName = JPTypeName.VOID
+val JPBoolean: JPTypeName = JPTypeName.BOOLEAN
+val JPByte: JPTypeName = JPTypeName.BYTE
+val JPShort: JPTypeName = JPTypeName.SHORT
+val JPInt: JPTypeName = JPTypeName.INT
+val JPLong: JPTypeName = JPTypeName.LONG
+val JPChar: JPTypeName = JPTypeName.CHAR
+val JPFloat: JPTypeName = JPTypeName.FLOAT
+val JPDouble: JPTypeName = JPTypeName.DOUBLE
 
-val JPObject: JPClassType = JPClassType.OBJECT
-val JPString: JPClassType = JPClassType.get(String::class.java)
-val JPList: JPClassType = JPClassType.get(List::class.java)
-val JPSet: JPClassType = JPClassType.get(Set::class.java)
-val JPMap: JPClassType = JPClassType.get(Map::class.java)
+val JPObject: JPClassName = JPClassName.OBJECT
+val JPString: JPClassName = JPClassName.get(String::class.java)
+val JPList: JPClassName = JPClassName.get(List::class.java)
+val JPSet: JPClassName = JPClassName.get(Set::class.java)
+val JPMap: JPClassName = JPClassName.get(Map::class.java)
 
-val JPStar: JPWildcardType = JPWildcardType.subtypeOf(JPObject)
+val JPStar: JPWildcardTypeName = JPWildcardTypeName.subtypeOf(JPObject)
 
-inline fun <reified A : Annotation> buildJavaAnnotation(builder: JPAnnotationBuilder.() -> Unit = {}): JPAnnotation =
-    JPAnnotation.builder(JPClassType.get(A::class.java)).apply(builder).build()
+inline fun <reified A : Annotation> buildJavaAnnotation(builder: Builder<JPAnnotationBuilder> = {}): JPAnnotation =
+    JPAnnotation.builder(JPClassName.get(A::class.java)).apply(builder).build()
 
-fun buildJavaCodeBlock(builder: IrJavaCodeBlockBuilder.() -> Unit = {}): JPCodeBlock =
-    IrJavaCodeBlockBuilder(JPCodeBlock.builder()).apply(builder).build()
+fun buildJavaCodeBlock(builder: Builder<IrJavaCodeBlock> = {}): JPCodeBlock =
+    IrJavaCodeBlock(JPCodeBlock.builder()).apply(builder).build()
 
-fun buildJavaCodeBlock(
-    format: String,
-    arguments: IrJavaCodeBlockBuilder.Arguments.() -> Unit = {}
-): JPCodeBlock =
+fun buildJavaCodeBlock(format: String, arguments: Builder<IrJavaCodeBlock.Arguments> = {}): JPCodeBlock =
     buildJavaCodeBlock {
         add(format, arguments)
     }
 
-fun buildJavaField(name: String, typeName: IrTypeName, builder: JPFieldBuilder.() -> Unit = {}): JPField =
+fun buildJavaField(name: String, typeName: IrTypeName, builder: Builder<JPFieldBuilder> = {}): JPField =
     JPField.builder(typeName.java, name).apply(builder).build()
 
-fun buildJavaMethod(name: String, builder: JPMethodBuilder.() -> Unit = {}): JPMethod =
+fun buildJavaMethod(name: String, builder: Builder<JPMethodBuilder> = {}): JPMethod =
     JPMethod.methodBuilder(name).apply(builder).build()
 
-fun buildJavaParameter(name: String, typeName: IrTypeName, builder: JPParameterBuilder.() -> Unit = {}): JPParameter =
+fun buildJavaParameter(name: String, typeName: IrTypeName, builder: Builder<JPParameterBuilder> = {}): JPParameter =
     JPParameter.builder(typeName.java, name).apply(builder).build()
 
-fun buildJavaInterface(name: String, builder: JPClassBuilder.() -> Unit = {}): JPClass =
+fun buildJavaParameter(parameter: IrParameter, builder: Builder<JPParameterBuilder> = {}): JPParameter =
+    buildJavaParameter(parameter.name, parameter.typeName, builder)
+
+fun buildJavaInterface(name: String, builder: Builder<JPClassBuilder> = {}): JPClass =
     JPClass.interfaceBuilder(name).apply(builder).build()
 
-fun buildJavaClass(name: String, builder: JPClassBuilder.() -> Unit = {}): JPClass =
+fun buildJavaClass(name: String, builder: Builder<JPClassBuilder> = {}): JPClass =
     JPClass.classBuilder(name).apply(builder).build()
 
 fun buildJavaFile(className: IrClassName, builder: () -> JPClass): JPFile =

@@ -1,30 +1,37 @@
 package io.github.recrafter.lapis.layers.generator
 
-import com.google.devtools.ksp.processing.CodeGenerator
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue
+import com.llamalad7.mixinextras.injector.ModifyReturnValue
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation
 import com.llamalad7.mixinextras.sugar.Cancellable
 import com.llamalad7.mixinextras.sugar.Local
-import io.github.recrafter.lapis.LapisMeta
+import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
+import io.github.recrafter.lapis.extensions.InternalPrefix.*
 import io.github.recrafter.lapis.extensions.capitalize
-import io.github.recrafter.lapis.extensions.common.defaultValue
+import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.ks.toDependencies
+import io.github.recrafter.lapis.extensions.ksp.KSPCodeGenerator
 import io.github.recrafter.lapis.extensions.ksp.KSPDependencies
 import io.github.recrafter.lapis.extensions.ksp.createResourceFile
-import io.github.recrafter.lapis.extensions.ksp.toDependencies
+import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.layers.generator.accessor.AccessorConfigEntry
 import io.github.recrafter.lapis.layers.generator.accessor.ClassEntry
 import io.github.recrafter.lapis.layers.generator.accessor.FieldEntry
 import io.github.recrafter.lapis.layers.generator.accessor.MethodEntry
-import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlockBuilder
+import io.github.recrafter.lapis.layers.generator.builders.Builder
+import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.layers.generator.builtins.Builtin
 import io.github.recrafter.lapis.layers.generator.builtins.Builtins
 import io.github.recrafter.lapis.layers.generator.builtins.DescBuiltin
-import io.github.recrafter.lapis.layers.lowering.*
+import io.github.recrafter.lapis.layers.lowering.IrModifier
+import io.github.recrafter.lapis.layers.lowering.asIr
+import io.github.recrafter.lapis.layers.lowering.binaryName
+import io.github.recrafter.lapis.layers.lowering.models.*
 import io.github.recrafter.lapis.layers.lowering.types.IrClassName
 import io.github.recrafter.lapis.layers.lowering.types.orVoid
 import kotlinx.serialization.json.Json
@@ -32,13 +39,17 @@ import org.objectweb.asm.Opcodes
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Unique
 import org.spongepowered.asm.mixin.injection.At
+import org.spongepowered.asm.mixin.injection.Inject
+import org.spongepowered.asm.mixin.injection.ModifyVariable
+import org.spongepowered.asm.mixin.injection.Redirect
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
 class MixinGenerator(
     private val options: Options,
     private val builtins: Builtins,
-    private val codeGenerator: CodeGenerator,
+    private val codeGenerator: KSPCodeGenerator,
+    private val logger: LapisLogger,
 ) {
     private val extensionProperties: MutableList<KPProperty> = mutableListOf()
     private val extensionFunctions: MutableList<KPFunction> = mutableListOf()
@@ -64,19 +75,22 @@ class MixinGenerator(
         }
         buildKotlinFile(options.generatedPackageName, "_Descriptors") {
             suppressWarnings(
-                KWarning.RedundantVisibilityModifier,
-                KWarning.NothingToInline,
+                KSuppressWarning.RedundantVisibilityModifier,
+                KSuppressWarning.NothingToInline,
+                KSuppressWarning.LocalVariableName,
             )
             descriptors.forEach { desc ->
                 when (desc) {
                     is IrInvokableDesc -> {
+                        desc.bodyWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.Body, it) }
                         desc.callWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.Call, it) }
                         desc.cancelWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.Cancel, it) }
                     }
 
                     is IrFieldDesc -> {
                         desc.fieldGetWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.FieldGet, it) }
-                        desc.fieldWriteWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.FieldWrite, it) }
+                        desc.fieldSetWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.FieldSet, it) }
+                        desc.arrayGetWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.ArrayGet, it) }
                     }
                 }
             }
@@ -87,7 +101,7 @@ class MixinGenerator(
         if (mixin.isNotEmpty()) {
             val dependencies = listOfNotNull(mixin.containingFile).toDependencies()
             buildKotlinFile(mixin.patchImplClassName) {
-                suppressWarnings(KWarning.RedundantVisibilityModifier)
+                suppressWarnings(KSuppressWarning.RedundantVisibilityModifier)
                 addType(buildPatchImplClass(mixin))
             }.writeTo(codeGenerator, dependencies)
 
@@ -104,7 +118,7 @@ class MixinGenerator(
             setSuperClass(mixin.patchClassName)
             setConstructor(
                 listOf(IrParameter("instance", mixin.targetClassName)),
-                IrModifier.OVERRIDE
+                IrModifier.PUBLIC, IrModifier.OVERRIDE
             )
         }
 
@@ -118,16 +132,17 @@ class MixinGenerator(
                 addAnnotation<Unique>()
                 setModifiers(IrModifier.PRIVATE)
             }
+            addField(patchField)
             val getOrInitPatchMethod = buildJavaMethod("getOrInitPatch".withInternalPrefix()) {
                 addAnnotation<Unique>()
                 setModifiers(IrModifier.PRIVATE)
                 setReturnType(mixin.patchClassName)
                 setBody {
-                    val patchNotInitializedCondition = buildJavaCodeBlock("%N == null") {
+                    val isNotInitializedCondition = buildJavaCodeBlock("%N == null") {
                         arg(patchField)
                     }
-                    if_(patchNotInitializedCondition) {
-                        code("%N = new %T((%T) (%T) this)") {
+                    if_(isNotInitializedCondition) {
+                        code_("%N = new %T((%T) (%T) this)") {
                             arg(patchField)
                             arg(mixin.patchImplClassName)
                             arg(mixin.targetClassName)
@@ -137,68 +152,107 @@ class MixinGenerator(
                     return_("%N") { arg(patchField) }
                 }
             }
-            addField(patchField)
             addMethod(getOrInitPatchMethod)
             mixin.extension?.let { extension ->
                 addSuperInterface(extension.className)
                 addMethods(extension.kinds.map { method ->
-                    buildJavaMethod(method.getInternalName(options.modId)) {
+                    buildJavaMethod(method.methodName) {
                         setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                         setParameters(method.parameters)
                         setReturnType(method.returnTypeName)
                         setBody {
-                            val format = "%N().%L(%L)"
-                            val args: IrJavaCodeBlockBuilder.Arguments.() -> Unit = {
+                            code_(
+                                format = "%N().%L(%L)",
+                                isReturn = method.returnTypeName != null
+                            ) {
                                 arg(getOrInitPatchMethod)
                                 arg(
                                     when (method) {
                                         is IrFieldGetterExtension -> "get" + method.name.capitalize()
                                         is IrFieldSetterExtension -> "set" + method.name.capitalize()
-                                        else -> method.name
+                                        is IrMethodExtension -> method.name
                                     }
                                 )
                                 arg(method.parameters.joinToString { it.name })
-                            }
-                            if (method.returnTypeName != null) {
-                                return_(format, args)
-                            } else {
-                                code(format, args)
                             }
                         }
                     }
                 })
             }
             addMethods(mixin.injections.map {
-                buildMixinInjectionMethod(mixin, it, getOrInitPatchMethod)
+                buildMixinInjectionMethod(it, mixin, getOrInitPatchMethod)
             })
         }
 
     private fun buildMixinInjectionMethod(
-        mixin: IrMixin,
         injection: IrInjection,
+        mixin: IrMixin,
         getOrInitPatchMethod: JPMethod
-    ): JPMethod {
-        val name = buildString {
+    ): JPMethod =
+        buildJavaMethod(buildString {
             append(injection.name)
-            if (injection.ordinal != At::ordinal.defaultValue) {
-                append("_ordinal${injection.ordinal}")
-            }
-        }
-        return buildJavaMethod(name) {
-            val callbackParameterName = "callback".withInternalPrefix()
-            val originalParameterName = "original".withInternalPrefix()
-            val receiverParameterName = "receiver".withInternalPrefix()
+            injection.ordinal?.let { append("_ordinal${it}") }
+        }) {
+            val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelArgument }
             when (injection) {
                 is IrWrapMethodInjection -> addAnnotation<WrapMethod> {
                     setStringArrayMember(WrapMethod::method, injection.methodMixinRef)
                 }
 
+                is IrInjectInjection -> addAnnotation<Inject> {
+                    setStringArrayMember(Inject::method, injection.methodMixinRef)
+                    setAnnotationArrayMember<Inject, At>(Inject::at) {
+                        setStringMember(
+                            At::value,
+                            when (injection) {
+                                is IrConstructorHeadInjection -> "CTOR_HEAD"
+                                is IrMethodHeadInjection -> "HEAD"
+                                is IrReturnInjection -> if (injection.isTail) "TAIL" else "RETURN"
+                            }
+                        )
+                        if (injection is IrConstructorHeadInjection) {
+                            setStringArrayMember(
+                                At::args,
+                                *injection.atArgs.map { "${it.first}=${it.second}" }.toTypedArray()
+                            )
+                        }
+                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
+                        setBooleanMember(At::unsafe, true)
+                    }
+                    if (hasCancelArgument) {
+                        setBooleanMember(Inject::cancellable, true)
+                    }
+                }
+
+                is IrModifyVariableInjection -> addAnnotation<ModifyVariable> {
+                    setStringArrayMember(ModifyVariable::method, injection.methodMixinRef)
+                    when (val local = injection.local) {
+                        is IrNamedLocal -> setStringArrayMember(ModifyVariable::name, local.name)
+                        is IrPositionalLocal -> setIntMember(ModifyVariable::ordinal, local.ordinal)
+                    }
+                    setAnnotationMember<ModifyVariable, At>(ModifyVariable::at) {
+                        setStringMember(At::value, if (injection.isSet) "STORE" else "LOAD")
+                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
+                        setBooleanMember(At::unsafe, true)
+                    }
+                }
+
+                is IrModifyReturnValueInjection -> addAnnotation<ModifyReturnValue> {
+                    setStringArrayMember(ModifyReturnValue::method, injection.methodMixinRef)
+                    setAnnotationArrayMember<ModifyReturnValue, At>(ModifyReturnValue::at) {
+                        setStringMember(At::value, "RETURN")
+                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
+                        setBooleanMember(At::unsafe, true)
+                    }
+                }
+
                 is IrWrapOperationInjection -> addAnnotation<WrapOperation> {
                     setStringArrayMember(WrapOperation::method, injection.methodMixinRef)
                     setAnnotationArrayMember<WrapOperation, At>(WrapOperation::at) {
-                        setStringMember(At::value, "INVOKE")
+                        setStringMember(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
                         setStringMember(At::target, injection.targetMixinRef)
-                        setIntMember(At::ordinal, injection.ordinal)
+                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
+                        setBooleanMember(At::unsafe, true)
                     }
                 }
 
@@ -208,70 +262,86 @@ class MixinGenerator(
                         setStringMember(At::value, "CONSTANT")
                         setStringArrayMember(
                             At::args,
-                            *injection.args.map { "${it.first}=${it.second}" }.toTypedArray()
+                            *injection.atArgs.map { "${it.first}=${it.second}" }.toTypedArray()
                         )
-                        setIntMember(At::ordinal, injection.ordinal)
+                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
+                        setBooleanMember(At::unsafe, true)
                     }
                 }
 
-                is IrFieldGetInjection -> addAnnotation<WrapOperation> {
+                is IrFieldGetInjection, is IrFieldSetInjection -> addAnnotation<WrapOperation> {
                     setStringArrayMember(WrapOperation::method, injection.methodMixinRef)
                     setAnnotationArrayMember<WrapOperation, At>(WrapOperation::at) {
                         setStringMember(At::value, "FIELD")
                         setStringMember(At::target, injection.targetMixinRef)
-                        setIntMember(At::opcode, if (injection.isStatic) Opcodes.GETSTATIC else Opcodes.GETFIELD)
-                        setIntMember(At::ordinal, injection.ordinal)
+                        val opcode = when (injection) {
+                            is IrFieldGetInjection -> {
+                                if (injection.isStaticTarget) Opcodes.GETSTATIC
+                                else Opcodes.GETFIELD
+                            }
+
+                            is IrFieldSetInjection -> {
+                                if (injection.isStaticTarget) Opcodes.PUTSTATIC
+                                else Opcodes.PUTFIELD
+                            }
+                        }
+                        setIntMember(At::opcode, opcode)
+                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
+                        setBooleanMember(At::unsafe, true)
                     }
                 }
 
-                is IrFieldWriteInjection -> addAnnotation<WrapOperation> {
-                    setStringArrayMember(WrapOperation::method, injection.methodMixinRef)
-                    setAnnotationArrayMember<WrapOperation, At>(WrapOperation::at) {
+                is IrArrayGetInjection -> addAnnotation<Redirect> {
+                    setStringArrayMember(Redirect::method, injection.methodMixinRef)
+                    setAnnotationMember<Redirect, At>(Redirect::at) {
                         setStringMember(At::value, "FIELD")
                         setStringMember(At::target, injection.targetMixinRef)
-                        setIntMember(At::opcode, if (injection.isStatic) Opcodes.PUTSTATIC else Opcodes.PUTFIELD)
-                        setIntMember(At::ordinal, injection.ordinal)
+                        setIntMember(At::opcode, if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD)
+                        setStringArrayMember(At::args, "array=get")
+                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
+                        setBooleanMember(At::unsafe, true)
                     }
                 }
             }
-            setModifiers(IrModifier.PRIVATE)
-            val sortedParameters = injection.parameters.sortedWith(
-                compareBy<IrInjectionParameter> { it.priority }.thenBy { it.subPriority }
-            )
-            val hasCallback = sortedParameters.find { it is IrInjectionCallbackParameter } != null
-            addParameters(sortedParameters.map { parameter ->
+            if (injection.isStatic) {
+                setModifiers(IrModifier.PRIVATE, IrModifier.STATIC)
+            } else {
+                setModifiers(IrModifier.PRIVATE)
+            }
+            val receiverParameterName = "receiver".withInternalPrefix()
+            val valueParameterName = "value".withInternalPrefix()
+            val originalParameterName = "original".withInternalPrefix()
+            val callbackParameterName = "callback".withInternalPrefix()
+            addParameters(injection.parameters.map { parameter ->
                 when (parameter) {
-                    is IrInjectionReceiverParameter -> {
-                        buildJavaParameter(receiverParameterName, parameter.typeName)
-                    }
-
+                    is IrInjectionReceiverParameter -> buildJavaParameter(receiverParameterName, parameter.typeName)
                     is IrInjectionArgumentParameter -> {
                         val name = parameter.name ?: parameter.index.toString()
-                        buildJavaParameter(name.withInternalPrefix("argument"), parameter.typeName)
+                        buildJavaParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName)
                     }
 
                     is IrInjectionOperationParameter -> {
                         buildJavaParameter(
                             originalParameterName,
-                            Operation::class.asIr().generic(parameter.returnTypeName.orVoid())
+                            Operation::class.asIr().parameterizedBy(parameter.returnTypeName.orVoid())
                         )
                     }
 
-                    is IrInjectionValueParameter -> {
-                        buildJavaParameter("value".withInternalPrefix(), parameter.typeName)
-                    }
-
+                    is IrInjectionValueParameter -> buildJavaParameter(valueParameterName, parameter.typeName)
                     is IrInjectionLocalParameter -> {
-                        buildJavaParameter(parameter.name.withInternalPrefix("local"), parameter.typeName) {
+                        buildJavaParameter(parameter.name.withInternalPrefix(LOCAL), parameter.typeName) {
                             addAnnotation<Local> {
-                                setIntMember(Local::ordinal, parameter.ordinal)
+                                when (val local = parameter.local) {
+                                    is IrNamedLocal -> setStringArrayMember(Local::name, local.name)
+                                    is IrPositionalLocal -> setIntMember(Local::ordinal, local.ordinal)
+                                }
                             }
                         }
                     }
 
                     is IrInjectionParamParameter -> {
                         val name = parameter.name ?: parameter.index.toString()
-                        buildJavaParameter(name.withInternalPrefix("parameter"), parameter.typeName) {
+                        buildJavaParameter(name.withInternalPrefix(PARAM), parameter.typeName) {
                             addAnnotation<Local> {
                                 setIntMember(Local::index, parameter.localIndex)
                                 setBooleanMember(Local::argsOnly, true)
@@ -283,10 +353,12 @@ class MixinGenerator(
                         buildJavaParameter(
                             callbackParameterName,
                             parameter.returnTypeName
-                                ?.let { CallbackInfoReturnable::class.asIr().generic(it) }
+                                ?.let { CallbackInfoReturnable::class.asIr().parameterizedBy(it) }
                                 ?: CallbackInfo::class.asIr()
                         ) {
-                            addAnnotation<Cancellable>()
+                            if (injection !is IrInjectInjection) {
+                                addAnnotation<Cancellable>()
+                            }
                         }
                     }
                 }
@@ -296,122 +368,117 @@ class MixinGenerator(
                 when (argument) {
                     is IrHookOriginValueArgument -> {
                         buildJavaCodeBlock("%L") {
-                            arg("value".withInternalPrefix())
+                            arg(valueParameterName)
                         }
                     }
 
-                    is IrHookOriginDescWrapperArgument -> {
-                        val constructorArgumentCodeBlocks = buildList {
-                            when (injection) {
-                                is IrWrapMethodInjection if !injection.isStatic -> {
-                                    add(buildJavaCodeBlock("(%T) (%T) this") {
-                                        arg(mixin.targetClassName)
-                                        arg(Object::class.asIr())
-                                    })
-                                    add(buildJavaCodeBlock("%L") { arg(false) })
-                                }
-
-                                is IrWrapOperationInjection if !injection.isStatic -> {
-                                    add(buildJavaCodeBlock(receiverParameterName))
-                                    add(buildJavaCodeBlock("%L") { arg(true) })
-                                }
-
-                                is IrFieldGetInjection if !injection.isStatic -> {
-                                    add(buildJavaCodeBlock(receiverParameterName))
-                                }
-
-                                is IrFieldWriteInjection if !injection.isStatic -> {
-                                    add(buildJavaCodeBlock(receiverParameterName))
-                                    add(buildJavaCodeBlock("newValue".withInternalPrefix("argument")))
-                                }
-
-                                else -> {}
-                            }
+                    is IrHookOriginDescWrapperArgument<*> -> {
+                        val descWrapperConstructorArgumentCodeBlocks = buildList {
                             val wrapper = argument.wrapper
-                            if (wrapper is IrDescCallWrapper) {
+                            if (injection is IrTargetInjection &&
+                                injection !is IrWrapMethodInjection &&
+                                injection !is IrArrayGetInjection &&
+                                !injection.isStaticTarget
+                            ) {
+                                add(buildJavaCodeBlock(receiverParameterName))
+                            }
+                            if (injection is IrFieldSetInjection) {
+                                add(buildJavaCodeBlock("value".withInternalPrefix(ARGUMENT)))
+                            }
+                            if (wrapper is IrInvokableDescWrapper) {
                                 addAll(wrapper.parameters.mapIndexed { index, parameter ->
                                     val name = parameter.name ?: index.toString()
-                                    buildJavaCodeBlock(name.withInternalPrefix("argument"))
+                                    buildJavaCodeBlock(name.withInternalPrefix(ARGUMENT))
                                 })
                             }
-                            add(buildJavaCodeBlock(originalParameterName))
+                            if (injection is IrArrayGetInjection) {
+                                add(buildJavaCodeBlock("array".withInternalPrefix(ARGUMENT)))
+                                add(buildJavaCodeBlock("index".withInternalPrefix(ARGUMENT)))
+                            } else {
+                                add(buildJavaCodeBlock(originalParameterName))
+                            }
                         }
                         buildJavaCodeBlock(buildString {
                             append("new %T(")
-                            append(constructorArgumentCodeBlocks.joinToString { "%L" })
+                            append(descWrapperConstructorArgumentCodeBlocks.joinToString { "%L" })
                             append(")")
                         }) {
                             arg(argument.wrapper.className)
-                            constructorArgumentCodeBlocks.forEach { arg(it) }
+                            descWrapperConstructorArgumentCodeBlocks.forEach { arg(it) }
                         }
                     }
 
                     is IrHookCancelArgument -> {
-                        val constructorArgumentCodeBlocks = buildList {
-                            addAll(argument.wrapper.parameters.mapIndexed { index, parameter ->
-                                val name = parameter.name ?: index.toString()
-                                buildJavaCodeBlock(name.withInternalPrefix("parameter"))
-                            })
-                            add(buildJavaCodeBlock(callbackParameterName))
-                        }
-                        buildJavaCodeBlock(buildString {
-                            append("new %T(")
-                            append(constructorArgumentCodeBlocks.joinToString { "%L" })
-                            append(")")
-                        }) {
+                        buildJavaCodeBlock("new %T(%L)") {
                             arg(argument.wrapper.className)
-                            constructorArgumentCodeBlocks.forEach { arg(it) }
+                            arg(callbackParameterName)
+                        }
+                    }
+
+                    is IrHookOrdinalArgument -> {
+                        buildJavaCodeBlock("%L") {
+                            arg(injection.ordinal ?: lapisError("Ordinal not found"))
                         }
                     }
 
                     is IrHookParamArgument -> buildJavaCodeBlock("%L") {
-                        arg(argument.name.withInternalPrefix("param"))
+                        arg(
+                            argument.name.withInternalPrefix(
+                                if (injection is IrInjectInjection) ARGUMENT
+                                else PARAM
+                            )
+                        )
                     }
 
                     is IrHookLocalArgument -> buildJavaCodeBlock("%L") {
-                        arg(argument.name.withInternalPrefix("local"))
+                        arg(argument.name.withInternalPrefix(LOCAL))
                     }
                 }
             }
             setBody {
-                val invokeHook: IrJavaCodeBlockBuilder.() -> Unit = {
-                    val format = buildString {
-                        append("%N().%L(")
-                        append(hookArgumentCodeBlocks.joinToString { "%L" })
-                        append(")")
-                    }
-                    val args: IrJavaCodeBlockBuilder.Arguments.() -> Unit = {
-                        arg(getOrInitPatchMethod)
+                val invokeHook: Builder<IrJavaCodeBlock> = {
+                    code_(
+                        format = buildString {
+                            if (injection.isStatic) {
+                                append("%T.Companion")
+                            } else {
+                                append("%N()")
+                            }
+                            append(".%L(")
+                            append(hookArgumentCodeBlocks.joinToString { "%L" })
+                            append(")")
+                        },
+                        isReturn = injection.returnTypeName != null,
+                    ) {
+                        if (injection.isStatic) {
+                            arg(mixin.patchImplClassName)
+                        } else {
+                            arg(getOrInitPatchMethod)
+                        }
                         arg(injection.name)
                         hookArgumentCodeBlocks.forEach { arg(it) }
                     }
-                    if (injection.returnTypeName != null) {
-                        return_(format, args)
-                    } else {
-                        code(format, args)
-                    }
                 }
-                if (hasCallback) {
+                if (hasCancelArgument) {
                     try_(
-                        tryBody = invokeHook,
-                        exceptionClassName = builtins[Builtin.CancelSignal],
-                        catchBody = if (injection.returnTypeName != null) {
-                            { return_(injection.returnTypeName.javaPrimitiveType?.defaultValue.toString()) }
-                        } else null
+                        try_ = invokeHook,
+                        catchingClassName = builtins[Builtin.CancelSignal],
+                        catch_ = injection.returnTypeName?.let {
+                            { return_(it.javaPrimitiveType?.defaultValue.toString()) }
+                        },
                     )
                 } else {
                     buildJavaCodeBlock(invokeHook)
                 }
             }
         }
-    }
 
     private fun generateMixinExtension(mixin: IrMixin, extension: IrExtension) {
         buildJavaFile(extension.className) {
             buildJavaInterface(extension.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
                 addMethods(extension.kinds.map { method ->
-                    buildJavaMethod(method.getInternalName(options.modId)) {
+                    buildJavaMethod(method.methodName) {
                         setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                         setParameters(method.parameters)
                         setReturnType(method.returnTypeName)
@@ -428,7 +495,7 @@ class MixinGenerator(
                     setBody {
                         return_("(this as %T).%L()") {
                             arg(extension.className)
-                            arg(getter.getInternalName(options.modId))
+                            arg(getter.methodName)
                         }
                     }
                 }
@@ -437,9 +504,9 @@ class MixinGenerator(
                         setModifiers(IrModifier.INLINE)
                         setParameters(setter.parameters)
                         setBody {
-                            code("(this as %T).%L(%L)") {
+                            code_("(this as %T).%L(%L)") {
                                 arg(extension.className)
-                                arg(setter.getInternalName(options.modId))
+                                arg(setter.methodName)
                                 arg(setter.parameters.joinToString { it.name })
                             }
                         }
@@ -456,7 +523,7 @@ class MixinGenerator(
                 setBody {
                     return_("(this as %T).%L(%L)") {
                         arg(extension.className)
-                        arg(method.getInternalName(options.modId))
+                        arg(method.methodName)
                         arg(method.parameters.joinToString { it.name })
                     }
                 }
@@ -470,9 +537,9 @@ class MixinGenerator(
         }
         buildKotlinFile(options.generatedPackageName, "_Extensions") {
             suppressWarnings(
-                KWarning.RedundantVisibilityModifier,
-                KWarning.UnusedReceiverParameter,
-                KWarning.NothingToInline,
+                KSuppressWarning.RedundantVisibilityModifier,
+                KSuppressWarning.UnusedReceiverParameter,
+                KSuppressWarning.NothingToInline,
             )
             addProperties(extensionProperties)
             addFunctions(extensionFunctions)
@@ -480,22 +547,27 @@ class MixinGenerator(
     }
 
     private fun generateMixinConfig(mixins: List<IrMixin>) {
+        val contents = configJson.encodeToString(
+            MixinConfig.of(
+                mixinPackage = options.mixinPackageName,
+                qualifiedNames = mixins.groupBy { it.side }.mapValues { (_, mixins) ->
+                    mixins.mapNotNull { mixin ->
+                        if (mixin.isNotEmpty()) {
+                            mixin.className.qualifiedName
+                        } else {
+                            null
+                        }
+                    }
+                },
+            )
+        )
+        logger.info(buildString {
+            appendLine("Mixin config generated:")
+            append(contents)
+        })
         codeGenerator.createResourceFile(
             path = options.mixinConfigName,
-            contents = configJson.encodeToString(
-                MixinConfig.of(
-                    mixinPackage = options.mixinPackageName,
-                    qualifiedNames = mixins.groupBy { it.side }.mapValues { (_, mixins) ->
-                        mixins.mapNotNull { mixin ->
-                            if (mixin.isNotEmpty()) {
-                                mixin.className.qualifiedName
-                            } else {
-                                null
-                            }
-                        }
-                    },
-                )
-            ),
+            contents = contents,
             aggregating = true,
         )
     }
@@ -542,12 +614,10 @@ class MixinGenerator(
         val sortedEntries = entries.distinctBy { it.awEntry }.sorted()
 
         fun formatConfig(header: String? = null, directive: (AccessorConfigEntry) -> String): String = buildString {
-            header?.let {
-                appendLine(it)
-                appendLine()
-            }
+            header?.let { appendLine(it) }
             var lastOwner: IrClassName? = null
             sortedEntries.forEach { entry ->
+                appendLine()
                 if (lastOwner != entry.ownerClassName) {
                     if (lastOwner != null) {
                         appendLine()
@@ -555,29 +625,43 @@ class MixinGenerator(
                     appendLine("# ${entry.ownerClassName.nestedName}")
                     lastOwner = entry.ownerClassName
                 }
-                appendLine(directive(entry))
+                append(directive(entry))
             }
         }
 
         options.accessWidenerConfigName?.let { name ->
             val header = if (options.isUnobfuscated) "classTweaker v1 official" else "accessWidener v2 named"
+            val contents = formatConfig(header) { it.awEntry }
+            logger.info(buildString {
+                appendLine("AW config generated:")
+                append(contents)
+            })
             codeGenerator.createResourceFile(
                 path = name,
-                contents = formatConfig(header) { it.awEntry },
+                contents = contents,
                 aggregating = true,
             )
         }
         options.accessTransformerConfigName?.let { name ->
+            val contents = formatConfig { it.atEntry }
+            logger.info(buildString {
+                appendLine("AT config generated:")
+                append(contents)
+            })
             codeGenerator.createResourceFile(
                 path = name,
-                contents = formatConfig { it.atEntry },
+                contents = contents,
                 aggregating = true,
             )
         }
     }
-}
 
-fun String.withInternalPrefix(prefix: String = LapisMeta.NAME.lowercase()): String =
-    "_${prefix}_$this"
+    val IrExtensionKind.methodName: String
+        get() = when (this) {
+            is IrFieldGetterExtension -> "get" + name.capitalize()
+            is IrFieldSetterExtension -> "set" + name.capitalize()
+            is IrMethodExtension -> name
+        }.withInternalPrefix(options.modId)
+}
 
 private val configJson: Json = Json { prettyPrint = true }
