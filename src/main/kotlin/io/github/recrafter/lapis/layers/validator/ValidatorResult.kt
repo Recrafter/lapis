@@ -29,8 +29,8 @@ class Schema(
     val targetClassDecl: KSClassDecl?,
     targetBinaryName: String,
 
-    val hasAccess: Boolean,
-    val isMarkedAsFinal: Boolean,
+    val makePublic: Boolean,
+    val removeFinal: Boolean,
     val descriptors: List<Desc>,
 ) {
     val className: IrClassName = classDecl.asIr()
@@ -72,9 +72,8 @@ class ConstructorDesc(
     returnType: KSType,
     parameters: List<FunctionTypeParameter>,
     makePublic: Boolean,
-    removeFinal: Boolean,
 ) : InvokableDesc(
-    name, "", classDecl, returnType, parameters, returnType, true, makePublic, removeFinal
+    name, "", classDecl, returnType, parameters, returnType, true, makePublic, false
 )
 
 open class MethodDesc(
@@ -314,6 +313,12 @@ class HookOriginDescBodyParameter(override val desc: InvokableDesc) : HookOrigin
 class HookOriginDescFieldGetParameter(override val desc: FieldDesc) : HookOriginDescParameter(desc)
 class HookOriginDescFieldSetParameter(override val desc: FieldDesc) : HookOriginDescParameter(desc)
 class HookOriginDescArrayGetParameter(
+    override val desc: FieldDesc,
+    arrayComponentType: KSType
+) : HookOriginDescParameter(desc) {
+    val arrayComponentTypeName: IrTypeName = arrayComponentType.asIr()
+}
+class HookOriginDescArraySetParameter(
     override val desc: FieldDesc,
     arrayComponentType: KSType
 ) : HookOriginDescParameter(desc) {

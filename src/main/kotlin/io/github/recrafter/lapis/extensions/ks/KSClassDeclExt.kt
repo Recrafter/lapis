@@ -21,10 +21,13 @@ val KSClassDecl.functionDeclarations: List<KSFunctionDecl>
     get() = getDeclaredFunctions().toList()
 
 fun KSClassDecl.getSuperClassTypeOrNull(): KSType? =
-    superTypes.map { it.resolve() }.find { it.getClassDecl()?.isClass == true }
+    superTypes.map { it.resolve() }.find { it.getClassDecl()?.takeNotAny()?.isClass == true }
 
 fun KSClassDecl.takeNotNothing(): KSClassDecl? =
     takeUnless { it.isInstance(Nothing::class) }
+
+fun KSClassDecl.takeNotAny(): KSClassDecl? =
+    takeUnless { it.isInstance(Any::class) }
 
 fun KSClassDecl.isSame(other: KSClassDecl?): Boolean {
     val thisName = qualifiedName?.asString() ?: return false

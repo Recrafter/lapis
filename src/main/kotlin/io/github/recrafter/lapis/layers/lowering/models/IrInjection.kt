@@ -127,7 +127,7 @@ class IrFieldSetInjection(
     isStatic: Boolean,
 ) : IrInjection(name, methodMixinRef, null, parameters, hookArguments, isStatic, ordinal), IrTargetInjection
 
-class IrArrayGetInjection(
+class IrArrayInjection(
     name: String,
     methodMixinRef: String,
     parameters: List<IrInjectionParameter>,
@@ -137,5 +137,9 @@ class IrArrayGetInjection(
     ordinal: Int?,
     componentTypeName: IrTypeName,
     isStatic: Boolean,
-) : IrInjection(name, methodMixinRef, componentTypeName, parameters, hookArguments, isStatic, ordinal),
-    IrTargetInjection
+    val isSet: Boolean,
+) : IrInjection(
+    name, methodMixinRef,
+    returnTypeName = if (isSet) null else componentTypeName,
+    parameters, hookArguments, isStatic, ordinal
+), IrTargetInjection

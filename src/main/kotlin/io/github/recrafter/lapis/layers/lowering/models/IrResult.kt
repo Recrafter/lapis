@@ -3,7 +3,6 @@ package io.github.recrafter.lapis.layers.lowering.models
 import io.github.recrafter.lapis.annotations.Side
 import io.github.recrafter.lapis.extensions.ks.KSFile
 import io.github.recrafter.lapis.layers.lowering.types.IrClassName
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 class IrResult(
     val schemas: List<IrSchema>,

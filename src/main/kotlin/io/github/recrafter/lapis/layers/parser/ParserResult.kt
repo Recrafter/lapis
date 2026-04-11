@@ -23,7 +23,7 @@ class ParsedSchema(
     val targetClassDecl: KSClassDecl?,
     val targetBinaryName: String?,
     val hasAccess: Boolean,
-    val isMarkedAsFinal: Boolean,
+    val unfinal: Boolean,
     val descriptors: List<ParsedDesc>,
     val nestedSchemas: List<ParsedSchema>,
 ) : SymbolSource(symbol)
@@ -35,7 +35,7 @@ class ParsedDesc(
     val classDecl: KSClassDecl,
     val hasStaticAnnotation: Boolean,
     val hasAccessAnnotation: Boolean,
-    val isMarkedAsFinal: Boolean,
+    val unfinal: Boolean,
     val superClassDecl: KSClassDecl?,
     val generic: ParsedDescGeneric?,
     val callable: ParsedDescCallable?,
@@ -54,28 +54,28 @@ class ParsedTypeDescGeneric(
     val arrayComponentType: KSType?,
 ) : ParsedDescGeneric
 
-sealed class ParsedDescCallable(
-    val receiverClassDecl: KSClassDecl?,
-)
+sealed class ParsedDescCallable(val name: String?)
+
+class PrivateCallable(name: String?) : ParsedDescCallable(name)
 
 class ParsedFieldDescCallable(
-    receiverClassDecl: KSClassDecl?,
-    val name: String?,
+    val receiverClassDecl: KSClassDecl?,
+    name: String?,
     val type: KSType?,
-) : ParsedDescCallable(receiverClassDecl)
+) : ParsedDescCallable(name)
 
 class ParsedMethodDescCallable(
-    receiverClassDecl: KSClassDecl?,
-    val name: String?,
+    val receiverClassDecl: KSClassDecl?,
+    name: String?,
     val parameters: List<ParsedParameter>,
     val returnType: KSType?,
-) : ParsedDescCallable(receiverClassDecl)
+) : ParsedDescCallable(name)
 
 class ParsedConstructorDescCallable(
-    receiverClassDecl: KSClassDecl?,
+    val receiverClassDecl: KSClassDecl?,
     val parameters: List<ParsedParameter>,
     val returnType: KSType?,
-) : ParsedDescCallable(receiverClassDecl)
+) : ParsedDescCallable(null)
 
 class ParsedPatch(
     override val symbol: KSAnnotated,

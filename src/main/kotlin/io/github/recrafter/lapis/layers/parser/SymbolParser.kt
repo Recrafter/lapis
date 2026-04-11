@@ -1,10 +1,14 @@
 package io.github.recrafter.lapis.layers.parser
 
-import com.google.devtools.ksp.*
+import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.impl.symbol.kotlin.KSClassDeclarationImpl
 import com.google.devtools.ksp.impl.symbol.kotlin.KSFunctionDeclarationImpl
 import com.google.devtools.ksp.impl.symbol.kotlin.KSPropertyDeclarationJavaImpl
+import com.google.devtools.ksp.isAbstract
+import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.isPublic
 import com.squareup.kotlinpoet.ksp.toClassName
+import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ka.KAClassSymbol
@@ -19,6 +23,7 @@ import ksp.com.intellij.psi.util.PsiTreeUtil
 import ksp.org.jetbrains.kotlin.analysis.api.KaImplementationDetail
 import ksp.org.jetbrains.kotlin.analysis.api.KaSession
 import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
+import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaErrorCallInfo
 import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaSuccessCallInfo
 import ksp.org.jetbrains.kotlin.analysis.api.session.KaSessionProvider
 import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
@@ -28,8 +33,10 @@ import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaJavaFieldSymbol
 import ksp.org.jetbrains.kotlin.analysis.api.types.KaClassType
 import ksp.org.jetbrains.kotlin.psi.KtElement
 
-class SymbolParser(private val resolver: KSPResolver) {
-
+class SymbolParser(
+    private val resolver: KSPResolver,
+    @Suppress("unused") private val logger: LapisLogger,
+) {
     fun prepare(): ParserPrepareResult =
         ParserPrepareResult(
             resolver.getSymbolsAnnotatedWith<Schema>()
@@ -53,20 +60,19 @@ class SymbolParser(private val resolver: KSPResolver) {
     private fun parseSchema(symbol: KSClassDecl, parentBinaryName: String? = null): ParsedSchema {
         val (nestedSchemas, descriptors) = symbol.declarations
             .filterIsInstance<KSClassDecl>()
-            .partition { it.hasAnnotation<Schema>() }
-        val schemaAnnotation = symbol.getAnnotationOrNull<Schema>()
-        val access = schemaAnnotation?.access?.ifEmpty { null }
+            .partition { it.getSuperClassTypeOrNull() == null }
+        val accessAnnotation = symbol.getAnnotationOrNull<Access>()
+        val accessTarget = accessAnnotation?.target?.ifEmpty { null }
         val explicitTarget = symbol.annotations.firstOrNull { it.isInstance<Schema>() }
             ?.getMemberTypeClassDecl(Schema::target)
-            ?.takeNotNothing()
         val (targetBinaryName, targetQualifiedName) = when {
-            parentBinaryName != null && access != null -> {
-                val innerName = access.removePrefix(".")
+            parentBinaryName != null && accessTarget != null -> {
+                val innerName = accessTarget.removePrefix(".")
                 parentBinaryName + "$" + innerName to parentBinaryName + "." + innerName
             }
 
-            access != null -> access to access
-            explicitTarget != null && explicitTarget.validate() -> {
+            accessTarget != null -> accessTarget to accessTarget
+            explicitTarget?.isValid == true -> {
                 explicitTarget.toClassName().asIr().run {
                     binaryName to qualifiedName
                 }
@@ -79,8 +85,8 @@ class SymbolParser(private val resolver: KSPResolver) {
             classDecl = symbol,
             targetClassDecl = targetQualifiedName?.let { resolver.getClassDeclarationByName(targetQualifiedName) },
             targetBinaryName = targetBinaryName,
-            hasAccess = access != null,
-            isMarkedAsFinal = schemaAnnotation?.final == true,
+            hasAccess = accessTarget != null,
+            unfinal = accessAnnotation?.unfinal == true,
             descriptors = descriptors.map { parseDesc(it) },
             nestedSchemas = nestedSchemas.map { parseSchema(it, targetBinaryName) },
         )
@@ -105,7 +111,7 @@ class SymbolParser(private val resolver: KSPResolver) {
             classDecl = classDecl,
             hasStaticAnnotation = classDecl.hasAnnotation<Static>(),
             hasAccessAnnotation = accessAnnotation != null,
-            isMarkedAsFinal = accessAnnotation?.final == true,
+            unfinal = accessAnnotation?.unfinal == true,
 
             generic = parseDescGeneric(
                 superClassType,
@@ -167,8 +173,12 @@ class SymbolParser(private val resolver: KSPResolver) {
             ?.getArgumentExpression()
             ?.castOrNull<KTCallableReferenceExpression>()
             ?.useAnalysis { callable ->
-                val callInfo = callable.resolveToCall() as? KaSuccessCallInfo ?: return@useAnalysis null
-                val call = callInfo.call as? KaCallableMemberCall<*, *> ?: return@useAnalysis null
+                val callInfo = callable.resolveToCall()
+                if (callInfo is KaErrorCallInfo && callInfo.diagnostic.factoryName == "INVISIBLE_REFERENCE") {
+                    return@useAnalysis PrivateCallable(callable.callableReference.text)
+                }
+                val successCallInfo = callInfo as? KaSuccessCallInfo ?: return@useAnalysis null
+                val call = successCallInfo.call as? KaCallableMemberCall<*, *> ?: return@useAnalysis null
                 val symbol = call.partiallyAppliedSymbol.signature.symbol
                 val containingClassSymbol = symbol.containingSymbol as? KaClassSymbol
                 val receiverClassDecl = containingClassSymbol?.let { KSClassDeclarationImpl.getCached(it) }

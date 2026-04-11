@@ -19,6 +19,9 @@ class IrHookOriginDescFieldSetWrapperArgument(override val wrapper: IrDescFieldS
 class IrHookOriginDescArrayGetWrapperArgument(override val wrapper: IrDescArrayGetWrapper) :
     IrHookOriginDescWrapperArgument<IrDescArrayGetWrapper>(wrapper)
 
+class IrHookOriginDescArraySetWrapperArgument(override val wrapper: IrDescArraySetWrapper) :
+    IrHookOriginDescWrapperArgument<IrDescArraySetWrapper>(wrapper)
+
 class IrHookOriginDescCallWrapperArgument(override val wrapper: IrDescCallWrapper) :
     IrHookOriginDescWrapperArgument<IrDescCallWrapper>(wrapper)
 

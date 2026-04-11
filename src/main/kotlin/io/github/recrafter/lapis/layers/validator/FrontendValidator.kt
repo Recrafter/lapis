@@ -21,9 +21,10 @@ class FrontendValidator(
     private val options: Options,
     private val builtins: Builtins,
 ) {
+    private val validSchemas: MutableMap<String, Schema> = mutableMapOf()
+
     private val validDescriptors: MutableMap<String, Desc> = mutableMapOf()
     private val invalidDescriptors: MutableList<String> = mutableListOf()
-    private val validSchemas: MutableMap<String, Schema> = mutableMapOf()
 
     fun validate(parserResult: ParserResult): ValidatorResult =
         ValidatorResult(
@@ -62,8 +63,8 @@ class FrontendValidator(
             classDecl = classDecl,
             targetClassDecl = targetClassDecl,
             targetBinaryName = targetBinaryName,
-            hasAccess = hasAccess,
-            isMarkedAsFinal = parsedSchema.isMarkedAsFinal,
+            makePublic = hasAccess,
+            removeFinal = parsedSchema.unfinal,
             descriptors = descriptors,
         )
         validSchemas[qualifiedName] = schema
@@ -92,7 +93,9 @@ class FrontendValidator(
         if (superClassDecl.isInstance(builtins[Builtin.Field])) {
             kspRequire(generic is ParsedTypeDescGeneric) { "93" }
             kspRequireNotNull(generic.type) { "94" }
-            kspRequire(callable is ParsedFieldDescCallable) { "95" }
+            if (callable !is PrivateCallable) {
+                kspRequire(callable is ParsedFieldDescCallable) { "95" }
+            }
             return FieldDesc(
                 name = name,
                 classDecl = classDecl,
@@ -102,7 +105,7 @@ class FrontendValidator(
                 arrayComponentType = generic.arrayComponentType,
                 isStatic = hasStaticAnnotation,
                 makePublic = hasAccessAnnotation,
-                removeFinal = isMarkedAsFinal,
+                removeFinal = unfinal,
             )
         }
         kspRequire(generic is ParsedFunctionTypeDescGeneric) { "108" }
@@ -115,7 +118,9 @@ class FrontendValidator(
         }
         return when {
             superClassDecl.isInstance(builtins[Builtin.Method]) -> {
-                kspRequire(callable is ParsedMethodDescCallable) { "118" }
+                if (callable !is PrivateCallable) {
+                    kspRequire(callable is ParsedMethodDescCallable) { "118" }
+                }
                 if (!hasStaticAnnotation) {
                     kspRequireNotNull(generic.receiverType) { "120" }
                 }
@@ -128,19 +133,21 @@ class FrontendValidator(
                     parameters = parameters,
                     isStatic = hasStaticAnnotation,
                     makePublic = hasAccessAnnotation,
-                    removeFinal = isMarkedAsFinal,
+                    removeFinal = unfinal,
                 )
             }
 
             superClassDecl.isInstance(builtins[Builtin.Constructor]) -> {
-                kspRequire(callable is ParsedConstructorDescCallable) { "136" }
+                if (callable !is PrivateCallable) {
+                    kspRequire(callable is ParsedConstructorDescCallable) { "136" }
+                }
+                kspRequire(!unfinal) { "96" }
                 ConstructorDesc(
                     name = name,
                     classDecl = classDecl,
                     returnType = kspRequireNotNull(generic.returnType) { "140" },
                     parameters = parameters,
                     makePublic = hasAccessAnnotation,
-                    removeFinal = isMarkedAsFinal,
                 )
             }
 
@@ -349,22 +356,19 @@ class FrontendValidator(
                 kspRequire(targetDesc is FieldDesc) { "349" }
                 kspRequireNotNull(targetDesc.arrayComponentType) { "350" }
                 when (atArrayOp) {
-                    Op.Get -> {
-                        kspRequire(returnType == targetDesc.arrayComponentType) { "353" }
-                        ArrayHook(
-                            name = name,
-                            desc = hookDesc,
-                            op = atArrayOp,
-                            type = targetDesc.fieldType,
-                            componentType = targetDesc.arrayComponentType,
-                            targetDesc = targetDesc,
-                            ordinals = ordinals(atFieldOrdinals),
-                            parameters = parameters(),
-                        )
-                    }
-
-                    Op.Set -> TODO()
+                    Op.Get -> kspRequire(returnType == targetDesc.arrayComponentType) { "353" }
+                    Op.Set -> kspRequire(returnType == null) { "353" }
                 }
+                ArrayHook(
+                    name = name,
+                    desc = hookDesc,
+                    op = atArrayOp,
+                    type = targetDesc.fieldType,
+                    componentType = targetDesc.arrayComponentType,
+                    targetDesc = targetDesc,
+                    ordinals = ordinals(atFieldOrdinals),
+                    parameters = parameters(),
+                )
             }
 
             At.Call -> {
@@ -437,7 +441,7 @@ class FrontendValidator(
         if (invalidDescriptors.contains(qualifiedName)) {
             kspError { "438" }
         }
-        return validDescriptors[qualifiedName] ?: lapisError("440")
+        return validDescriptors[qualifiedName] ?: lapisError("Failed to find descriptor by $qualifiedName")
     }
 
     private fun validateHookParameter(
@@ -515,7 +519,12 @@ class FrontendValidator(
                                 HookOriginDescArrayGetParameter(originDesc, originDesc.arrayComponentType)
                             }
 
-                            Op.Set -> TODO()
+                            Op.Set -> {
+                                kspRequire(type.getClassDecl()?.isInstance(builtins[DescBuiltin.ArraySet]) == true) {
+                                    "513"
+                                }
+                                HookOriginDescArraySetParameter(originDesc, originDesc.arrayComponentType)
+                            }
                         }
                     }
 

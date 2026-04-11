@@ -49,6 +49,14 @@ class IrDescArrayGetWrapper(
     val arrayComponentTypeName: IrTypeName,
 ) : IrDescWrapper(className, descClassName, builtin, null)
 
+class IrDescArraySetWrapper(
+    className: IrClassName,
+    descClassName: IrClassName,
+    builtin: IrClassName,
+    val arrayTypeName: IrTypeName,
+    val arrayComponentTypeName: IrTypeName,
+) : IrDescWrapper(className, descClassName, builtin, null)
+
 class IrDescCallWrapper(
     className: IrClassName,
     descClassName: IrClassName,

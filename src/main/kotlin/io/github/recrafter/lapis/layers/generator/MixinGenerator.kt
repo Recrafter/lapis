@@ -91,6 +91,7 @@ class MixinGenerator(
                         desc.fieldGetWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.FieldGet, it) }
                         desc.fieldSetWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.FieldSet, it) }
                         desc.arrayGetWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.ArrayGet, it) }
+                        desc.arraySetWrapper?.let { builtins.generateDescWrapper(this, DescBuiltin.ArraySet, it) }
                     }
                 }
             }
@@ -291,13 +292,13 @@ class MixinGenerator(
                     }
                 }
 
-                is IrArrayGetInjection -> addAnnotation<Redirect> {
+                is IrArrayInjection -> addAnnotation<Redirect> {
                     setStringArrayMember(Redirect::method, injection.methodMixinRef)
                     setAnnotationMember<Redirect, At>(Redirect::at) {
                         setStringMember(At::value, "FIELD")
                         setStringMember(At::target, injection.targetMixinRef)
                         setIntMember(At::opcode, if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD)
-                        setStringArrayMember(At::args, "array=get")
+                        setStringArrayMember(At::args, "array=${if (injection.isSet) "set" else "get"}")
                         injection.ordinal?.let { setIntMember(At::ordinal, it) }
                         setBooleanMember(At::unsafe, true)
                     }
@@ -377,7 +378,7 @@ class MixinGenerator(
                             val wrapper = argument.wrapper
                             if (injection is IrTargetInjection &&
                                 injection !is IrWrapMethodInjection &&
-                                injection !is IrArrayGetInjection &&
+                                injection !is IrArrayInjection &&
                                 !injection.isStaticTarget
                             ) {
                                 add(buildJavaCodeBlock(receiverParameterName))
@@ -391,9 +392,12 @@ class MixinGenerator(
                                     buildJavaCodeBlock(name.withInternalPrefix(ARGUMENT))
                                 })
                             }
-                            if (injection is IrArrayGetInjection) {
+                            if (injection is IrArrayInjection) {
                                 add(buildJavaCodeBlock("array".withInternalPrefix(ARGUMENT)))
                                 add(buildJavaCodeBlock("index".withInternalPrefix(ARGUMENT)))
+                                if (injection.isSet) {
+                                    add(buildJavaCodeBlock("value".withInternalPrefix(ARGUMENT)))
+                                }
                             } else {
                                 add(buildJavaCodeBlock(originalParameterName))
                             }

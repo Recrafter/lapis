@@ -45,5 +45,6 @@ class IrFieldDesc(
     val fieldGetWrapper: IrDescFieldGetWrapper?,
     val fieldSetWrapper: IrDescFieldSetWrapper?,
     val arrayGetWrapper: IrDescArrayGetWrapper?,
+    val arraySetWrapper: IrDescArraySetWrapper?,
     val typeName: IrTypeName,
 ) : IrDesc(makePublic, removeFinal)

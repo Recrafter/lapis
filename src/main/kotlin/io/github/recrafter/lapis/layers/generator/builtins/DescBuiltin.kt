@@ -190,7 +190,9 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
                 setConstructor(listOf(arrayParameter, indexParameter), IrModifier.PUBLIC)
                 addSuperInterface(wrapper.superClassTypeName)
             })
-            val arrayProperty = buildKotlinProperty("array", wrapper.arrayTypeName, jvmNamespace = wrapper.className) {
+            val arrayProperty = buildKotlinProperty(
+                "array", arrayParameter.typeName, jvmNamespace = wrapper.className
+            ) {
                 setReceiverType(wrapper.superClassTypeName)
                 setGetter {
                     setModifiers(IrModifier.INLINE)
@@ -204,7 +206,9 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
             }
             dest.addProperty(arrayProperty)
 
-            val indexProperty = buildKotlinProperty("index", KPInt.asIrTypeName(), jvmNamespace = wrapper.className) {
+            val indexProperty = buildKotlinProperty(
+                "index", indexParameter.typeName, jvmNamespace = wrapper.className
+            ) {
                 setReceiverType(wrapper.superClassTypeName)
                 setGetter {
                     setModifiers(IrModifier.INLINE)
@@ -221,12 +225,12 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
             dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(wrapper.superClassTypeName)
-                val arrayParameter = buildKotlinParameter("array", wrapper.arrayTypeName) {
+                val arrayParameter = buildKotlinParameter("array", arrayParameter.typeName) {
                     defaultValue(buildKotlinCodeBlock("this.%N") {
                         arg(arrayProperty)
                     })
                 }
-                val indexParameter = buildKotlinParameter("index", KPInt.asIrTypeName()) {
+                val indexParameter = buildKotlinParameter("index", indexParameter.typeName) {
                     defaultValue(buildKotlinCodeBlock("this.%N") {
                         arg(indexProperty)
                     })
@@ -237,6 +241,94 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
                     return_("%N[%N]") {
                         arg(arrayParameter)
                         arg(indexParameter)
+                    }
+                }
+            })
+        }
+    }
+
+    data object ArraySet : DescBuiltin<IrFieldDesc, IrDescArraySetWrapper>("ArraySet", Builtin.Field) {
+
+        override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescArraySetWrapper, typer: BuiltinTyper) {
+            val arrayParameter = IrParameter("array".withInternalPrefix(), wrapper.arrayTypeName)
+            val indexParameter = IrParameter("index".withInternalPrefix(), KPInt.asIrTypeName())
+            val valueParameter = IrParameter("value".withInternalPrefix(), wrapper.arrayComponentTypeName)
+            dest.addType(buildKotlinClass(wrapper.className.simpleName) {
+                setConstructor(listOf(arrayParameter, indexParameter, valueParameter), IrModifier.PUBLIC)
+                addSuperInterface(wrapper.superClassTypeName)
+            })
+            val arrayProperty = buildKotlinProperty(
+                "array", arrayParameter.typeName, jvmNamespace = wrapper.className
+            ) {
+                setReceiverType(wrapper.superClassTypeName)
+                setGetter {
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(arrayParameter)
+                        }
+                    }
+                }
+            }
+            dest.addProperty(arrayProperty)
+
+            val indexProperty = buildKotlinProperty(
+                "index", indexParameter.typeName, jvmNamespace = wrapper.className
+            ) {
+                setReceiverType(wrapper.superClassTypeName)
+                setGetter {
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(indexParameter)
+                        }
+                    }
+                }
+            }
+            dest.addProperty(indexProperty)
+
+            val valueProperty = buildKotlinProperty(
+                "value", valueParameter.typeName, jvmNamespace = wrapper.className
+            ) {
+                setReceiverType(wrapper.superClassTypeName)
+                setGetter {
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_("(this as %T).%N") {
+                            arg(wrapper.className)
+                            arg(valueParameter)
+                        }
+                    }
+                }
+            }
+            dest.addProperty(valueProperty)
+
+            dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
+                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                setReceiverType(wrapper.superClassTypeName)
+                val arrayParameter = buildKotlinParameter(arrayProperty.name, arrayParameter.typeName) {
+                    defaultValue(buildKotlinCodeBlock("this.%N") {
+                        arg(arrayProperty)
+                    })
+                }
+                val indexParameter = buildKotlinParameter(indexProperty.name, indexParameter.typeName) {
+                    defaultValue(buildKotlinCodeBlock("this.%N") {
+                        arg(indexProperty)
+                    })
+                }
+                val valueParameter = buildKotlinParameter(valueProperty.name, valueParameter.typeName) {
+                    defaultValue(buildKotlinCodeBlock("this.%N") {
+                        arg(indexProperty)
+                    })
+                }
+                addParameters(listOf(arrayParameter, indexParameter, valueParameter))
+                setBody {
+                    code_("%N[%N] = %N") {
+                        arg(arrayParameter)
+                        arg(indexParameter)
+                        arg(valueParameter)
                     }
                 }
             })
@@ -494,6 +586,6 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
     }
 
     companion object {
-        val entries: Array<DescBuiltin<*, *>> = arrayOf(FieldGet, FieldSet, ArrayGet, Body, Call, Cancel)
+        val entries: Array<DescBuiltin<*, *>> = arrayOf(FieldGet, FieldSet, ArrayGet, ArraySet, Body, Call, Cancel)
     }
 }

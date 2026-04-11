@@ -4,6 +4,7 @@ import com.squareup.kotlinpoet.asClassName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
+import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.layers.generator.builtins.Builtins
@@ -17,7 +18,7 @@ import kotlin.reflect.KClass
 class MixinLowering(
     private val options: Options,
     private val builtins: Builtins,
-    private val logger: LapisLogger,
+    @Suppress("unused") private val logger: LapisLogger,
 ) {
     private val mixins: MutableList<IrMixin> = mutableListOf()
 
@@ -28,8 +29,8 @@ class MixinLowering(
                 IrSchema(
                     containingFile = schema.containingFile,
 
-                    makePublic = schema.hasAccess,
-                    removeFinal = schema.isMarkedAsFinal,
+                    makePublic = schema.makePublic,
+                    removeFinal = schema.removeFinal,
                     className = schema.className,
                     targetClassName = schema.targetClassName,
                     descriptors = schema.descriptors.map { desc -> lowerDesc(desc) },
@@ -74,6 +75,7 @@ class MixinLowering(
                     fieldGetWrapper = findOriginDescWrapper(desc.className),
                     fieldSetWrapper = findOriginDescWrapper(desc.className),
                     arrayGetWrapper = findOriginDescWrapper(desc.className),
+                    arraySetWrapper = findOriginDescWrapper(desc.className),
                     typeName = desc.fieldTypeName,
                 )
             }
@@ -176,6 +178,9 @@ class MixinLowering(
                 hook is ArrayHook -> {
                     add(IrInjectionArgumentParameter("array", 0, hook.typeName))
                     add(IrInjectionArgumentParameter("index", 1, KPInt.asIrTypeName()))
+                    if (hook.op == Op.Set) {
+                        add(IrInjectionArgumentParameter("value", 2, hook.componentTypeName))
+                    }
                 }
 
                 hook is ReturnHook && !hook.isInjectBased -> {
@@ -344,7 +349,7 @@ class MixinLowering(
                     isStatic = hook.desc.isStatic,
                 )
 
-                is ArrayHook -> IrArrayGetInjection(
+                is ArrayHook -> IrArrayInjection(
                     name = hook.name,
                     methodMixinRef = hook.desc.getMixinRef(),
                     parameters = parameters,
@@ -354,6 +359,7 @@ class MixinLowering(
                     ordinal = ordinal,
                     componentTypeName = hook.componentTypeName,
                     isStatic = hook.desc.isStatic,
+                    isSet = hook.op == Op.Set,
                 )
 
                 is CallHook -> IrWrapOperationInjection(
@@ -490,6 +496,21 @@ class MixinLowering(
                     arrayComponentTypeName = parameter.arrayComponentTypeName,
                 )
                 IrHookOriginDescArrayGetWrapperArgument(wrapper)
+            }
+
+            is HookOriginDescArraySetParameter -> {
+                val desc = parameter.desc
+                val wrapper = IrDescArraySetWrapper(
+                    className = IrClassName.of(
+                        options.generatedPackageName,
+                        DescBuiltin.ArraySet.name.withQualifiedNamePrefix(desc.className)
+                    ),
+                    descClassName = desc.className,
+                    builtin = builtins[DescBuiltin.ArraySet],
+                    arrayTypeName = desc.fieldTypeName,
+                    arrayComponentTypeName = parameter.arrayComponentTypeName,
+                )
+                IrHookOriginDescArraySetWrapperArgument(wrapper)
             }
 
             is HookOriginDescCallParameter -> {
