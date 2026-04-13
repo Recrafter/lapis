@@ -488,8 +488,8 @@ class FrontendValidator(
                     }
 
                     At.Instanceof -> {
-                        kspRequire(type.toClassName().asIr() == KPAny.asIr()) { "491" }
-                        HookOriginValueParameter()
+                        kspRequire(type.getClassDecl()?.isInstance(builtins[Builtin.Instanceof]) == true) { "491" }
+                        HookOriginInstanceofParameter()
                     }
 
                     At.Return -> {

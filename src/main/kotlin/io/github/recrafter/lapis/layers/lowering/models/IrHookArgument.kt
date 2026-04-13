@@ -25,6 +25,7 @@ class IrHookOriginDescArraySetWrapperArgument(override val wrapper: IrDescArrayS
 class IrHookOriginDescCallWrapperArgument(override val wrapper: IrDescCallWrapper) :
     IrHookOriginDescWrapperArgument<IrDescCallWrapper>(wrapper)
 
+class IrHookOriginInstanceofArgument : IrHookOriginArgument
 class IrHookCancelArgument(val wrapper: IrDescCancelWrapper) : IrHookArgument
 object IrHookOrdinalArgument : IrHookArgument
 class IrHookParamArgument(val name: String) : IrHookArgument

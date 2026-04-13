@@ -559,6 +559,8 @@ class MixinLowering(
                 IrHookCancelArgument(wrapper)
             }
 
+            is HookOriginInstanceofParameter -> IrHookOriginInstanceofArgument()
+
             is HookOrdinalParameter -> IrHookOrdinalArgument
             is HookParamParameter -> IrHookParamArgument(parameter.name)
             is HookLocalParameter -> IrHookLocalArgument(parameter.name)

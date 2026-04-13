@@ -40,14 +40,15 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescFieldGetWrapper, typer: BuiltinTyper) {
             val receiverParameter = wrapper.receiverTypeName?.let {
-                IrParameter("receiver".withInternalPrefix(), it)
+                IrParameter("receiver".withInternalPrefix(), it, listOf(IrModifier.PUBLIC))
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIr().parameterizedBy(wrapper.fieldTypeName)
+                Operation::class.asIr().parameterizedBy(wrapper.fieldTypeName),
+                listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(listOfNotNull(receiverParameter, operationParameter), IrModifier.PUBLIC)
+                setConstructor(listOfNotNull(receiverParameter, operationParameter))
                 addSuperInterface(wrapper.superClassTypeName)
             })
             val getReceiverFunction = receiverParameter?.let {
@@ -101,19 +102,22 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
             val receiverParameter = wrapper.receiverTypeName?.let {
                 IrParameter(
                     "receiver".withInternalPrefix(),
-                    it
+                    it,
+                    listOf(IrModifier.PUBLIC)
                 )
             }
             val valueParameter = IrParameter(
                 "value".withInternalPrefix(),
-                wrapper.fieldTypeName
+                wrapper.fieldTypeName,
+                listOf(IrModifier.PUBLIC)
             )
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIr().parameterizedBy(IrTypeName.VOID)
+                Operation::class.asIr().parameterizedBy(IrTypeName.VOID),
+                listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(listOfNotNull(receiverParameter, valueParameter, operationParameter), IrModifier.PUBLIC)
+                setConstructor(listOfNotNull(receiverParameter, valueParameter, operationParameter))
                 addSuperInterface(wrapper.superClassTypeName)
             })
             val valueProperty = buildKotlinProperty("value", wrapper.fieldTypeName, jvmNamespace = wrapper.className) {
@@ -184,10 +188,18 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
     data object ArrayGet : DescBuiltin<IrFieldDesc, IrDescArrayGetWrapper>("ArrayGet", Builtin.Field) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescArrayGetWrapper, typer: BuiltinTyper) {
-            val arrayParameter = IrParameter("array".withInternalPrefix(), wrapper.arrayTypeName)
-            val indexParameter = IrParameter("index".withInternalPrefix(), KPInt.asIrTypeName())
+            val arrayParameter = IrParameter(
+                "array".withInternalPrefix(),
+                wrapper.arrayTypeName,
+                listOf(IrModifier.PUBLIC)
+            )
+            val indexParameter = IrParameter(
+                "index".withInternalPrefix(),
+                KPInt.asIrTypeName(),
+                listOf(IrModifier.PUBLIC)
+            )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(listOf(arrayParameter, indexParameter), IrModifier.PUBLIC)
+                setConstructor(listOf(arrayParameter, indexParameter))
                 addSuperInterface(wrapper.superClassTypeName)
             })
             val arrayProperty = buildKotlinProperty(
@@ -250,11 +262,23 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
     data object ArraySet : DescBuiltin<IrFieldDesc, IrDescArraySetWrapper>("ArraySet", Builtin.Field) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescArraySetWrapper, typer: BuiltinTyper) {
-            val arrayParameter = IrParameter("array".withInternalPrefix(), wrapper.arrayTypeName)
-            val indexParameter = IrParameter("index".withInternalPrefix(), KPInt.asIrTypeName())
-            val valueParameter = IrParameter("value".withInternalPrefix(), wrapper.arrayComponentTypeName)
+            val arrayParameter = IrParameter(
+                "array".withInternalPrefix(),
+                wrapper.arrayTypeName,
+                listOf(IrModifier.PUBLIC)
+            )
+            val indexParameter = IrParameter(
+                "index".withInternalPrefix(),
+                KPInt.asIrTypeName(),
+                listOf(IrModifier.PUBLIC)
+            )
+            val valueParameter = IrParameter(
+                "value".withInternalPrefix(),
+                wrapper.arrayComponentTypeName,
+                listOf(IrModifier.PUBLIC)
+            )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(listOf(arrayParameter, indexParameter, valueParameter), IrModifier.PUBLIC)
+                setConstructor(listOf(arrayParameter, indexParameter, valueParameter))
                 addSuperInterface(wrapper.superClassTypeName)
             })
             val arrayProperty = buildKotlinProperty(
@@ -343,14 +367,19 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
             }
             val argumentParameters = wrapper.parameters.mapIndexed { index, parameter ->
                 val name = parameter.name ?: index.toString()
-                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName)
+                IrParameter(
+                    name.withInternalPrefix(ARGUMENT),
+                    parameter.typeName,
+                    listOf(IrModifier.PUBLIC)
+                )
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIr().parameterizedBy(wrapper.returnTypeName.orVoid())
+                Operation::class.asIr().parameterizedBy(wrapper.returnTypeName.orVoid()),
+                listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(argumentParameters + operationParameter, IrModifier.PUBLIC)
+                setConstructor(argumentParameters + operationParameter)
                 addSuperInterface(wrapper.superClassTypeName)
             })
             dest.addProperties(namedParameters.map { parameter ->
@@ -405,25 +434,33 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
             val receiverParameter = wrapper.receiverTypeName?.let {
                 IrParameter(
                     "receiver".withInternalPrefix(),
-                    it
+                    it,
+                    listOf(IrModifier.PUBLIC)
                 )
             }
             val namedParameters = wrapper.parameters.mapNotNull { parameter ->
-                parameter.name?.let { IrParameter(parameter.name, parameter.typeName) }
+                parameter.name?.let {
+                    IrParameter(
+                        parameter.name,
+                        parameter.typeName,
+                        listOf(IrModifier.PUBLIC)
+                    )
+                }
             }
             val argumentParameters = wrapper.parameters.mapIndexed { index, parameter ->
                 val name = parameter.name ?: index.toString()
-                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName)
+                IrParameter(
+                    name.withInternalPrefix(ARGUMENT),
+                    parameter.typeName,
+                    listOf(IrModifier.PUBLIC)
+                )
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIr().parameterizedBy(wrapper.returnTypeName.orVoid())
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(
-                    listOfNotNull(receiverParameter) + argumentParameters + operationParameter,
-                    IrModifier.PUBLIC
-                )
+                setConstructor(listOfNotNull(receiverParameter) + argumentParameters + operationParameter)
                 addSuperInterface(wrapper.superClassTypeName)
             })
             dest.addProperties(namedParameters.map { parameter ->
@@ -548,10 +585,11 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val bu
                 "callback".withInternalPrefix(),
                 wrapper.returnTypeName
                     ?.let { CallbackInfoReturnable::class.asIr().parameterizedBy(it) }
-                    ?: CallbackInfo::class.asIr()
+                    ?: CallbackInfo::class.asIr(),
+                listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
-                setConstructor(listOf(callbackParameter), IrModifier.PUBLIC)
+                setConstructor(listOf(callbackParameter))
                 addSuperInterface(wrapper.superClassTypeName)
             })
             dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {

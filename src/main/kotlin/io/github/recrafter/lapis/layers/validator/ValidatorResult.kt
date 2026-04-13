@@ -327,6 +327,7 @@ class HookOriginDescArrayGetParameter(
 ) : HookOriginDescParameter(desc) {
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIr()
 }
+class HookOriginInstanceofParameter : HookOriginParameter
 
 class HookOriginDescArraySetParameter(
     override val desc: FieldDesc,

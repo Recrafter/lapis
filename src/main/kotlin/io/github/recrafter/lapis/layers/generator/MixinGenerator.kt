@@ -38,11 +38,7 @@ import kotlinx.serialization.json.Json
 import org.objectweb.asm.Opcodes
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Unique
-import org.spongepowered.asm.mixin.injection.At
-import org.spongepowered.asm.mixin.injection.Constant
-import org.spongepowered.asm.mixin.injection.Inject
-import org.spongepowered.asm.mixin.injection.ModifyVariable
-import org.spongepowered.asm.mixin.injection.Redirect
+import org.spongepowered.asm.mixin.injection.*
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
@@ -119,8 +115,7 @@ class MixinGenerator(
             setModifiers(IrModifier.PUBLIC)
             setSuperClass(mixin.patchClassName)
             setConstructor(
-                listOf(IrParameter("instance", mixin.targetClassName)),
-                IrModifier.PUBLIC, IrModifier.OVERRIDE
+                listOf(IrParameter("instance", mixin.targetClassName, listOf(IrModifier.PUBLIC, IrModifier.OVERRIDE))),
             )
         }
 
@@ -422,6 +417,14 @@ class MixinGenerator(
                         }) {
                             arg(argument.wrapper.className)
                             descWrapperConstructorArgumentCodeBlocks.forEach { arg(it) }
+                        }
+                    }
+
+                    is IrHookOriginInstanceofArgument -> {
+                        buildJavaCodeBlock("new %T(%L, %L)") {
+                            arg(builtins[Builtin.Instanceof])
+                            arg(valueParameterName)
+                            arg(originalParameterName)
                         }
                     }
 

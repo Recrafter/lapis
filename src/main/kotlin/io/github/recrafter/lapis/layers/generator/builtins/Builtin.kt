@@ -1,6 +1,8 @@
 package io.github.recrafter.lapis.layers.generator.builtins
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.asIr
 import io.github.recrafter.lapis.layers.lowering.models.IrParameter
@@ -106,6 +108,40 @@ enum class Builtin {
                     setModifiers(IrModifier.OVERRIDE)
                     setReturnType(Throwable::class.asIr())
                     setBody { return_("this") }
+                })
+            }
+    },
+    Instanceof {
+        override fun generate(typer: BuiltinTyper): KPClass =
+            buildKotlinClass(name) {
+                setModifiers(IrModifier.PUBLIC)
+                val valueParameter = IrParameter(
+                    "value",
+                    KPAny.asIr(),
+                    listOf(IrModifier.PUBLIC)
+                )
+                val operationParameter = IrParameter(
+                    "operation".withInternalPrefix(),
+                    Operation::class.asIr().parameterizedBy(KPBoolean.asIr()),
+                    listOf(IrModifier.PRIVATE)
+                )
+                setConstructor(listOf(valueParameter, operationParameter))
+                addFunction(buildKotlinFunction("invoke") {
+                    setModifiers(IrModifier.PUBLIC, IrModifier.OPERATOR)
+                    val valueParameter = buildKotlinParameter("value", valueParameter.typeName) {
+                        defaultValue(buildKotlinCodeBlock("this.%N") {
+                            arg(valueParameter)
+                        })
+                    }
+                    addParameter(valueParameter)
+                    setReturnType(KPBoolean.asIr())
+                    setBody {
+                        return_("%N.%L(%N)") {
+                            arg(operationParameter)
+                            arg(Operation<*>::call)
+                            arg(valueParameter)
+                        }
+                    }
                 })
             }
     };

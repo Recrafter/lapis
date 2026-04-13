@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.layers.lowering
 
+import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.layers.lowering.models.IrConstructorDesc
 import io.github.recrafter.lapis.layers.lowering.models.IrInvokableDesc
@@ -25,7 +26,8 @@ class JvmDesc(private val type: JPTypeName) {
             JPChar -> "C"
             JPFloat -> "F"
             JPDouble -> "D"
-            else -> VOID_NAME
+            JPVoid -> VOID_NAME
+            else -> lapisError("Unsupported Java type")
         }
 
     private val JPClassName.typeDesc: String

@@ -7,15 +7,15 @@ import io.github.recrafter.lapis.layers.lowering.models.IrParameter
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeVariableName
 
-fun KPClassBuilder.setConstructor(parameters: List<IrParameter>, vararg propertyModifiers: IrModifier) {
+fun KPClassBuilder.setConstructor(parameters: List<IrParameter>) {
     primaryConstructor(buildKotlinConstructor {
         setParameters(parameters)
     })
-    if (propertyModifiers.isNotEmpty()) {
+    if (parameters.any { it.modifiers.isNotEmpty() }) {
         addProperties(parameters.map { parameter ->
             buildKotlinProperty(parameter.name, parameter.typeName) {
                 initializer(parameter.name)
-                setModifiers(*propertyModifiers)
+                setModifiers(*parameter.modifiers.toTypedArray())
             }
         })
     }
