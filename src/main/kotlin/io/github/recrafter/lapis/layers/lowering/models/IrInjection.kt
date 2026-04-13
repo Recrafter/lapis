@@ -1,5 +1,8 @@
 package io.github.recrafter.lapis.layers.lowering.models
 
+import io.github.recrafter.lapis.extensions.kp.KPBoolean
+import io.github.recrafter.lapis.layers.lowering.asIrTypeName
+import io.github.recrafter.lapis.layers.lowering.types.IrClassName
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 sealed class IrInjection(
@@ -143,3 +146,17 @@ class IrArrayInjection(
     returnTypeName = if (isSet) null else componentTypeName,
     parameters, hookArguments, isStatic, ordinal
 ), IrTargetInjection
+
+class IrInstanceofInjection(
+    name: String,
+    methodMixinRef: String,
+    val className: IrClassName,
+    parameters: List<IrInjectionParameter>,
+    hookArguments: List<IrHookArgument>,
+    ordinal: Int?,
+    isStatic: Boolean,
+) : IrInjection(
+    name, methodMixinRef,
+    returnTypeName = KPBoolean.asIrTypeName(),
+    parameters, hookArguments, isStatic, ordinal
+)

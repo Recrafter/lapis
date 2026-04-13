@@ -39,6 +39,7 @@ import org.objectweb.asm.Opcodes
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Unique
 import org.spongepowered.asm.mixin.injection.At
+import org.spongepowered.asm.mixin.injection.Constant
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.ModifyVariable
 import org.spongepowered.asm.mixin.injection.Redirect
@@ -303,6 +304,14 @@ class MixinGenerator(
                         setBooleanMember(At::unsafe, true)
                     }
                 }
+
+                is IrInstanceofInjection -> addAnnotation<WrapOperation> {
+                    setStringArrayMember(WrapOperation::method, injection.methodMixinRef)
+                    setAnnotationArrayMember<WrapOperation, Constant>(WrapOperation::constant) {
+                        setClassMember(Constant::classValue, injection.className)
+                        injection.ordinal?.let { setIntMember(Constant::ordinal, it) }
+                    }
+                }
             }
             if (injection.isStatic) {
                 setModifiers(IrModifier.PRIVATE, IrModifier.STATIC)
@@ -376,7 +385,8 @@ class MixinGenerator(
                     is IrHookOriginDescWrapperArgument<*> -> {
                         val descWrapperConstructorArgumentCodeBlocks = buildList {
                             val wrapper = argument.wrapper
-                            if (injection is IrTargetInjection &&
+                            if (
+                                injection is IrTargetInjection &&
                                 injection !is IrWrapMethodInjection &&
                                 injection !is IrArrayInjection &&
                                 !injection.isStaticTarget
@@ -391,6 +401,9 @@ class MixinGenerator(
                                     val name = parameter.name ?: index.toString()
                                     buildJavaCodeBlock(name.withInternalPrefix(ARGUMENT))
                                 })
+                            }
+                            if (injection is IrInstanceofInjection) {
+                                add(buildJavaCodeBlock("value".withInternalPrefix(ARGUMENT)))
                             }
                             if (injection is IrArrayInjection) {
                                 add(buildJavaCodeBlock("array".withInternalPrefix(ARGUMENT)))

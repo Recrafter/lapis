@@ -312,7 +312,7 @@ class SymbolParser(
             atLocalOpOrdinals = atLocalAnnotation?.ordinal?.toList().orEmpty(),
 
             hasAtInstanceofAnnotation = atInstanceofAnnotation != null,
-            atInstanceofType = functionDecl
+            atInstanceofTypeClassDecl = functionDecl
                 .annotations
                 .firstOrNull { it.isInstance<AtInstanceof>() }
                 ?.getMemberTypeClassDecl(AtInstanceof::type),

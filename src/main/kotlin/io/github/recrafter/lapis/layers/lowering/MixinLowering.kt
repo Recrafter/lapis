@@ -191,6 +191,11 @@ class MixinLowering(
                 hook is LocalHook -> {
                     add(IrInjectionValueParameter(hook.typeName))
                 }
+
+                hook is InstanceofHook -> {
+                    add(IrInjectionValueParameter(Object::class.asIr()))
+                    add(IrInjectionOperationParameter(KPBoolean.asIr()))
+                }
             }
             if (!hook.isInjectBased && hook.parameters.any { it is HookCancelParameter }) {
                 add(IrInjectionCallbackParameter(hook.desc.returnTypeName))
@@ -264,6 +269,16 @@ class MixinLowering(
                     hookArguments = hookArguments,
                     local = lowerLocal(hook.local, hook.desc, hook.typeName),
                     isSet = hook.isSet,
+                    ordinal = ordinal,
+                    isStatic = hook.desc.isStatic,
+                )
+
+                is InstanceofHook -> IrInstanceofInjection(
+                    name = hook.name,
+                    methodMixinRef = hook.desc.getMixinRef(),
+                    className = hook.className,
+                    parameters = parameters,
+                    hookArguments = hookArguments,
                     ordinal = ordinal,
                     isStatic = hook.desc.isStatic,
                 )

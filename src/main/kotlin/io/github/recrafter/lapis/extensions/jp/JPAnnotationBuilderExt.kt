@@ -18,6 +18,10 @@ fun <A : Annotation> JPAnnotationBuilder.setStringMember(property: KProperty1<A,
     addMember(property.name, buildJavaCodeBlock("%S") { arg(string) })
 }
 
+fun <A : Annotation> JPAnnotationBuilder.setClassMember(property: KProperty1<A, KClass<*>>, className: IrClassName) {
+    addMember(property.name, buildJavaCodeBlock("%T.class") { arg(className) })
+}
+
 inline fun <reified O : Annotation, reified I : Annotation> JPAnnotationBuilder.setAnnotationMember(
     property: KProperty1<O, I>,
     crossinline builder: Builder<JPAnnotationBuilder> = {},

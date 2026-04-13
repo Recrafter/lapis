@@ -197,7 +197,16 @@ class LocalHook(
     val typeName: IrTypeName = type.asIr()
 }
 
-// instanceof
+class InstanceofHook(
+    name: String,
+    desc: InvokableDesc,
+    classDecl: KSClassDecl,
+    returnType: KSType,
+    parameters: List<HookParameter>,
+    ordinals: List<Int>,
+) : DomainHook(name, desc, returnType, parameters, ordinals) {
+    val className: IrClassName = classDecl.asIr()
+}
 
 class ReturnHook(
     name: String,
@@ -318,6 +327,7 @@ class HookOriginDescArrayGetParameter(
 ) : HookOriginDescParameter(desc) {
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIr()
 }
+
 class HookOriginDescArraySetParameter(
     override val desc: FieldDesc,
     arrayComponentType: KSType

@@ -135,7 +135,7 @@ class ParsedPatchFunction(
     val atLocalOpOrdinals: List<Int>,
 
     val hasAtInstanceofAnnotation: Boolean,
-    val atInstanceofType: KSClassDecl?,
+    val atInstanceofTypeClassDecl: KSClassDecl?,
     val atInstanceofOrdinals: List<Int>,
 
     val hasAtReturnAnnotation: Boolean,
