@@ -6,4 +6,4 @@ fun KSValueArgument.getKClassType(): KSType? =
     value?.castOrNull<KSType>()
 
 fun KSValueArgument.getTypeClassDecl(): KSClassDecl? =
-    getKClassType()?.getClassDecl()
+    getKClassType()?.getClassDecl()?.takeNotNothing()

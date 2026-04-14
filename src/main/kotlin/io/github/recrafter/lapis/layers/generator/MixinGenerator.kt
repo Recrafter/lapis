@@ -30,9 +30,9 @@ import io.github.recrafter.lapis.layers.generator.builtins.Builtins
 import io.github.recrafter.lapis.layers.generator.builtins.DescBuiltin
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.asIr
-import io.github.recrafter.lapis.layers.lowering.binaryName
 import io.github.recrafter.lapis.layers.lowering.models.*
 import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.binaryName
 import io.github.recrafter.lapis.layers.lowering.types.orVoid
 import kotlinx.serialization.json.Json
 import org.objectweb.asm.Opcodes
@@ -53,7 +53,7 @@ class MixinGenerator(
 
     fun generate(schemas: List<IrSchema>, mixins: List<IrMixin>) {
         val schemaContainingFiles = schemas.mapNotNull { it.containingFile }
-        generateDescriptors(
+        generateDescriptorWrappers(
             schemas.flatMap { it.descriptors },
             schemaContainingFiles.toDependencies()
         )
@@ -66,7 +66,7 @@ class MixinGenerator(
         generateAccessorConfig(schemas)
     }
 
-    private fun generateDescriptors(descriptors: List<IrDesc>, dependencies: KSPDependencies) {
+    private fun generateDescriptorWrappers(descriptors: List<IrDesc>, dependencies: KSPDependencies) {
         if (descriptors.isEmpty()) {
             return
         }
@@ -115,7 +115,13 @@ class MixinGenerator(
             setModifiers(IrModifier.PUBLIC)
             setSuperClass(mixin.patchClassName)
             setConstructor(
-                listOf(IrParameter("instance", mixin.targetClassName, listOf(IrModifier.PUBLIC, IrModifier.OVERRIDE))),
+                listOf(
+                    IrParameter(
+                        "instance",
+                        mixin.targetClassName,
+                        listOf(IrModifier.PUBLIC, IrModifier.OVERRIDE)
+                    )
+                ),
             )
         }
 
@@ -484,7 +490,7 @@ class MixinGenerator(
                         try_ = invokeHook,
                         catchingClassName = builtins[Builtin.CancelSignal],
                         catch_ = injection.returnTypeName?.let {
-                            { return_(it.javaPrimitiveType?.defaultValue.toString()) }
+                            { return_(it.javaPrimitiveType?.primitiveDefaultValue ?: "null") }
                         },
                     )
                 } else {
@@ -676,7 +682,7 @@ class MixinGenerator(
         }
     }
 
-    val IrExtensionKind.methodName: String
+    private val IrExtensionKind.methodName: String
         get() = when (this) {
             is IrFieldGetterExtension -> "get" + name.capitalize()
             is IrFieldSetterExtension -> "set" + name.capitalize()

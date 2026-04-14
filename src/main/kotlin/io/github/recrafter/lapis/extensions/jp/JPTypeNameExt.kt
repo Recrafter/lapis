@@ -1,6 +1,6 @@
 package io.github.recrafter.lapis.extensions.jp
 
-val JPTypeName.defaultValue: String
+val JPTypeName.primitiveDefaultValue: String?
     get() = when (this) {
         JPBoolean -> "false"
         JPByte, JPShort, JPInt -> "0"
@@ -8,7 +8,7 @@ val JPTypeName.defaultValue: String
         JPChar -> "'\\0'"
         JPFloat -> "0f"
         JPDouble -> "0d"
-        else -> "null"
+        else -> null
     }
 
 fun JPTypeName?.orVoid(): JPTypeName =

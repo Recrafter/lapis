@@ -16,5 +16,5 @@ fun KSPCodeGenerator.createResourceFile(
         packageName = file.parent?.replace(File.separatorChar, '.').orEmpty(),
         fileName = file.nameWithoutExtension,
         extensionName = file.extension,
-    ).bufferedWriter().use { it.write(contents + "\n") }
+    ).bufferedWriter().use { it.write(contents.trimEnd() + "\n") }
 }

@@ -2,7 +2,6 @@ package io.github.recrafter.lapis.layers.generator.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.InternalPrefix.ARGUMENT
-import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.layers.lowering.IrModifier
@@ -16,22 +15,14 @@ import io.github.recrafter.lapis.layers.lowering.types.orVoid
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
-sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(val name: String, val builtin: Builtin) {
-
+sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
+    val name: String,
+    val builtin: Builtin,
+) {
     fun generate(typer: BuiltinTyper): KPClass =
         buildKotlinInterface(name) {
             setModifiers(IrModifier.PUBLIC)
-            setVariableTypes(
-                IrTypeVariableName.of(
-                    when (builtin) {
-                        Builtin.Field -> "F"
-                        Builtin.Callable -> "C"
-                        Builtin.Method -> "M"
-                        else -> lapisError("Desc builtin must be field or method")
-                    },
-                    typer(builtin).parameterizedBy(KPStar.asIr())
-                )
-            )
+            setVariableTypes(IrTypeVariableName.of("D", typer(builtin).parameterizedBy(KPStar.asIr())))
         }
 
     abstract fun generateWrapper(dest: KPFileBuilder, wrapper: W, typer: BuiltinTyper)

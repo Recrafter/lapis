@@ -1,16 +1,7 @@
 package io.github.recrafter.lapis.extensions.ks
 
 import io.github.recrafter.lapis.extensions.common.castOrNull
-import io.github.recrafter.lapis.extensions.kp.KPArray
-import io.github.recrafter.lapis.extensions.kp.KPBooleanArray
-import io.github.recrafter.lapis.extensions.kp.KPByteArray
-import io.github.recrafter.lapis.extensions.kp.KPCharArray
-import io.github.recrafter.lapis.extensions.kp.KPDoubleArray
-import io.github.recrafter.lapis.extensions.kp.KPFloatArray
-import io.github.recrafter.lapis.extensions.kp.KPIntArray
-import io.github.recrafter.lapis.extensions.kp.KPLongArray
-import io.github.recrafter.lapis.extensions.kp.KPShortArray
-import io.github.recrafter.lapis.extensions.kp.qualifiedName
+import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ksp.KSPResolver
 import kotlin.reflect.KClass
 

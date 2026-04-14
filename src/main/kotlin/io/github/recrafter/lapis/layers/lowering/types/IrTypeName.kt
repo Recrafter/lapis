@@ -1,9 +1,7 @@
 package io.github.recrafter.lapis.layers.lowering.types
 
-import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.lowering.asIr
 import io.github.recrafter.lapis.layers.lowering.asIrTypeName
 

@@ -19,5 +19,6 @@ inline fun <reified A : Annotation> KSAnnotation.getMemberTypeClassDecl(
     findArgument(property)?.getTypeClassDecl()
 
 fun KSAnnotation.getArgumentType(name: String): KSType? =
-    annotationType.resolve().getClassDecl()?.propertyDeclarations.orEmpty()
-        .find { it.name == name }?.type?.resolve()
+    annotationType.resolve().getClassDecl()
+        ?.propertyDeclarations.orEmpty().find { it.name == name }
+        ?.type?.resolve()

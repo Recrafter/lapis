@@ -1,1 +1,1 @@
-A Kotlin Symbol Processor for Sponge Mixins. Generates boilerplate with compile-time safety and automatically handles Mixin/AW/AT configurations.
+A Kotlin Symbol Processor (KSP) for Sponge Mixins. Built exclusively for Minecraft modding, Lapis focuses on intent-based injections and compile-time safety. It provides a Kotlin-first frontend with a type-safe DSL, leverages a MixinExtras-based backend, and automates the generation of Mixin and AW/AT configurations.

@@ -1,23 +1,22 @@
-package io.github.recrafter.lapis.layers.lowering
+package io.github.recrafter.lapis.layers.lowering.types
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.layers.lowering.models.IrConstructorDesc
 import io.github.recrafter.lapis.layers.lowering.models.IrInvokableDesc
 import io.github.recrafter.lapis.layers.lowering.models.IrMethodDesc
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 import io.github.recrafter.lapis.layers.validator.ConstructorDesc
 import io.github.recrafter.lapis.layers.validator.Desc
 import io.github.recrafter.lapis.layers.validator.FieldDesc
 import io.github.recrafter.lapis.layers.validator.MethodDesc
 
-class JvmDesc(private val type: JPTypeName) {
+class IrJvmType(private val type: JPTypeName) {
 
     override fun toString(): String =
         when (type) {
             is JPClassName -> type.typeDesc
             is JPParameterizedTypeName -> type.rawType().typeDesc
-            is JPArrayTypeName -> "[" + type.componentType().asJvmDesc().toString()
+            is JPArrayTypeName -> "[" + type.componentType().jvmType.toString()
             JPBoolean -> "Z"
             JPByte -> "B"
             JPShort -> "S"
@@ -34,20 +33,20 @@ class JvmDesc(private val type: JPTypeName) {
         get() = "L$internalName;"
 
     companion object {
-        fun of(typeName: IrTypeName): String =
-            typeName.java.asJvmDesc().toString()
+        fun buildDesc(typeName: IrTypeName): String =
+            typeName.java.jvmType.toString()
 
         fun buildSignature(parameterTypeNames: List<IrTypeName>, returnTypeName: IrTypeName?): String = buildString {
             append("(")
-            parameterTypeNames.forEach { append(of(it)) }
+            parameterTypeNames.forEach { append(buildDesc(it)) }
             append(")")
-            append(returnTypeName?.let { of(it) } ?: VOID_NAME)
+            append(returnTypeName?.let { buildDesc(it) } ?: VOID_NAME)
         }
     }
 }
 
-fun JPTypeName.asJvmDesc(): JvmDesc =
-    JvmDesc(this)
+val JPTypeName.jvmType: IrJvmType
+    get() = IrJvmType(this)
 
 private const val CONSTRUCTOR_NAME: String = "<init>"
 private const val VOID_NAME: String = "V"
@@ -59,7 +58,7 @@ fun Desc.getMixinRef(isTarget: Boolean = false): String =
                 append(CONSTRUCTOR_NAME)
             }
             append(
-                JvmDesc.buildSignature(
+                IrJvmType.buildSignature(
                     parameters.map { it.typeName },
                     if (isTarget) returnTypeName else null
                 )
@@ -68,11 +67,11 @@ fun Desc.getMixinRef(isTarget: Boolean = false): String =
 
         is MethodDesc -> buildString {
             if (isTarget) {
-                append(JvmDesc.of(receiverTypeName))
+                append(IrJvmType.buildDesc(receiverTypeName))
             }
             append(targetName)
             append(
-                JvmDesc.buildSignature(
+                IrJvmType.buildSignature(
                     parameters.map { it.typeName },
                     returnTypeName
                 )
@@ -81,11 +80,11 @@ fun Desc.getMixinRef(isTarget: Boolean = false): String =
 
         is FieldDesc -> buildString {
             if (isTarget) {
-                append(JvmDesc.of(receiverTypeName))
+                append(IrJvmType.buildDesc(receiverTypeName))
             }
             append(targetName)
             append(":")
-            append(JvmDesc.of(fieldTypeName))
+            append(IrJvmType.buildDesc(fieldTypeName))
         }
     }
 

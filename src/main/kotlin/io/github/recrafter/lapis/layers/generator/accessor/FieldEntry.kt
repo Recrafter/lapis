@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.layers.generator.accessor
 
-import io.github.recrafter.lapis.layers.lowering.JvmDesc
 import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.layers.lowering.types.IrJvmType
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 class FieldEntry(
@@ -18,7 +18,7 @@ class FieldEntry(
             append(" ")
             append(name)
             append(" ")
-            append(JvmDesc.of(typeName))
+            append(IrJvmType.buildDesc(typeName))
         }
         append("accessible $fieldPart")
         if (removeFinal) {

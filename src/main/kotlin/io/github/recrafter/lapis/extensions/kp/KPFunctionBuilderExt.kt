@@ -6,7 +6,6 @@ import com.squareup.kotlinpoet.ExperimentalKotlinPoetApi
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.generator.builders.Builder
-import io.github.recrafter.lapis.layers.generator.builders.IrKotlinCodeBlock
 import io.github.recrafter.lapis.layers.generator.builders.IrKotlinFunctionBody
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.models.IrParameter

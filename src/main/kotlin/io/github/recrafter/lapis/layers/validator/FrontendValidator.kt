@@ -8,14 +8,12 @@ import io.github.recrafter.lapis.annotations.At
 import io.github.recrafter.lapis.annotations.AtLiteral
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.kp.KPAny
 import io.github.recrafter.lapis.extensions.kp.KPBoolean
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.layers.generator.builders.Remapper
 import io.github.recrafter.lapis.layers.generator.builtins.Builtin
 import io.github.recrafter.lapis.layers.generator.builtins.Builtins
 import io.github.recrafter.lapis.layers.generator.builtins.DescBuiltin
-import io.github.recrafter.lapis.layers.lowering.asIr
 import io.github.recrafter.lapis.layers.lowering.asIrTypeName
 import io.github.recrafter.lapis.layers.parser.*
 import kotlin.contracts.ExperimentalContracts
@@ -422,7 +420,10 @@ class FrontendValidator(
             AtLiteral::long.name -> LongLiteral(kspRequireNotNull(atLiteralLong) { "422" })
             AtLiteral::double.name -> DoubleLiteral(kspRequireNotNull(atLiteralDouble) { "423" })
             AtLiteral::string.name -> StringLiteral(kspRequireNotNull(atLiteralString) { "424" })
-            AtLiteral::`class`.name -> ClassLiteral(kspRequireNotNull(argType.getClassDecl()) { "425" })
+            AtLiteral::`class`.name -> ClassLiteral(kspRequireNotNull(argType.getClassDecl()?.takeNotNothing()) {
+                "425"
+            })
+
             AtLiteral::`null`.name -> NullLiteral
             else -> kspError { "427" }
         }
@@ -458,7 +459,7 @@ class FrontendValidator(
         if (invalidDescriptors.contains(qualifiedName)) {
             kspError { "459" }
         }
-        return validDescriptors[qualifiedName] ?: lapisError("461")
+        return validDescriptors[qualifiedName] ?: lapisError("Failed to find descriptor by $qualifiedName")
     }
 
     private fun validateHookParameter(

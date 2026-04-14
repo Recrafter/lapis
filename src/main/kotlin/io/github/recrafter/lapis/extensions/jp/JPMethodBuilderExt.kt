@@ -3,11 +3,9 @@ package io.github.recrafter.lapis.extensions.jp
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.layers.generator.builders.Builder
-import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.layers.generator.builders.IrJavaMethodBody
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.models.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> JPMethodBuilder.addAnnotation(builder: Builder<JPAnnotationBuilder> = {}) {

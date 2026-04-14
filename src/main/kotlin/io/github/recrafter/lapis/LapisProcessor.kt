@@ -26,9 +26,9 @@ class LapisProcessor(
     private val mixins: MutableMap<String, IrMixin> = mutableMapOf()
 
     override fun process(resolver: KSPResolver): List<KSAnnotated> {
-        logger.setPhase(LapisPhase.BUILTINS)
         val parser = SymbolParser(resolver, logger)
         if (!builtins.isGenerated) {
+            logger.setPhase(LapisPhase.BUILTINS)
             builtins.generate()
             return parser.prepare().run { schemaClassDecls + patchClassDecls }
         }
