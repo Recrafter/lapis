@@ -335,7 +335,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                 }
                 val valueParameter = buildKotlinParameter(valueProperty.name, valueParameter.typeName) {
                     defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(indexProperty)
+                        arg(valueProperty)
                     })
                 }
                 addParameters(listOf(arrayParameter, indexParameter, valueParameter))
@@ -387,6 +387,13 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                     }
                 }
             })
+            val operationArguments = wrapper.parameters.mapIndexed { index, parameter ->
+                if (parameter.name != null) {
+                    namedParameters.first { it.name == parameter.name }
+                } else {
+                    argumentParameters[index]
+                }
+            }
             dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(wrapper.superClassTypeName)
@@ -402,8 +409,8 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                     code_(
                         format = buildString {
                             append("(this as %T).%N.%L(")
-                            if (namedParameters.isNotEmpty()) {
-                                append(namedParameters.joinToString { "%N" })
+                            if (operationArguments.isNotEmpty()) {
+                                append(operationArguments.joinToString { "%N" })
                             }
                             append(")")
                         },
@@ -412,7 +419,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                         arg(wrapper.className)
                         arg(operationParameter)
                         arg(Operation<*>::call)
-                        namedParameters.forEach { arg(it) }
+                        operationArguments.forEach { arg(it) }
                     }
                 }
             })
@@ -488,6 +495,13 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                     })
                 }
             }
+            val operationArguments = wrapper.parameters.mapIndexed { index, parameter ->
+                if (parameter.name != null) {
+                    namedParameters.first { it.name == parameter.name }
+                } else {
+                    argumentParameters[index]
+                }
+            }
             dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(wrapper.superClassTypeName)
@@ -498,8 +512,8 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                         format = buildString {
                             append("(this as %T).%N.%L(")
                             getReceiverFunction?.let { append("%N()") }
-                            if (namedParameters.isNotEmpty()) {
-                                append(namedParameters.joinToString(prefix = ", ") { "%N" })
+                            if (operationArguments.isNotEmpty()) {
+                                append(operationArguments.joinToString(prefix = ", ") { "%N" })
                             }
                             append(")")
                         },
@@ -509,7 +523,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                         arg(operationParameter)
                         arg(Operation<*>::call)
                         getReceiverFunction?.let { arg(it) }
-                        namedParameters.forEach { arg(it) }
+                        operationArguments.forEach { arg(it) }
                     }
                 }
             })
@@ -526,8 +540,8 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                         format = buildString {
                             append("(this as %T).%N.%L(")
                             append("%N")
-                            if (argumentParameters.isNotEmpty()) {
-                                append(argumentParameters.joinToString(prefix = ", ") { "%N" })
+                            if (operationArguments.isNotEmpty()) {
+                                append(operationArguments.joinToString(prefix = ", ") { "%N" })
                             }
                             append(")")
                         },
@@ -537,7 +551,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                         arg(operationParameter)
                         arg(Operation<*>::call)
                         arg(receiverParameter)
-                        argumentParameters.forEach { arg(it) }
+                        operationArguments.forEach { arg(it) }
                     }
                 }
             })
