@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.layers.generator.builtins
+package io.github.recrafter.lapis.layers.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.InternalPrefix.ARGUMENT
@@ -16,18 +16,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
 sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
-    val name: String,
-    val builtin: Builtin,
-) {
-    fun generate(typer: BuiltinTyper): KPClass =
-        buildKotlinInterface(name) {
-            setModifiers(IrModifier.PUBLIC)
-            setVariableTypes(IrTypeVariableName.of("D", typer(builtin).parameterizedBy(KPStar.asIr())))
-        }
+    override val name: String,
+    val builtin: ExternalBuiltin,
+) : Builtin<KPClass> {
 
-    abstract fun generateWrapper(dest: KPFileBuilder, wrapper: W, typer: BuiltinTyper)
-
-    data object FieldGet : DescBuiltin<IrFieldDesc, IrDescFieldGetWrapper>("FieldGet", Builtin.Field) {
+    data object FieldGet : DescBuiltin<IrFieldDesc, IrDescFieldGetWrapper>("FieldGet", ExternalBuiltin.Field) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescFieldGetWrapper, typer: BuiltinTyper) {
             val receiverParameter = wrapper.receiverTypeName?.let {
@@ -87,7 +80,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
         }
     }
 
-    data object FieldSet : DescBuiltin<IrFieldDesc, IrDescFieldSetWrapper>("FieldSet", Builtin.Field) {
+    data object FieldSet : DescBuiltin<IrFieldDesc, IrDescFieldSetWrapper>("FieldSet", ExternalBuiltin.Field) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescFieldSetWrapper, typer: BuiltinTyper) {
             val receiverParameter = wrapper.receiverTypeName?.let {
@@ -176,7 +169,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
         }
     }
 
-    data object ArrayGet : DescBuiltin<IrFieldDesc, IrDescArrayGetWrapper>("ArrayGet", Builtin.Field) {
+    data object ArrayGet : DescBuiltin<IrFieldDesc, IrDescArrayGetWrapper>("ArrayGet", ExternalBuiltin.Field) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescArrayGetWrapper, typer: BuiltinTyper) {
             val arrayParameter = IrParameter(
@@ -250,7 +243,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
         }
     }
 
-    data object ArraySet : DescBuiltin<IrFieldDesc, IrDescArraySetWrapper>("ArraySet", Builtin.Field) {
+    data object ArraySet : DescBuiltin<IrFieldDesc, IrDescArraySetWrapper>("ArraySet", ExternalBuiltin.Field) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescArraySetWrapper, typer: BuiltinTyper) {
             val arrayParameter = IrParameter(
@@ -350,7 +343,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
         }
     }
 
-    data object Body : DescBuiltin<IrInvokableDesc, IrDescBodyWrapper>("Body", Builtin.Method) {
+    data object Body : DescBuiltin<IrInvokableDesc, IrDescBodyWrapper>("Body", ExternalBuiltin.Method) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescBodyWrapper, typer: BuiltinTyper) {
             val namedParameters = wrapper.parameters.mapNotNull { parameter ->
@@ -426,7 +419,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
         }
     }
 
-    data object Call : DescBuiltin<IrInvokableDesc, IrDescCallWrapper>("Call", Builtin.Callable) {
+    data object Call : DescBuiltin<IrInvokableDesc, IrDescCallWrapper>("Call", ExternalBuiltin.Callable) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescCallWrapper, typer: BuiltinTyper) {
             val receiverParameter = wrapper.receiverTypeName?.let {
@@ -583,7 +576,7 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
         }
     }
 
-    data object Cancel : DescBuiltin<IrInvokableDesc, IrDescCancelWrapper>("Cancel", Builtin.Method) {
+    data object Cancel : DescBuiltin<IrInvokableDesc, IrDescCancelWrapper>("Cancel", ExternalBuiltin.Method) {
 
         override fun generateWrapper(dest: KPFileBuilder, wrapper: IrDescCancelWrapper, typer: BuiltinTyper) {
             val callbackParameter = IrParameter(
@@ -621,12 +614,22 @@ sealed class DescBuiltin<D : IrDesc, W : IrDescWrapper>(
                         returnValueParameter?.let { arg(it) }
                     }
                     throw_("%T") {
-                        arg(typer(Builtin.CancelSignal))
+                        arg(typer(InternalBuiltin.CancelSignal))
                     }
                 }
             })
         }
     }
+
+    override val isInternal: Boolean = false
+
+    abstract fun generateWrapper(dest: KPFileBuilder, wrapper: W, typer: BuiltinTyper)
+
+    override fun generate(typer: BuiltinTyper): KPClass =
+        buildKotlinInterface(name) {
+            setModifiers(IrModifier.PUBLIC)
+            setVariableTypes(IrTypeVariableName.of("D", typer(builtin).parameterizedBy(KPStar.asIr())))
+        }
 
     companion object {
         val entries: Array<DescBuiltin<*, *>> = arrayOf(FieldGet, FieldSet, ArrayGet, ArraySet, Body, Call, Cancel)

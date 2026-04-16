@@ -1,16 +1,15 @@
-package io.github.recrafter.lapis.layers.generator.builtins
+package io.github.recrafter.lapis.layers.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.asIr
 import io.github.recrafter.lapis.layers.lowering.models.IrParameter
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeVariableName
 import kotlin.reflect.KProperty
 
-enum class Builtin {
-    Desc {
+enum class ExternalBuiltin : Builtin<KPClass> {
+    Descriptor {
         override fun generate(typer: BuiltinTyper): KPClass =
             buildKotlinInterface(name) {
                 setModifiers(IrModifier.PRIVATE, IrModifier.SEALED)
@@ -30,7 +29,7 @@ enum class Builtin {
                         )
                     )
                 )
-                addSuperInterface(typer(Desc))
+                addSuperInterface(typer(Descriptor))
             }
     },
     Callable {
@@ -43,7 +42,7 @@ enum class Builtin {
                 )
                 setVariableTypes(functionTypeVariableName)
                 setConstructor(listOf(IrParameter("callable", functionTypeVariableName)))
-                addSuperInterface(typer(Desc))
+                addSuperInterface(typer(Descriptor))
             }
     },
     Method {
@@ -91,23 +90,15 @@ enum class Builtin {
                 })
             }
     },
-    CancelSignal {
+    LocalVar {
         override fun generate(typer: BuiltinTyper): KPClass =
-            buildKotlinObject(name) {
-                setModifiers(IrModifier.PUBLIC)
-                setSuperClass(
-                    RuntimeException::class.asIr(),
-                    listOf(
-                        buildKotlinCodeBlock("null"),
-                        buildKotlinCodeBlock("null"),
-                        buildKotlinCodeBlock("false"),
-                        buildKotlinCodeBlock("false"),
-                    )
-                )
-                addFunction(buildKotlinFunction(RuntimeException::fillInStackTrace.name) {
-                    setModifiers(IrModifier.OVERRIDE)
-                    setReturnType(Throwable::class.asIr())
-                    setBody { return_("this") }
+            buildKotlinInterface(name) {
+                setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
+                val localTypeVariableName = IrTypeVariableName.of("T")
+                setVariableTypes(localTypeVariableName)
+                addProperty(buildKotlinProperty("value", localTypeVariableName) {
+                    setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
+                    mutable(true)
                 })
             }
     },
@@ -121,7 +112,7 @@ enum class Builtin {
                     listOf(IrModifier.PUBLIC)
                 )
                 val operationParameter = IrParameter(
-                    "operation".withInternalPrefix(),
+                    "operation",
                     Operation::class.asIr().parameterizedBy(KPBoolean.asIr()),
                     listOf(IrModifier.PRIVATE)
                 )
@@ -146,5 +137,7 @@ enum class Builtin {
             }
     };
 
-    abstract fun generate(typer: BuiltinTyper): KPClass
+    override val isInternal: Boolean = false
+
+    abstract override fun generate(typer: BuiltinTyper): KPClass
 }

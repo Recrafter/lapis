@@ -29,6 +29,9 @@ typealias KPParameter = ParameterSpec
 typealias KPClassBuilder = TypeSpec.Builder
 typealias KPClass = TypeSpec
 
+typealias KPTypeAliasBuilder = TypeAliasSpec.Builder
+typealias KPTypeAlias = TypeAliasSpec
+
 typealias KPFileBuilder = FileSpec.Builder
 typealias KPFile = FileSpec
 
@@ -96,9 +99,11 @@ fun buildKotlinProperty(
     name: String,
     typeName: IrTypeName,
     jvmNamespace: IrClassName? = null,
-    builder: Builder<KPPropertyBuilder> = {}
+    builder: KPPropertyBuilder.(propertyName: String) -> Unit = {}
 ): KPProperty {
-    val initialBuilder = KPProperty.builder(name, typeName.kotlin).apply(builder)
+    val initialBuilder = KPProperty.builder(name, typeName.kotlin).apply {
+        builder(name)
+    }
     val property = initialBuilder.build()
     if (jvmNamespace == null) {
         return property
@@ -160,6 +165,9 @@ fun buildKotlinClass(name: String, builder: Builder<KPClassBuilder> = {}): KPCla
 
 fun buildKotlinObject(name: String, builder: Builder<KPClassBuilder> = {}): KPClass =
     KPClass.objectBuilder(name).apply(builder).build()
+
+fun buildKotlinTypeAlias(name: String, typeName: IrTypeName, builder: Builder<KPTypeAliasBuilder> = {}): KPTypeAlias =
+    KPTypeAlias.builder(name, typeName.kotlin).apply(builder).build()
 
 fun buildKotlinFile(packageName: String, name: String, builder: Builder<KPFileBuilder> = {}): KPFile =
     KPFile.builder(packageName, name)

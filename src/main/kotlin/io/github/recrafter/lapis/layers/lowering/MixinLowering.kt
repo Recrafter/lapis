@@ -7,8 +7,8 @@ import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.layers.generator.builtins.Builtins
-import io.github.recrafter.lapis.layers.generator.builtins.DescBuiltin
+import io.github.recrafter.lapis.layers.builtins.Builtins
+import io.github.recrafter.lapis.layers.builtins.DescBuiltin
 import io.github.recrafter.lapis.layers.lowering.models.*
 import io.github.recrafter.lapis.layers.lowering.types.*
 import io.github.recrafter.lapis.layers.validator.*
