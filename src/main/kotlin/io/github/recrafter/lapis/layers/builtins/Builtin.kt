@@ -6,4 +6,12 @@ sealed interface Builtin<T> {
     val isInternal: Boolean
 
     fun generate(typer: BuiltinTyper): T
+
+    companion object {
+        val entries: List<Builtin<*>> by lazy {
+            TypeAliasBuiltin.entries +
+                SimpleBuiltin.entries +
+                DescBuiltin.entries
+        }
+    }
 }

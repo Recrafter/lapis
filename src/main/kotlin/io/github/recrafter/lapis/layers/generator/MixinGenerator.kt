@@ -25,10 +25,9 @@ import io.github.recrafter.lapis.layers.generator.accessor.FieldEntry
 import io.github.recrafter.lapis.layers.generator.accessor.MethodEntry
 import io.github.recrafter.lapis.layers.generator.builders.Builder
 import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlock
-import io.github.recrafter.lapis.layers.builtins.ExternalBuiltin
+import io.github.recrafter.lapis.layers.builtins.SimpleBuiltin
 import io.github.recrafter.lapis.layers.builtins.Builtins
 import io.github.recrafter.lapis.layers.builtins.DescBuiltin
-import io.github.recrafter.lapis.layers.builtins.InternalBuiltin
 import io.github.recrafter.lapis.layers.lowering.IrModifier
 import io.github.recrafter.lapis.layers.lowering.asIr
 import io.github.recrafter.lapis.layers.lowering.models.*
@@ -429,7 +428,7 @@ class MixinGenerator(
 
                     is IrHookOriginInstanceofArgument -> {
                         buildJavaCodeBlock("new %T(%L, %L)") {
-                            arg(builtins[ExternalBuiltin.Instanceof])
+                            arg(builtins[SimpleBuiltin.Instanceof])
                             arg(valueParameterName)
                             arg(originalParameterName)
                         }
@@ -489,7 +488,7 @@ class MixinGenerator(
                 if (hasCancelArgument) {
                     try_(
                         try_ = invokeHook,
-                        catchingClassName = builtins[InternalBuiltin.CancelSignal],
+                        catchingClassName = builtins[SimpleBuiltin.CancelSignal],
                         catch_ = injection.returnTypeName?.let {
                             { return_(it.javaPrimitiveType?.primitiveDefaultValue ?: "null") }
                         },

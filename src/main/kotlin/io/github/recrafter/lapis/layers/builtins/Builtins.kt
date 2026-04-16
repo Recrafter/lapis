@@ -37,11 +37,12 @@ class Builtins(
             suppressWarnings(
                 KSuppressWarning.RedundantVisibilityModifier,
             )
-            TypeAliasBuiltin.entries.forEach {
-                addTypeAlias(it.generate(::get))
+            val externalBuiltins = Builtin.entries.filter { !it.isInternal }.map { it.generate(::get) }
+            externalBuiltins.filterIsInstance<KPTypeAlias>().forEach {
+                addTypeAlias(it)
             }
             addType(buildKotlinObject(externalClassName.simpleName) {
-                addTypes((ExternalBuiltin.entries + DescBuiltin.entries).map { it.generate(::get) })
+                addTypes(externalBuiltins.filterIsInstance<KPClass>())
             })
         }.writeTo(codeGenerator, KSPDependencies.ALL_FILES)
         isExternalGenerated = true
@@ -50,6 +51,9 @@ class Builtins(
     fun generateInternal() {
         if (isInternalGenerated) {
             lapisError("Internal builtins already generated")
+        }
+        if (requestedInternalBuiltins.isEmpty()) {
+            return
         }
         buildKotlinFile(internalClassName) {
             suppressWarnings(

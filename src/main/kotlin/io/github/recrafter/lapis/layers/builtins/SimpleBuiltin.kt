@@ -8,7 +8,7 @@ import io.github.recrafter.lapis.layers.lowering.models.IrParameter
 import io.github.recrafter.lapis.layers.lowering.types.IrTypeVariableName
 import kotlin.reflect.KProperty
 
-enum class ExternalBuiltin : Builtin<KPClass> {
+enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPClass> {
     Descriptor {
         override fun generate(typer: BuiltinTyper): KPClass =
             buildKotlinInterface(name) {
@@ -135,9 +135,27 @@ enum class ExternalBuiltin : Builtin<KPClass> {
                     }
                 })
             }
+    },
+    CancelSignal(isInternal = true) {
+        override fun generate(typer: BuiltinTyper): KPClass =
+            buildKotlinObject(name) {
+                setModifiers(IrModifier.PUBLIC)
+                setSuperClass(
+                    RuntimeException::class.asIr(),
+                    listOf(
+                        buildKotlinCodeBlock("null"),
+                        buildKotlinCodeBlock("null"),
+                        buildKotlinCodeBlock("false"),
+                        buildKotlinCodeBlock("false"),
+                    )
+                )
+                addFunction(buildKotlinFunction(RuntimeException::fillInStackTrace.name) {
+                    setModifiers(IrModifier.OVERRIDE)
+                    setReturnType(Throwable::class.asIr())
+                    setBody { return_("this") }
+                })
+            }
     };
-
-    override val isInternal: Boolean = false
 
     abstract override fun generate(typer: BuiltinTyper): KPClass
 }

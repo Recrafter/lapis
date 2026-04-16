@@ -11,7 +11,7 @@ import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.KPBoolean
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.layers.generator.builders.Remapper
-import io.github.recrafter.lapis.layers.builtins.ExternalBuiltin
+import io.github.recrafter.lapis.layers.builtins.SimpleBuiltin
 import io.github.recrafter.lapis.layers.builtins.Builtins
 import io.github.recrafter.lapis.layers.builtins.DescBuiltin
 import io.github.recrafter.lapis.layers.lowering.asIrTypeName
@@ -93,7 +93,7 @@ class FrontendValidator(
             }
         }
         val receiverType = schemaTargetClassDecl.asStarProjectedType()
-        if (superClassDecl.isInstance(builtins[ExternalBuiltin.Field])) {
+        if (superClassDecl.isInstance(builtins[SimpleBuiltin.Field])) {
             kspRequire(generic is ParsedTypeDescGeneric) { "99" }
             kspRequireNotNull(generic.type) { "100" }
             if (callable !is PrivateCallable) {
@@ -120,7 +120,7 @@ class FrontendValidator(
             )
         }
         return when {
-            superClassDecl.isInstance(builtins[ExternalBuiltin.Method]) -> {
+            superClassDecl.isInstance(builtins[SimpleBuiltin.Method]) -> {
                 if (callable !is PrivateCallable) {
                     kspRequire(callable is ParsedMethodDescCallable) { "127" }
                 }
@@ -140,7 +140,7 @@ class FrontendValidator(
                 )
             }
 
-            superClassDecl.isInstance(builtins[ExternalBuiltin.Constructor]) -> {
+            superClassDecl.isInstance(builtins[SimpleBuiltin.Constructor]) -> {
                 if (callable !is PrivateCallable) {
                     kspRequire(callable is ParsedConstructorDescCallable) { "147" }
                 }
@@ -165,7 +165,7 @@ class FrontendValidator(
         kspRequireNotNull(side) { "167" }
         kspRequire(classDecl?.run { isAbstract() && !isInner && isClass } == true) { "168" }
         kspRequire(classDecl.typeParameters.isEmpty()) { "169" }
-        kspRequire(superClassDecl?.isInstance(builtins[ExternalBuiltin.Patch]) == true) { "170" }
+        kspRequire(superClassDecl?.isInstance(builtins[SimpleBuiltin.Patch]) == true) { "170" }
         val schema = validSchemas[schemaClassDecl.qualifiedName?.asString()]
         kspRequire(superGenericClassDecl.isSame(schema?.targetClassDecl)) { "172" }
         return Patch(
@@ -489,7 +489,7 @@ class FrontendValidator(
                     }
 
                     At.Instanceof -> {
-                        kspRequire(type.getClassDecl()?.isInstance(builtins[ExternalBuiltin.Instanceof]) == true) { "491" }
+                        kspRequire(type.getClassDecl()?.isInstance(builtins[SimpleBuiltin.Instanceof]) == true) { "491" }
                         HookOriginInstanceofParameter()
                     }
 
