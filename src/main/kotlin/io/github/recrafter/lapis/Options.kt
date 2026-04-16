@@ -11,6 +11,6 @@ data class Options(
     val accessWidenerConfigName: String? = null,
     val accessTransformerConfigName: String? = null,
 ) {
-    val mixinPackageName: String get() = "$packageName.mixin"
     val generatedPackageName: String get() = "$packageName.generated"
+    val mixinPackageName: String get() = "$generatedPackageName.mixin"
 }
