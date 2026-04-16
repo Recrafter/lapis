@@ -500,17 +500,17 @@ class MixinGenerator(
         }
 
     private fun generateMixinExtension(mixin: IrMixin, extension: IrExtension) {
-        buildJavaFile(extension.className) {
-            buildJavaInterface(extension.className.simpleName) {
+        buildKotlinFile(extension.className) {
+            addType(buildKotlinInterface(extension.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
-                addMethods(extension.kinds.map { method ->
-                    buildJavaMethod(method.methodName) {
+                addFunctions(extension.kinds.map { method ->
+                    buildKotlinFunction(method.methodName) {
                         setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                         setParameters(method.parameters)
                         setReturnType(method.returnTypeName)
                     }
                 })
-            }
+            })
         }.writeTo(codeGenerator, listOfNotNull(mixin.containingFile).toDependencies())
 
         extensionProperties += extension.kinds.filterIsInstance<IrFieldGetterExtension>().map { getter ->
