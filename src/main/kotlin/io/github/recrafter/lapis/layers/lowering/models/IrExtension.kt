@@ -14,17 +14,17 @@ sealed class IrExtensionKind(
     val returnTypeName: IrTypeName?,
 )
 
-class IrFieldGetterExtension(
+class IrPropertyGetterExtension(
     name: String,
     val typeName: IrTypeName,
 ) : IrExtensionKind(name, emptyList(), typeName)
 
-class IrFieldSetterExtension(
+class IrPropertySetterExtension(
     name: String,
     val typeName: IrTypeName,
-) : IrExtensionKind(name, listOf(IrParameter("newValue", typeName)), null)
+) : IrExtensionKind(name, listOf(IrSetterParameter(typeName)), null)
 
-class IrMethodExtension(
+class IrFunctionCallExtension(
     name: String,
     parameters: List<IrParameter>,
     returnTypeName: IrTypeName?,

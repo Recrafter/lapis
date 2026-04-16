@@ -171,9 +171,9 @@ class MixinGenerator(
                                 arg(getOrInitPatchMethod)
                                 arg(
                                     when (method) {
-                                        is IrFieldGetterExtension -> "get" + method.name.capitalize()
-                                        is IrFieldSetterExtension -> "set" + method.name.capitalize()
-                                        is IrMethodExtension -> method.name
+                                        is IrPropertyGetterExtension -> "get" + method.name.capitalize()
+                                        is IrPropertySetterExtension -> "set" + method.name.capitalize()
+                                        is IrFunctionCallExtension -> method.name
                                     }
                                 )
                                 arg(method.parameters.joinToString { it.name })
@@ -513,7 +513,7 @@ class MixinGenerator(
             })
         }.writeTo(codeGenerator, listOfNotNull(mixin.containingFile).toDependencies())
 
-        extensionProperties += extension.kinds.filterIsInstance<IrFieldGetterExtension>().map { getter ->
+        extensionProperties += extension.kinds.filterIsInstance<IrPropertyGetterExtension>().map { getter ->
             buildKotlinProperty(getter.name, getter.typeName) {
                 setReceiverType(mixin.targetClassName)
                 setGetter {
@@ -525,7 +525,7 @@ class MixinGenerator(
                         }
                     }
                 }
-                extension.kinds.find { it is IrFieldSetterExtension && it.name == getter.name }?.let { setter ->
+                extension.kinds.find { it is IrPropertySetterExtension && it.name == getter.name }?.let { setter ->
                     setSetter {
                         setModifiers(IrModifier.INLINE)
                         setParameters(setter.parameters)
@@ -540,7 +540,7 @@ class MixinGenerator(
                 }
             }
         }
-        extensionFunctions += extension.kinds.filterIsInstance<IrMethodExtension>().map { method ->
+        extensionFunctions += extension.kinds.filterIsInstance<IrFunctionCallExtension>().map { method ->
             buildKotlinFunction(method.name) {
                 setModifiers(IrModifier.INLINE)
                 setReceiverType(mixin.targetClassName)
@@ -684,9 +684,9 @@ class MixinGenerator(
 
     private val IrExtensionKind.methodName: String
         get() = when (this) {
-            is IrFieldGetterExtension -> "get" + name.capitalize()
-            is IrFieldSetterExtension -> "set" + name.capitalize()
-            is IrMethodExtension -> name
+            is IrPropertyGetterExtension -> "get" + name.capitalize()
+            is IrPropertySetterExtension -> "set" + name.capitalize()
+            is IrFunctionCallExtension -> name
         }.withInternalPrefix(options.modId)
 }
 

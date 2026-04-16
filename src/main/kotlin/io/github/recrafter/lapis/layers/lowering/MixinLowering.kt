@@ -113,14 +113,14 @@ class MixinLowering(
             kinds = buildList {
                 patch.sharedProperties.forEach { property ->
                     add(
-                        IrFieldGetterExtension(
+                        IrPropertyGetterExtension(
                             name = property.name,
                             typeName = property.typeName,
                         )
                     )
                     if (property.isMutable) {
                         add(
-                            IrFieldSetterExtension(
+                            IrPropertySetterExtension(
                                 name = property.name,
                                 typeName = property.typeName,
                             )
@@ -128,7 +128,7 @@ class MixinLowering(
                     }
                 }
                 addAll(patch.sharedFunctions.map { function ->
-                    IrMethodExtension(
+                    IrFunctionCallExtension(
                         name = function.name,
                         parameters = function.parameters.asIr(),
                         returnTypeName = function.returnTypeName,
