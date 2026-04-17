@@ -11,7 +11,8 @@ sealed interface Builtin<T> {
         val entries: List<Builtin<*>> by lazy {
             TypeAliasBuiltin.entries +
                 SimpleBuiltin.entries +
-                DescBuiltin.entries
+                DescBuiltin.entries +
+                LocalVarBuiltin.entries
         }
     }
 }
