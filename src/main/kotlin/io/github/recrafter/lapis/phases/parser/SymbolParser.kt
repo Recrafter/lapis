@@ -1,0 +1,511 @@
+package io.github.recrafter.lapis.phases.parser
+
+import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.impl.symbol.kotlin.KSClassDeclarationImpl
+import com.google.devtools.ksp.impl.symbol.kotlin.KSFunctionDeclarationImpl
+import com.google.devtools.ksp.impl.symbol.kotlin.KSPropertyDeclarationJavaImpl
+import com.google.devtools.ksp.isAbstract
+import com.google.devtools.ksp.isConstructor
+import com.google.devtools.ksp.isPublic
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.*
+import com.squareup.kotlinpoet.ksp.toClassName
+import io.github.recrafter.lapis.LapisLogger
+import io.github.recrafter.lapis.annotations.*
+import io.github.recrafter.lapis.annotations.Origin
+import io.github.recrafter.lapis.extensions.common.castOrNull
+import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.ks.*
+import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
+import io.github.recrafter.lapis.phases.lowering.asIr
+import ksp.com.intellij.psi.PsiElement
+import ksp.com.intellij.psi.util.PsiTreeUtil
+import ksp.org.jetbrains.kotlin.analysis.api.KaImplementationDetail
+import ksp.org.jetbrains.kotlin.analysis.api.KaSession
+import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
+import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaErrorCallInfo
+import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaSuccessCallInfo
+import ksp.org.jetbrains.kotlin.analysis.api.session.KaSessionProvider
+import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
+import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
+import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
+import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaJavaFieldSymbol
+import ksp.org.jetbrains.kotlin.analysis.api.types.KaClassType
+import ksp.org.jetbrains.kotlin.psi.*
+import kotlin.reflect.KClass
+import kotlin.reflect.KProperty1
+
+class SymbolParser(
+    private val resolver: Resolver,
+    private val types: KSTypes,
+    @Suppress("unused") private val logger: LapisLogger,
+) {
+    fun prepare(): ParserPrepareResult =
+        ParserPrepareResult(
+            resolver
+                .getSymbolsAnnotatedWith<Schema>()
+                .filterIsInstance<KSClassDeclaration>()
+                .filter { symbol ->
+                    val parent = symbol.parentDeclaration
+                    parent == null || !parent.hasAnnotation<Schema>()
+                },
+            resolver
+                .getSymbolsAnnotatedWith<Patch>()
+                .filterIsInstance<KSClassDeclaration>(),
+        )
+
+    fun parse(): ParserResult =
+        prepare().run {
+            ParserResult(
+                schemas = schemaClassDeclarations.map { parseSchema(it) },
+                patches = patchClassDeclarations.map { parsePatch(it) },
+            )
+        }
+
+    private fun parseSchema(symbol: KSClassDeclaration, parentBinaryName: String? = null): ParsedSchema {
+        val (nestedSchemas, descriptors) = symbol.declarations
+            .filterIsInstance<KSClassDeclaration>()
+            .partition { it.getSuperClassTypeOrNull() == null }
+        val accessAnnotation = symbol.findAnnotation<Access>()
+        val accessTarget = accessAnnotation?.getArgumentValue(Access::target)
+        val explicitTarget = symbol.findAnnotation<Schema>()?.getArgumentValue(Schema::target)?.toClassDeclaration()
+        val (targetBinaryName, targetQualifiedName) = when {
+            parentBinaryName != null && accessTarget != null -> {
+                val innerName = accessTarget.removePrefix(".")
+                parentBinaryName + "$" + innerName to parentBinaryName + "." + innerName
+            }
+
+            accessTarget != null -> accessTarget to accessTarget
+            explicitTarget?.isValid == true -> {
+                explicitTarget.toClassName().asIr().run {
+                    binaryName to qualifiedName
+                }
+            }
+
+            else -> null to null
+        }
+        return ParsedSchema(
+            symbol = symbol,
+            classDeclaration = symbol,
+            targetClassDeclaration = targetQualifiedName?.let {
+                resolver.getClassDeclarationByName(targetQualifiedName)
+            },
+            targetBinaryName = targetBinaryName,
+            hasAccess = accessTarget != null,
+            unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
+            descriptors = descriptors.map { parseDescriptor(it) },
+            nestedSchemas = nestedSchemas.map { parseSchema(it, targetBinaryName) },
+        )
+    }
+
+    private fun parseDescriptor(classDeclaration: KSClassDeclaration): ParsedDescriptor {
+        val accessAnnotation = classDeclaration.findAnnotation<Access>()
+        val superClassType = classDeclaration.getSuperClassTypeOrNull()
+        val ktSuperTypeCallEntry = classDeclaration
+            .castOrNull<KSClassDeclarationImpl>()
+            ?.ktDeclarationSymbol
+            ?.castOrNull<KaClassSymbol>()
+            ?.psi
+            ?.castOrNull<KtClassOrObject>()
+            ?.superTypeListEntries
+            ?.filterIsInstance<KtSuperTypeCallEntry>()
+            ?.firstOrNull()
+        return ParsedDescriptor(
+            symbol = classDeclaration,
+
+            name = classDeclaration.name,
+            classDeclaration = classDeclaration,
+            hasStaticAnnotation = classDeclaration.hasAnnotation<Static>(),
+            hasAccessAnnotation = accessAnnotation != null,
+            unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
+
+            generic = parseDescriptorGeneric(
+                superClassType,
+                ktSuperTypeCallEntry
+                    ?.typeArguments
+                    ?.firstOrNull()
+                    ?.typeReference
+                    ?.typeElement
+                    ?.castOrNull<KtFunctionType>()
+            ),
+            callable = parseDescriptorCallable(ktSuperTypeCallEntry),
+            superClassDeclaration = superClassType?.toClassDeclaration(),
+        )
+    }
+
+    private fun parseDescriptorGeneric(
+        superClassType: KSType?,
+        ktFunctionType: KtFunctionType?
+    ): ParsedDescriptorGeneric {
+        val superClassGenericType = superClassType?.genericTypes?.firstOrNull()
+        return if (superClassGenericType?.isFunctionType == true) {
+            val functionGenericTypes = superClassGenericType.genericTypes
+            val receiverType = if (ktFunctionType?.receiver != null) functionGenericTypes.firstOrNull() else null
+            ParsedFunctionTypeDescriptorGeneric(
+                receiverType = receiverType,
+                parameters = functionGenericTypes
+                    .drop(
+                        if (receiverType != null) 1
+                        else 0
+                    )
+                    .dropLast(1)
+                    .mapIndexed { index, type ->
+                        ParsedParameter(
+                            type = type,
+                            name = ktFunctionType?.parameters?.getOrNull(index)?.name,
+                        )
+                    },
+                returnType = functionGenericTypes.lastOrNull()?.takeNotUnit()
+            )
+        } else {
+            ParsedTypeDescriptorGeneric(
+                type = superClassGenericType,
+                arrayComponentType = superClassGenericType?.findArrayComponentType()
+            )
+        }
+    }
+
+    private fun parseDescriptorCallable(ktSuperTypeCallEntry: KtSuperTypeCallEntry?): ParsedDescriptorCallable? {
+        ktSuperTypeCallEntry?.useAnalysis {
+            it.typeReference?.type?.castOrNull<KaClassType>()?.typeArguments?.firstOrNull()?.type
+        }
+        return ktSuperTypeCallEntry
+            ?.getChildOfType<KtValueArgumentList>()
+            ?.arguments
+            ?.firstOrNull()
+            ?.getArgumentExpression()
+            ?.castOrNull<KtCallableReferenceExpression>()
+            ?.useAnalysis { callable ->
+                val callInfo = callable.resolveToCall()
+                if (callInfo is KaErrorCallInfo && callInfo.diagnostic.factoryName == "INVISIBLE_REFERENCE") {
+                    return@useAnalysis InvisibleCallableReference(callable.callableReference.text)
+                }
+                val successCallInfo = callInfo as? KaSuccessCallInfo ?: return@useAnalysis null
+                val call = successCallInfo.call as? KaCallableMemberCall<*, *> ?: return@useAnalysis null
+                val symbol = call.partiallyAppliedSymbol.signature.symbol
+                val containingClassSymbol = symbol.containingSymbol as? KaClassSymbol
+                val receiverClassDecl = containingClassSymbol?.let { KSClassDeclarationImpl.getCached(it) }
+                when (symbol) {
+                    is KaConstructorSymbol -> {
+                        val declaration = KSFunctionDeclarationImpl.getCached(symbol)
+                        ParsedConstructorDescriptorCallable(
+                            receiverClassDeclaration = receiverClassDecl,
+                            parameters = declaration.parameters.map {
+                                ParsedParameter(it.type.resolve(), it.name?.asString())
+                            },
+                            returnType = declaration.getReturnTypeOrNull(),
+                        )
+                    }
+
+                    is KaFunctionSymbol -> {
+                        val declaration = KSFunctionDeclarationImpl.getCached(symbol)
+                        ParsedMethodDescriptorCallable(
+                            receiverClassDeclaration = receiverClassDecl,
+                            name = declaration.name,
+                            parameters = declaration.parameters.map {
+                                ParsedParameter(it.type.resolve(), it.name?.asString())
+                            },
+                            returnType = declaration.getReturnTypeOrNull(),
+                        )
+                    }
+
+                    is KaJavaFieldSymbol -> {
+                        val declaration = KSPropertyDeclarationJavaImpl.getCached(symbol)
+                        ParsedFieldDescriptorCallable(
+                            receiverClassDeclaration = receiverClassDecl,
+                            name = declaration.name,
+                            type = declaration.type.resolve(),
+                        )
+                    }
+
+                    else -> null
+                }
+            }
+    }
+
+    private fun parsePatch(symbol: KSAnnotated): ParsedPatch {
+        val classDeclaration = symbol.castOrNull<KSClassDeclaration>()
+        val superClassType = classDeclaration?.getSuperClassTypeOrNull()
+        val patchAnnotation = symbol.findAnnotation<Patch>()
+        return ParsedPatch(
+            symbol = symbol,
+
+            name = classDeclaration?.name,
+            side = patchAnnotation?.getArgumentValue(Patch::side),
+            classDeclaration = classDeclaration,
+
+            superClassDeclaration = superClassType?.toClassDeclaration(),
+            superGenericClassDeclaration = superClassType?.getGenericTypeOrNull()?.toClassDeclaration(),
+
+            schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
+
+            properties = classDeclaration?.propertyDeclarations?.map { parsePatchProperty(it) }.orEmpty(),
+            functions = listOfNotNull(
+                classDeclaration,
+                classDeclaration?.findCompanionObject(),
+            ).flatMap { classDeclaration ->
+                classDeclaration.functionDeclarations
+                    .filter { !it.isConstructor() }
+                    .map { parsePatchFunction(it) }
+            },
+        )
+    }
+
+    private fun parsePatchProperty(propertyDeclaration: KSPropertyDeclaration): ParsedPatchProperty =
+        ParsedPatchProperty(
+            symbol = propertyDeclaration,
+
+            name = propertyDeclaration.name,
+            type = propertyDeclaration.type.resolve(),
+            isPublic = propertyDeclaration.isPublic(),
+            isAbstract = propertyDeclaration.isAbstract(),
+            isExtension = propertyDeclaration.isExtension,
+            isMutable = propertyDeclaration.isMutable &&
+                propertyDeclaration.setter?.modifiers?.contains(Modifier.PUBLIC) == true,
+        )
+
+    private fun parsePatchFunction(functionDeclaration: KSFunctionDeclaration): ParsedPatchFunction {
+        val atConstructorHeadAnnotation = functionDeclaration.findAnnotation<AtConstructorHead>()
+        val atLocalAnnotation = functionDeclaration.findAnnotation<AtLocal>()
+        val atLocalLocalAnnotation = atLocalAnnotation?.getArgumentValue(AtLocal::local)
+        val atInstanceofAnnotation = functionDeclaration.findAnnotation<AtInstanceof>()
+        val atReturnAnnotation = functionDeclaration.findAnnotation<AtReturn>()
+        val atLiteralAnnotation = functionDeclaration.findAnnotation<AtLiteral>()
+        val atLiteralZeroAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::zero, explicit = true)
+        val atLiteralClassType = atLiteralAnnotation?.getArgumentValue(AtLiteral::`class`, explicit = true)
+        val atLiteralNullAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::`null`, explicit = true)
+        val atFieldAnnotation = functionDeclaration.findAnnotation<AtField>()
+        val atArrayAnnotation = functionDeclaration.findAnnotation<AtArray>()
+        val atCallAnnotation = functionDeclaration.findAnnotation<AtCall>()
+        val hookAnnotation = functionDeclaration.findAnnotation<Hook>()
+        return ParsedPatchFunction(
+            symbol = functionDeclaration,
+
+            name = functionDeclaration.name,
+            parameters = functionDeclaration.parameters.map { parsePatchFunctionParameter(it) },
+            returnType = functionDeclaration.getReturnTypeOrNull(),
+            hasTypeParameters = functionDeclaration.typeParameters.isNotEmpty(),
+
+            isPublic = functionDeclaration.isPublic(),
+            isAbstract = functionDeclaration.isAbstract,
+            isExtension = functionDeclaration.isExtension,
+
+            fromCompanionObject = functionDeclaration.parentDeclaration.let {
+                it is KSClassDeclaration && it.isCompanionObject
+            },
+
+            hasHookAnnotation = hookAnnotation != null,
+            hookDescriptorClassDeclaration = hookAnnotation?.getArgumentValue(Hook::desc)?.toClassDeclaration(),
+            hookAt = functionDeclaration.findAnnotation<Hook>()?.getArgumentValue(Hook::at),
+
+            hasAtConstructorHeadAnnotation = atConstructorHeadAnnotation != null,
+            atConstructorHeadPhase = atConstructorHeadAnnotation
+                ?.getArgumentValue(AtConstructorHead::phase),
+
+            hasAtLocalAnnotation = atLocalAnnotation != null,
+            atLocalOp = atLocalAnnotation?.getArgumentValue(AtLocal::op),
+            atLocalType = functionDeclaration.findAnnotation<AtLocal>()?.getArgumentValue(AtLocal::type),
+            atLocalName = atLocalLocalAnnotation?.getArgumentValue(Local::name, explicit = true),
+            atLocalOrdinal = atLocalLocalAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
+            atLocalOpOrdinals = atLocalAnnotation?.getArgumentValue(AtLocal::ordinal).orEmpty(),
+
+            hasAtInstanceofAnnotation = atInstanceofAnnotation != null,
+            atInstanceofTypeClassDeclaration = functionDeclaration
+                .findAnnotation<AtInstanceof>()
+                ?.getArgumentValue(AtInstanceof::type)
+                ?.toClassDeclaration(),
+            atInstanceofOrdinals = atInstanceofAnnotation
+                ?.getArgumentValue(AtInstanceof::ordinal).orEmpty(),
+
+            hasAtReturnAnnotation = atReturnAnnotation != null,
+            atReturnOrdinals = atReturnAnnotation?.getArgumentValue(AtReturn::ordinal).orEmpty(),
+
+            hasAtLiteralAnnotation = atLiteralAnnotation != null,
+            atLiteralZero = atLiteralZeroAnnotation,
+            atLiteralZeroConditions = atLiteralZeroAnnotation?.getArgumentValue(Zero::conditions).orEmpty(),
+            atLiteralInt = atLiteralAnnotation?.getArgumentValue(AtLiteral::int, explicit = true),
+            atLiteralFloat = atLiteralAnnotation?.getArgumentValue(AtLiteral::float, explicit = true),
+            atLiteralLong = atLiteralAnnotation?.getArgumentValue(AtLiteral::long, explicit = true),
+            atLiteralDouble = atLiteralAnnotation?.getArgumentValue(AtLiteral::double, explicit = true),
+            atLiteralString = atLiteralAnnotation?.getArgumentValue(AtLiteral::string, explicit = true),
+            atLiteralClass = atLiteralClassType,
+            atLiteralClassDeclaration = atLiteralClassType?.toClassDeclaration(),
+            atLiteralNull = atLiteralNullAnnotation,
+            atLiteralOrdinals = atLiteralAnnotation?.getArgumentValue(AtLiteral::ordinal).orEmpty(),
+
+            hasAtFieldAnnotation = atFieldAnnotation != null,
+            atFieldOp = atFieldAnnotation?.getArgumentValue(AtField::op),
+            atFieldDescriptorClassDeclaration = functionDeclaration
+                .findAnnotation<AtField>()
+                ?.getArgumentValue(AtField::desc)
+                ?.toClassDeclaration(),
+            atFieldOrdinals = atFieldAnnotation?.getArgumentValue(AtField::ordinal).orEmpty(),
+
+            hasAtArrayAnnotation = atArrayAnnotation != null,
+            atArrayOp = atArrayAnnotation?.getArgumentValue(AtArray::op),
+            atArrayDescriptorClassDeclaration = functionDeclaration
+                .findAnnotation<AtArray>()
+                ?.getArgumentValue(AtArray::desc)
+                ?.toClassDeclaration(),
+            atArrayOrdinals = atArrayAnnotation?.getArgumentValue(AtArray::ordinal).orEmpty(),
+
+            hasAtCallAnnotation = atCallAnnotation != null,
+            atCallDescriptorClassDeclaration = functionDeclaration
+                .findAnnotation<AtCall>()
+                ?.getArgumentValue(AtCall::desc)
+                ?.toClassDeclaration(),
+            atCallOrdinals = atCallAnnotation?.getArgumentValue(AtCall::ordinal).orEmpty(),
+        )
+    }
+
+    private fun parsePatchFunctionParameter(parameter: KSValueParameter): ParsedPatchFunctionParameter {
+        val name = parameter.name?.asString()
+        val type = parameter.type.resolve()
+        val originAnnotation = parameter.findAnnotation<Origin>()
+        val cancelAnnotation = parameter.findAnnotation<Cancel>()
+        val paramAnnotation = parameter.findAnnotation<Param>()
+        val localAnnotation = parameter.findAnnotation<Local>()
+        val shareAnnotation = parameter.findAnnotation<Share>()
+        return ParsedPatchFunctionParameter(
+            symbol = parameter,
+
+            name = name,
+            type = type,
+            hasDefaultArgument = parameter.hasDefault,
+
+            hasOriginAnnotation = originAnnotation != null,
+            originGenericClassDeclaration = if (originAnnotation != null) {
+                type.getGenericTypeOrNull()?.toClassDeclaration()
+            } else null,
+
+            hasCancelAnnotation = cancelAnnotation != null,
+            cancelGenericClassDeclaration = if (cancelAnnotation != null) {
+                type.getGenericTypeOrNull()?.toClassDeclaration()
+            } else null,
+
+            hasOrdinalAnnotation = parameter.hasAnnotation<Ordinal>(),
+
+            hasParamAnnotation = paramAnnotation != null,
+            paramName = paramAnnotation?.getArgumentValue(Param::name) ?: name,
+
+            hasLocalAnnotation = localAnnotation != null,
+            localName = localAnnotation?.getArgumentValue(Local::name, explicit = true),
+            localOrdinal = localAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
+
+            hasShareAnnotation = shareAnnotation != null,
+            shareKey = shareAnnotation?.getArgumentValue(Share::key) ?: name,
+            isShareExported = shareAnnotation?.getArgumentValue(Share::exported) == true,
+        )
+    }
+
+    fun KSType.takeNotUnit(): KSType? =
+        takeIf { it != types.unit }
+
+    fun KSClassDeclaration.getSuperClassTypeOrNull(): KSType? =
+        superTypes
+            .map { it.resolve() }
+            .find { it.takeIf { it != types.any }?.toClassDeclaration()?.isClass == true }
+
+    fun KSFunctionDeclaration.getReturnTypeOrNull(): KSType? =
+        returnType?.resolve()?.takeNotUnit()
+
+    fun KSType.findArrayComponentType(): KSType? =
+        when (declaration.qualifiedName?.asString()) {
+            KPArray.qualifiedName -> arguments.firstOrNull()?.type?.resolve()
+            KPBooleanArray.qualifiedName -> types.boolean
+            KPByteArray.qualifiedName -> types.byte
+            KPShortArray.qualifiedName -> types.short
+            KPIntArray.qualifiedName -> types.int
+            KPLongArray.qualifiedName -> types.long
+            KPCharArray.qualifiedName -> types.char
+            KPFloatArray.qualifiedName -> types.float
+            KPDoubleArray.qualifiedName -> types.double
+            else -> null
+        }
+
+    private inline fun <reified A : Annotation> KSAnnotation.findArgumentValue(
+        property: KProperty1<A, *>,
+        explicit: Boolean,
+    ): KSAnnotationArgumentValue? =
+        (if (explicit) explicitArguments else arguments)
+            .find { it.name?.asString() == property.name }
+            ?.value
+            ?.let { KSAnnotationArgumentValue(it, keepDefault = explicit) }
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Boolean>,
+        explicit: Boolean = false,
+    ): Boolean? =
+        findArgumentValue(property, explicit)?.asBoolean()
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Int>,
+        explicit: Boolean = false,
+    ): Int? =
+        findArgumentValue(property, explicit)?.asInt()
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Long>,
+        explicit: Boolean = false,
+    ): Long? =
+        findArgumentValue(property, explicit)?.asLong()
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Float>,
+        explicit: Boolean = false,
+    ): Float? =
+        findArgumentValue(property, explicit)?.asFloat()
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Double>,
+        explicit: Boolean = false,
+    ): Double? =
+        findArgumentValue(property, explicit)?.asDouble()
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, String>,
+        explicit: Boolean = false,
+    ): String? =
+        findArgumentValue(property, explicit)?.asString()
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, KClass<*>>,
+        explicit: Boolean = false,
+    ): KSType? =
+        findArgumentValue(property, explicit)?.asKClass(types)
+
+    private inline fun <reified A : Annotation, reified E : Enum<E>> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, E>,
+        explicit: Boolean = false,
+    ): E? =
+        findArgumentValue(property, explicit)?.asEnum()
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Annotation>,
+        explicit: Boolean = false,
+    ): KSAnnotation? =
+        findArgumentValue(property, explicit)?.asAnnotation()
+
+    @JvmName("getIntArrayArgumentValue")
+    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, IntArray>,
+        explicit: Boolean = false,
+    ): List<Int>? =
+        findArgumentValue(property, explicit)?.asArray()?.mapNotNull { it.asInt() }
+
+    @JvmName("getEnumArrayArgumentValue")
+    private inline fun <reified A : Annotation, reified E : Enum<E>> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Array<out E>>,
+        explicit: Boolean = false,
+    ): List<E>? =
+        findArgumentValue(property, explicit)?.asArray()?.mapNotNull { it.asEnum() }
+}
+
+inline fun <reified T : PsiElement> PsiElement.getChildOfType(): T? =
+    PsiTreeUtil.getChildOfType(this, T::class.java)
+
+@OptIn(KaImplementationDetail::class)
+inline fun <T : KtElement, R> T.useAnalysis(crossinline action: KaSession.(T) -> R): R =
+    KaSessionProvider.getInstance(project).analyze(this) {
+        action(this@useAnalysis)
+    }

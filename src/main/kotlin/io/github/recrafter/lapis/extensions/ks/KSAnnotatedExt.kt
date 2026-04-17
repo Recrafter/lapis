@@ -1,18 +1,13 @@
 package io.github.recrafter.lapis.extensions.ks
 
-import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.getAnnotationsByType
-import com.google.devtools.ksp.isAnnotationPresent
-import kotlin.reflect.KClass
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
 
-@OptIn(KspExperimental::class)
-fun KSAnnotated.hasAnnotation(annotation: KClass<out Annotation>): Boolean =
-    isAnnotationPresent(annotation)
+inline fun <reified A : Annotation> KSAnnotated.findAnnotation(): KSAnnotation? =
+    annotations.find {
+        it.shortName.getShortName() == A::class.simpleName &&
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == A::class.qualifiedName
+    }
 
-@OptIn(KspExperimental::class)
 inline fun <reified A : Annotation> KSAnnotated.hasAnnotation(): Boolean =
-    hasAnnotation(A::class)
-
-@OptIn(KspExperimental::class)
-inline fun <reified A : Annotation> KSAnnotated.getAnnotationOrNull(): A? =
-    getAnnotationsByType(A::class).firstOrNull()
+    findAnnotation<A>() != null

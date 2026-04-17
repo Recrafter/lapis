@@ -2,10 +2,10 @@ package io.github.recrafter.lapis.extensions.kp
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.layers.lowering.IrModifier
-import io.github.recrafter.lapis.layers.lowering.models.IrParameter
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeVariableName
+import io.github.recrafter.lapis.phases.lowering.IrModifier
+import io.github.recrafter.lapis.phases.lowering.models.IrParameter
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 
 fun KPClassBuilder.setConstructor(parameters: List<IrParameter>) {
     primaryConstructor(buildKotlinConstructor {
@@ -19,6 +19,10 @@ fun KPClassBuilder.setConstructor(parameters: List<IrParameter>) {
             }
         })
     }
+}
+
+fun KPClassBuilder.setConstructor(vararg parameters: IrParameter) {
+    setConstructor(parameters.toList())
 }
 
 fun KPClassBuilder.setSuperClass(typeName: IrTypeName, constructorParameters: List<KPCodeBlock> = emptyList()) {

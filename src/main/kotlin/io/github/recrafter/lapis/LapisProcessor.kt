@@ -1,43 +1,45 @@
 package io.github.recrafter.lapis
 
+import com.google.devtools.ksp.processing.CodeGenerator
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
-import io.github.recrafter.lapis.extensions.ks.KSAnnotated
-import io.github.recrafter.lapis.extensions.ksp.KSPCodeGenerator
-import io.github.recrafter.lapis.extensions.ksp.KSPResolver
-import io.github.recrafter.lapis.layers.generator.MixinGenerator
-import io.github.recrafter.lapis.layers.builtins.Builtins
-import io.github.recrafter.lapis.layers.lowering.MixinLowering
-import io.github.recrafter.lapis.layers.lowering.models.IrMixin
-import io.github.recrafter.lapis.layers.lowering.models.IrSchema
-import io.github.recrafter.lapis.layers.parser.SymbolParser
-import io.github.recrafter.lapis.layers.validator.FrontendValidator
+import com.google.devtools.ksp.symbol.KSAnnotated
+import io.github.recrafter.lapis.phases.LapisPhase
+import io.github.recrafter.lapis.phases.builtins.Builtins
+import io.github.recrafter.lapis.phases.generator.MixinGenerator
+import io.github.recrafter.lapis.phases.lowering.MixinLowering
+import io.github.recrafter.lapis.phases.lowering.models.IrMixin
+import io.github.recrafter.lapis.phases.lowering.models.IrSchema
+import io.github.recrafter.lapis.phases.parser.KSTypes
+import io.github.recrafter.lapis.phases.parser.SymbolParser
+import io.github.recrafter.lapis.phases.validator.FrontendValidator
 
 class LapisProcessor(
     private val options: Options,
-    private val codeGenerator: KSPCodeGenerator,
+    private val codeGenerator: CodeGenerator,
     private val logger: LapisLogger,
 ) : SymbolProcessor {
 
     private val builtins: Builtins = Builtins(options.generatedPackageName, codeGenerator)
-    private val frontendValidator: FrontendValidator = FrontendValidator(logger, options, builtins)
     private val mixinLowering: MixinLowering = MixinLowering(options, builtins, logger)
 
     private val schemas: MutableMap<String, IrSchema> = mutableMapOf()
     private val mixins: MutableMap<String, IrMixin> = mutableMapOf()
 
-    override fun process(resolver: KSPResolver): List<KSAnnotated> {
-        val parser = SymbolParser(resolver, logger)
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        val types = KSTypes(resolver.builtIns)
+        val parser = SymbolParser(resolver, types, logger)
         if (!builtins.isExternalGenerated) {
             logger.setPhase(LapisPhase.BUILTINS)
             builtins.generateExternal()
-            return parser.prepare().run { schemaClassDecls + patchClassDecls }
+            return parser.prepare().run { schemaClassDeclarations + patchClassDeclarations }
         }
 
         logger.setPhase(LapisPhase.PARSING)
         val parserResult = parser.parse()
 
         logger.setPhase(LapisPhase.VALIDATION)
-        val validatorResult = frontendValidator.validate(parserResult)
+        val validatorResult = FrontendValidator(logger, options, builtins, types).validate(parserResult)
 
         logger.setPhase(LapisPhase.TRANSFORMATION)
         val irResult = mixinLowering.lower(validatorResult)

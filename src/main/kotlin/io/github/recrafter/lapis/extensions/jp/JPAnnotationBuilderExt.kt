@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.extensions.jp
 
-import io.github.recrafter.lapis.layers.generator.builders.Builder
-import io.github.recrafter.lapis.layers.generator.builders.IrJavaCodeBlock
-import io.github.recrafter.lapis.layers.lowering.types.IrClassName
+import io.github.recrafter.lapis.phases.generator.builders.Builder
+import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
+import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 

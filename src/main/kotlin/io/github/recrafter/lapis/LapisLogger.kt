@@ -1,29 +1,30 @@
 package io.github.recrafter.lapis
 
-import io.github.recrafter.lapis.extensions.common.castOrNull
-import io.github.recrafter.lapis.extensions.ks.KSSymbol
-import io.github.recrafter.lapis.extensions.ksp.KSPFileLocation
-import io.github.recrafter.lapis.extensions.ksp.KSPLogger
+import com.google.devtools.ksp.processing.KSPLogger
+import com.google.devtools.ksp.symbol.FileLocation
+import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.NonExistLocation
+import io.github.recrafter.lapis.phases.LapisPhase
 
 class LapisLogger(private val logger: KSPLogger) {
 
     private var currentPhase: LapisPhase = LapisPhase.entries.first()
 
-    fun info(message: String, symbol: KSSymbol? = null) {
+    fun info(message: String, symbol: KSNode? = null) {
         println(buildFullMessage(message, symbol))
     }
 
-    fun warn(message: String, symbol: KSSymbol? = null) {
+    fun warn(message: String, symbol: KSNode? = null) {
         logger.warn(buildFullMessage(message, symbol))
     }
 
-    fun error(message: String, symbol: KSSymbol? = null) {
+    fun error(message: String, symbol: KSNode? = null) {
         logger.error(buildFullMessage(message, symbol))
     }
 
     fun fatal(
         message: String,
-        symbol: KSSymbol? = null,
+        symbol: KSNode? = null,
     ): Nothing {
         error(message, symbol)
         throw LapisException(message)
@@ -33,17 +34,19 @@ class LapisLogger(private val logger: KSPLogger) {
         currentPhase = phase
     }
 
-    private fun buildFullMessage(message: String, symbol: KSSymbol?): String = buildString {
-        append("[${LapisMeta.NAME}] [Phase: $currentPhase]")
-        symbol?.location?.castOrNull<KSPFileLocation>()?.let { location ->
-            appendLine()
-            append(location.ideaLink)
+    private fun buildFullMessage(message: String, symbol: KSNode?): String = buildString {
+        appendLine("[${LapisMeta.NAME}] [Phase: $currentPhase]")
+        appendLine(message.trimEnd())
+        symbol?.let {
+            val locationText = when (val location = it.location) {
+                is FileLocation -> location.ideaLink
+                is NonExistLocation -> "<no physical location>"
+            }
+            appendLine("├── symbol: $symbol")
+            appendLine("└── at $locationText")
         }
-        appendLine()
-        append(message.trimEnd())
-        appendLine()
     }
 }
 
-private val KSPFileLocation.ideaLink: String
+private val FileLocation.ideaLink: String
     get() = "file://$filePath:$lineNumber"

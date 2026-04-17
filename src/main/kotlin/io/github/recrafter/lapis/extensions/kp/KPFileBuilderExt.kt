@@ -1,10 +1,10 @@
 package io.github.recrafter.lapis.extensions.kp
 
+import com.google.devtools.ksp.processing.CodeGenerator
+import com.google.devtools.ksp.processing.Dependencies
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
-import io.github.recrafter.lapis.extensions.ksp.KSPCodeGenerator
-import io.github.recrafter.lapis.extensions.ksp.KSPDependencies
-import io.github.recrafter.lapis.layers.generator.KSuppressWarning
-import io.github.recrafter.lapis.layers.generator.builders.Builder
+import io.github.recrafter.lapis.phases.generator.KSuppressWarning
+import io.github.recrafter.lapis.phases.generator.builders.Builder
 
 inline fun <reified A : Annotation> KPFileBuilder.addAnnotation(
     useSiteTarget: UseSiteTarget? = null,
@@ -13,7 +13,7 @@ inline fun <reified A : Annotation> KPFileBuilder.addAnnotation(
     addAnnotation(buildKotlinAnnotation<A>(useSiteTarget, builder))
 }
 
-fun KPFile.writeTo(codeGenerator: KSPCodeGenerator, dependencies: KSPDependencies) {
+fun KPFile.writeTo(codeGenerator: CodeGenerator, dependencies: Dependencies) {
     codeGenerator.createNewFile(dependencies, packageName, name).writer().use { writeTo(it) }
 }
 

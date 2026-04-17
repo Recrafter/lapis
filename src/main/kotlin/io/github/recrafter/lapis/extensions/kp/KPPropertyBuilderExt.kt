@@ -3,9 +3,9 @@ package io.github.recrafter.lapis.extensions.kp
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.layers.generator.builders.Builder
-import io.github.recrafter.lapis.layers.lowering.IrModifier
-import io.github.recrafter.lapis.layers.lowering.types.IrTypeName
+import io.github.recrafter.lapis.phases.generator.builders.Builder
+import io.github.recrafter.lapis.phases.lowering.IrModifier
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> KPPropertyBuilder.addAnnotation(
     useSiteTarget: UseSiteTarget? = null,
