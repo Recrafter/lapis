@@ -1,5 +1,7 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
+import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
+
 sealed interface IrHookArgument
 
 sealed interface IrHookOriginArgument : IrHookArgument
@@ -28,5 +30,9 @@ class IrHookOriginDescriptorCallWrapperArgument(override val wrapper: IrDescript
 object IrHookOriginInstanceofArgument : IrHookOriginArgument
 class IrHookCancelArgument(val wrapper: IrDescriptorCancelWrapper) : IrHookArgument
 object IrHookOrdinalArgument : IrHookArgument
-class IrHookParamArgument(val name: String) : IrHookArgument
-class IrHookLocalArgument(val name: String) : IrHookArgument
+
+class IrHookLocalArgument(
+    val name: String,
+    val isBody: Boolean,
+    val varBuiltin: LocalVarImplBuiltin?,
+) : IrHookArgument

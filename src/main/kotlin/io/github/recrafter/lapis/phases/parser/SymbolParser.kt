@@ -299,8 +299,7 @@ class SymbolParser(
             hookAt = functionDeclaration.findAnnotation<Hook>()?.getArgumentValue(Hook::at),
 
             hasAtConstructorHeadAnnotation = atConstructorHeadAnnotation != null,
-            atConstructorHeadPhase = atConstructorHeadAnnotation
-                ?.getArgumentValue(AtConstructorHead::phase),
+            atConstructorHeadPhase = atConstructorHeadAnnotation?.getArgumentValue(AtConstructorHead::phase),
 
             hasAtLocalAnnotation = atLocalAnnotation != null,
             atLocalOp = atLocalAnnotation?.getArgumentValue(AtLocal::op),
@@ -477,8 +476,9 @@ class SymbolParser(
     private inline fun <reified A : Annotation, reified E : Enum<E>> KSAnnotation.getArgumentValue(
         property: KProperty1<A, E>,
         explicit: Boolean = false,
+        default: E? = null,
     ): E? =
-        findArgumentValue(property, explicit)?.asEnum()
+        findArgumentValue(property, explicit)?.asEnum(default)
 
     private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
         property: KProperty1<A, Annotation>,

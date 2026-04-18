@@ -9,6 +9,7 @@ import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorBuiltin
+import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.*
 import io.github.recrafter.lapis.phases.validator.*
@@ -202,15 +203,15 @@ class MixinLowering(
             }
             addAll(
                 hook.parameters.mapNotNull { lowerInjectionLocalBasedParameter(hook, it) }.sortedWith(
-                    compareBy<IrInjectionLocalBasedParameter> { parameter ->
+                    compareBy<IrInjectionLocalParameter> { parameter ->
                         when (parameter) {
-                            is IrInjectionParamParameter -> 0
-                            is IrInjectionLocalParameter -> if (parameter.local is IrNamedLocal) 1 else 2
+                            is IrInjectionParamLocalParameter -> 0
+                            is IrInjectionBodyLocalParameter -> if (parameter.local is IrNamedLocal) 1 else 2
                         }
                     }.thenBy { parameter ->
-                        (parameter as? IrInjectionParamParameter)?.localIndex
+                        (parameter as? IrInjectionParamLocalParameter)?.localIndex
                     }.thenBy { parameter ->
-                        ((parameter as? IrInjectionLocalParameter)?.local as? IrPositionalLocal)?.ordinal
+                        ((parameter as? IrInjectionBodyLocalParameter)?.local as? IrPositionalLocal)?.ordinal
                     }
                 )
             )
@@ -396,28 +397,32 @@ class MixinLowering(
     private fun lowerInjectionLocalBasedParameter(
         hook: DomainHook,
         parameter: HookParameter
-    ): IrInjectionLocalBasedParameter? =
+    ): IrInjectionLocalParameter? =
         when (parameter) {
-            is HookParamParameter -> {
+            is HookParamLocalParameter -> {
                 if (hook.isInjectBased) {
                     return null
                 }
                 val initialSlot = if (hook.descriptor.isStatic) 0 else 1
-                val descParameter = hook.descriptor.parameters[parameter.index]
+                val descriptorParameter = hook.descriptor.parameters[parameter.index]
                 val slotOffset = hook.descriptor.parameters.take(parameter.index).sumOf {
                     if (it.typeName.is64bit) 2
                     else 1
                 }
-                IrInjectionParamParameter(
-                    name = descParameter.name,
+                IrInjectionParamLocalParameter(
+                    name = descriptorParameter.name,
                     index = parameter.index,
-                    typeName = descParameter.typeName,
+                    typeName = descriptorParameter.typeName,
+                    varBuiltin = lowerHookLocalVarBuiltin(parameter),
                     localIndex = initialSlot + slotOffset,
                 )
             }
 
-            is HookLocalParameter -> {
-                val irLocal = when (val local = parameter.local) {
+            is HookBodyLocalParameter -> IrInjectionBodyLocalParameter(
+                name = parameter.name,
+                typeName = parameter.typeName,
+                varBuiltin = lowerHookLocalVarBuiltin(parameter),
+                local = when (val local = parameter.local) {
                     is NamedLocal -> IrNamedLocal(local.name)
                     is PositionalLocal -> {
                         val paramsOffset = buildList {
@@ -429,8 +434,7 @@ class MixinLowering(
                         IrPositionalLocal(paramsOffset + local.ordinal)
                     }
                 }
-                IrInjectionLocalParameter(parameter.name, parameter.typeName, irLocal)
-            }
+            )
 
             else -> null
         }
@@ -562,9 +566,16 @@ class MixinLowering(
             is HookOriginInstanceofParameter -> IrHookOriginInstanceofArgument
 
             is HookOrdinalParameter -> IrHookOrdinalArgument
-            is HookParamParameter -> IrHookParamArgument(parameter.name)
-            is HookLocalParameter -> IrHookLocalArgument(parameter.name)
+            is HookParamLocalParameter, is HookBodyLocalParameter -> IrHookLocalArgument(
+                name = parameter.name,
+                isBody = parameter is HookBodyLocalParameter,
+                varBuiltin = lowerHookLocalVarBuiltin(parameter),
+            )
         }
+
+    private fun lowerHookLocalVarBuiltin(parameter: HookLocalParameter): LocalVarImplBuiltin? =
+        if (parameter.isVar) LocalVarImplBuiltin.of(parameter.typeName)
+        else null
 
     private inline fun <reified W : IrDescriptorWrapper> findOriginDescriptorWrapper(
         descriptorClassName: IrClassName

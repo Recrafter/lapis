@@ -12,7 +12,7 @@ sealed interface Builtin<T> {
             TypeAliasBuiltin.entries +
                 SimpleBuiltin.entries +
                 DescriptorBuiltin.entries +
-                LocalVarBuiltin.entries
+                LocalVarImplBuiltin.entries
         }
     }
 }

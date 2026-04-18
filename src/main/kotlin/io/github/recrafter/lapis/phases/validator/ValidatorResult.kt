@@ -382,10 +382,28 @@ class HookOriginDescriptorCallParameter(override val descriptor: InvokableDescri
 
 class HookCancelParameter(val descriptor: InvokableDescriptor) : HookParameter
 object HookOrdinalParameter : HookParameter
-class HookParamParameter(val name: String, val index: Int) : HookParameter
-class HookLocalParameter(val name: String, type: KSType, val local: DomainLocal) : HookParameter {
+
+sealed class HookLocalParameter(
+    val name: String,
+    type: KSType,
+    val isVar: Boolean,
+) : HookParameter {
     val typeName: IrTypeName = type.asIr()
 }
+
+class HookParamLocalParameter(
+    name: String,
+    type: KSType,
+    val index: Int,
+    isVar: Boolean
+) : HookLocalParameter(name, type, isVar)
+
+class HookBodyLocalParameter(
+    name: String,
+    type: KSType,
+    val local: DomainLocal,
+    isVar: Boolean,
+) : HookLocalParameter(name, type, isVar)
 
 class FunctionParameter(val name: String, type: KSType) {
     val typeName: IrTypeName = type.asIr()

@@ -32,8 +32,8 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
     fun nested(name: String): IrClassName =
         kotlin.nestedClass(name).asIr()
 
-    fun parameterizedBy(vararg argumentTypeNames: IrTypeName?): IrParameterizedTypeName =
-        kotlin.parameterizedBy(argumentTypeNames.map { it?.kotlin.orUnit() }).asIr()
+    fun parameterizedBy(vararg argumentTypeNames: IrTypeName): IrParameterizedTypeName =
+        kotlin.parameterizedBy(argumentTypeNames.map { it.kotlin }).asIr()
 
     companion object {
         fun of(packageName: String, vararg names: String): IrClassName =

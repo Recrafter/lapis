@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.phases.validator
 
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.ksp.toClassName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
@@ -607,22 +608,33 @@ class FrontendValidator(
                 hasParamAnnotation -> {
                     kspRequire(at != At.Body) { "576" }
                     kspRequireNotNull(paramName) { "577" }
-                    val descParameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == paramName }
-                    kspRequireNotNull(descParameterIndex) { "580" }
-                    val descParameter = hookDescriptor.parameters[descParameterIndex]
-                    kspRequire(descParameter.type == type) { "582" }
-                    HookParamParameter(paramName, descParameterIndex)
+                    val descriptorParameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == paramName }
+                    kspRequireNotNull(descriptorParameterIndex) { "580" }
+                    val descriptorParameter = hookDescriptor.parameters[descriptorParameterIndex]
+                    val (paramLocalType, isVar) = validateLocalType(type)
+                    kspRequire(descriptorParameter.type == paramLocalType) { "582" }
+                    HookParamLocalParameter(paramName, paramLocalType, descriptorParameterIndex, isVar)
                 }
 
                 hasLocalAnnotation -> {
                     kspRequire(at != At.Body) { "587" }
-                    kspRequireNotNull(type) { "588" }
-                    HookLocalParameter(name, type, validateLocal(localOrdinal, localName, name))
+                    val (bodyLocalType, isVar) = validateLocalType(type)
+                    HookBodyLocalParameter(name, bodyLocalType, validateLocal(localOrdinal, localName, name), isVar)
                 }
 
                 else -> skipWithError { "592" }
             }
         }
+
+    private fun ParsedPatchFunctionParameter.validateLocalType(type: KSType): Pair<KSType, Boolean> {
+        val isVar = type.toClassDeclaration()?.isInstance(builtins[SimpleBuiltin.LocalVar]) == true
+        val localType = if (isVar) {
+            kspRequireNotNull(type.getGenericTypeOrNull()) { "535" }
+        } else {
+            kspRequireNotNull(type) { "588" }
+        }
+        return localType to isVar
+    }
 
     private fun skip(): Nothing = throw SkipSignal()
 

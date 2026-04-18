@@ -32,8 +32,8 @@ class KSAnnotationArgumentValue(
     fun asKClass(types: KSTypes): KSType? =
         raw.castOrNull<KSType>()?.filter { it == types.nothing }
 
-    inline fun <reified E : Enum<E>> asEnum(): E? {
-        val entryName = raw.castOrNull<KSClassDeclaration>()?.name?.filter { it.equals("none", ignoreCase = true) }
+    inline fun <reified E : Enum<E>> asEnum(default: E? = null): E? {
+        val entryName = raw.castOrNull<KSClassDeclaration>()?.name?.filter { it == default?.name }
         return enumEntries<E>().find { it.name == entryName }
     }
 

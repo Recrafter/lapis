@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
+import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 sealed interface IrInjectionParameter
@@ -16,16 +17,22 @@ class IrInjectionOperationParameter(val returnTypeName: IrTypeName?) : IrInjecti
 class IrInjectionValueParameter(val typeName: IrTypeName) : IrInjectionParameter
 class IrInjectionCallbackParameter(val returnTypeName: IrTypeName?) : IrInjectionParameter
 
-sealed class IrInjectionLocalBasedParameter : IrInjectionParameter
-class IrInjectionParamParameter(
+sealed class IrInjectionLocalParameter(
+    val typeName: IrTypeName,
+    val varBuiltin: LocalVarImplBuiltin?,
+) : IrInjectionParameter
+
+class IrInjectionParamLocalParameter(
     val name: String?,
     val index: Int,
-    val typeName: IrTypeName,
+    typeName: IrTypeName,
+    varBuiltin: LocalVarImplBuiltin?,
     val localIndex: Int,
-) : IrInjectionLocalBasedParameter()
+) : IrInjectionLocalParameter(typeName, varBuiltin)
 
-class IrInjectionLocalParameter(
+class IrInjectionBodyLocalParameter(
     val name: String,
-    val typeName: IrTypeName,
+    typeName: IrTypeName,
+    varBuiltin: LocalVarImplBuiltin?,
     val local: IrLocal,
-) : IrInjectionLocalBasedParameter()
+) : IrInjectionLocalParameter(typeName, varBuiltin)

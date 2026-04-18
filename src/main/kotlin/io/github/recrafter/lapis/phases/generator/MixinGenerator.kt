@@ -22,6 +22,7 @@ import io.github.recrafter.lapis.extensions.ksp.createResourceFile
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorBuiltin
+import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin
 import io.github.recrafter.lapis.phases.generator.accessor.AccessorConfigEntry
 import io.github.recrafter.lapis.phases.generator.accessor.ClassEntry
@@ -352,23 +353,35 @@ class MixinGenerator(
                     }
 
                     is IrInjectionValueParameter -> buildJavaParameter(valueParameterName, parameter.typeName)
+
                     is IrInjectionLocalParameter -> {
-                        buildJavaParameter(parameter.name.withInternalPrefix(LOCAL), parameter.typeName) {
-                            addAnnotation<Local> {
-                                when (val local = parameter.local) {
-                                    is IrNamedLocal -> setStringArrayMember(Local::name, local.name)
-                                    is IrPositionalLocal -> setIntMember(Local::ordinal, local.ordinal)
+                        val typeName = parameter.varBuiltin?.let {
+                            if (it == LocalVarImplBuiltin.ObjectLocalVar) {
+                                it.referenceClassName.parameterizedBy(parameter.typeName)
+                            } else {
+                                it.referenceClassName
+                            }
+                        } ?: parameter.typeName
+                        when (parameter) {
+                            is IrInjectionBodyLocalParameter -> {
+                                buildJavaParameter(parameter.name.withInternalPrefix(LOCAL), typeName) {
+                                    addAnnotation<Local> {
+                                        when (val local = parameter.local) {
+                                            is IrNamedLocal -> setStringArrayMember(Local::name, local.name)
+                                            is IrPositionalLocal -> setIntMember(Local::ordinal, local.ordinal)
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    }
 
-                    is IrInjectionParamParameter -> {
-                        val name = parameter.name ?: parameter.index.toString()
-                        buildJavaParameter(name.withInternalPrefix(PARAM), parameter.typeName) {
-                            addAnnotation<Local> {
-                                setIntMember(Local::index, parameter.localIndex)
-                                setBooleanMember(Local::argsOnly, true)
+                            is IrInjectionParamLocalParameter -> {
+                                val name = parameter.name ?: parameter.index.toString()
+                                buildJavaParameter(name.withInternalPrefix(PARAM), typeName) {
+                                    addAnnotation<Local> {
+                                        setIntMember(Local::index, parameter.localIndex)
+                                        setBooleanMember(Local::argsOnly, true)
+                                    }
+                                }
                             }
                         }
                     }
@@ -397,7 +410,7 @@ class MixinGenerator(
                     }
 
                     is IrHookOriginDescriptorWrapperArgument<*> -> {
-                        val descWrapperConstructorArgumentCodeBlocks = buildList {
+                        val descriptorWrapperConstructorArgumentCodeBlocks = buildList {
                             val wrapper = argument.wrapper
                             if (
                                 injection is IrTargetInjection &&
@@ -431,11 +444,11 @@ class MixinGenerator(
                         }
                         buildJavaCodeBlock(buildString {
                             append("new %T(")
-                            append(descWrapperConstructorArgumentCodeBlocks.joinToString { "%L" })
+                            append(descriptorWrapperConstructorArgumentCodeBlocks.joinToString { "%L" })
                             append(")")
                         }) {
                             arg(argument.wrapper.className)
-                            descWrapperConstructorArgumentCodeBlocks.forEach { arg(it) }
+                            descriptorWrapperConstructorArgumentCodeBlocks.forEach { arg(it) }
                         }
                     }
 
@@ -460,17 +473,31 @@ class MixinGenerator(
                         }
                     }
 
-                    is IrHookParamArgument -> buildJavaCodeBlock("%L") {
-                        arg(
-                            argument.name.withInternalPrefix(
-                                if (injection is IrInjectInjection) ARGUMENT
-                                else PARAM
-                            )
+                    is IrHookLocalArgument -> {
+                        val localName = argument.name.withInternalPrefix(
+                            when {
+                                argument.isBody -> LOCAL
+                                injection is IrInjectInjection -> ARGUMENT
+                                else -> PARAM
+                            }
                         )
-                    }
-
-                    is IrHookLocalArgument -> buildJavaCodeBlock("%L") {
-                        arg(argument.name.withInternalPrefix(LOCAL))
+                        val format = buildString {
+                            if (argument.varBuiltin != null) {
+                                append("new %T")
+                                if (argument.varBuiltin == LocalVarImplBuiltin.ObjectLocalVar) {
+                                    append("<>")
+                                }
+                                append("(")
+                            }
+                            append("%L")
+                            if (argument.varBuiltin != null) {
+                                append(")")
+                            }
+                        }
+                        buildJavaCodeBlock(format) {
+                            argument.varBuiltin?.let { arg(builtins[it]) }
+                            arg(localName)
+                        }
                     }
                 }
             }
