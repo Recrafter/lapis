@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.phases.generator
 
 import com.google.devtools.ksp.processing.CodeGenerator
-import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.symbol.KSFile
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue
 import com.llamalad7.mixinextras.injector.ModifyReturnValue
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod
@@ -9,6 +9,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation
 import com.llamalad7.mixinextras.sugar.Cancellable
 import com.llamalad7.mixinextras.sugar.Local
+import com.squareup.kotlinpoet.ksp.writeTo
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
 import io.github.recrafter.lapis.annotations.Op
@@ -17,7 +18,6 @@ import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.ks.toDependencies
 import io.github.recrafter.lapis.extensions.ksp.createResourceFile
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.builtins.Builtins
@@ -54,20 +54,16 @@ class MixinGenerator(
 
     fun generate(schemas: List<IrSchema>, mixins: List<IrMixin>) {
         val schemaContainingFiles = schemas.mapNotNull { it.containingFile }
-        generateDescriptorWrappers(
-            schemas.flatMap { it.descriptors },
-            schemaContainingFiles.toDependencies()
-        )
+        generateDescriptorWrappers(schemas.flatMap { it.descriptors }, schemaContainingFiles)
         mixins.forEach { generateMixin(it) }
 
-        val allContainingFiles = schemaContainingFiles + mixins.mapNotNull { it.containingFile }
-        generateExtensions(allContainingFiles.toDependencies())
+        generateExtensions(schemaContainingFiles + mixins.mapNotNull { it.containingFile })
 
         generateMixinConfig(mixins)
         generateAccessorConfig(schemas)
     }
 
-    private fun generateDescriptorWrappers(descriptors: List<IrDescriptor>, dependencies: Dependencies) {
+    private fun generateDescriptorWrappers(descriptors: List<IrDescriptor>, originatingFiles: List<KSFile>) {
         if (descriptors.isEmpty()) {
             return
         }
@@ -103,20 +99,20 @@ class MixinGenerator(
                     }
                 }
             }
-        }.writeTo(codeGenerator, dependencies)
+        }.writeTo(codeGenerator, aggregating = false, originatingFiles)
     }
 
     private fun generateMixin(mixin: IrMixin) {
         if (mixin.isNotEmpty()) {
-            val dependencies = listOfNotNull(mixin.containingFile).toDependencies()
+            val originatingFiles = listOfNotNull(mixin.containingFile)
             buildKotlinFile(mixin.patchImplClassName) {
                 suppressWarnings(KSuppressWarning.RedundantVisibilityModifier)
                 addType(buildPatchImplClass(mixin))
-            }.writeTo(codeGenerator, dependencies)
+            }.writeTo(codeGenerator, aggregating = false, originatingFiles)
 
             buildJavaFile(mixin.className) {
                 buildMixinClass(mixin)
-            }.writeTo(codeGenerator, dependencies)
+            }.writeTo(codeGenerator, aggregating = false, originatingFiles)
         }
         mixin.extension?.let { generateMixinExtension(mixin, it) }
     }
@@ -528,7 +524,7 @@ class MixinGenerator(
                     }
                 })
             })
-        }.writeTo(codeGenerator, listOfNotNull(mixin.containingFile).toDependencies())
+        }.writeTo(codeGenerator, aggregating = false, listOfNotNull(mixin.containingFile))
 
         extensionProperties += extension.kinds.filterIsInstance<IrPropertyGetterExtension>().map { getter ->
             buildKotlinProperty(getter.name, getter.typeName) {
@@ -574,7 +570,7 @@ class MixinGenerator(
         }
     }
 
-    private fun generateExtensions(dependencies: Dependencies) {
+    private fun generateExtensions(originatingFiles: List<KSFile>) {
         if (extensionProperties.isEmpty() && extensionFunctions.isEmpty()) {
             return
         }
@@ -586,7 +582,7 @@ class MixinGenerator(
             )
             addProperties(extensionProperties)
             addFunctions(extensionFunctions)
-        }.writeTo(codeGenerator, dependencies)
+        }.writeTo(codeGenerator, aggregating = false, originatingFiles)
     }
 
     private fun generateMixinConfig(mixins: List<IrMixin>) {

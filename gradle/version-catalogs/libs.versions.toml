@@ -10,7 +10,7 @@ asm = "9.9.1"
 
 lapis-annotations = "0.8.6"
 
-java-poet = "0.11.0"
+java-poet = "0.14.0"
 kotlin-poet = "2.3.0"
 
 kotlin-serialization-json = "1.11.0"

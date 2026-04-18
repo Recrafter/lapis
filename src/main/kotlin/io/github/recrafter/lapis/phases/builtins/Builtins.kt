@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.phases.builtins
 
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
+import com.squareup.kotlinpoet.ksp.writeTo
 import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*

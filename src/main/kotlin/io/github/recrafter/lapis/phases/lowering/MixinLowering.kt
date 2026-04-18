@@ -310,13 +310,13 @@ class MixinLowering(
                 is LiteralHook -> {
                     val args = when (val literal = hook.literal) {
                         is ZeroLiteral -> {
-                            val mixinConditions = literal.conditions.map {
+                            val expandZeroConditions = literal.conditions.map {
                                 Constant.Condition.entries[it.ordinal]
                             }
                             buildList {
                                 add("intValue" to "0")
-                                if (mixinConditions.isNotEmpty()) {
-                                    add("expandZeroConditions" to mixinConditions.joinToString(","))
+                                if (expandZeroConditions.isNotEmpty()) {
+                                    add("expandZeroConditions" to expandZeroConditions.joinToString(","))
                                 }
                             }
                         }

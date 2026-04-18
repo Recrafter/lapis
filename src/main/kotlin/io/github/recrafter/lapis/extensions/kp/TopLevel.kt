@@ -2,7 +2,6 @@ package io.github.recrafter.lapis.extensions.kp
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
-import com.squareup.kotlinpoet.jvm.jvmName
 import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.phases.generator.GeneratorConstants
 import io.github.recrafter.lapis.phases.generator.builders.Builder
@@ -139,7 +138,9 @@ fun buildKotlinFunction(
 ): KPFunction =
     KPFunction.builder(name).apply {
         jvmNamespace?.simpleName?.let {
-            jvmName(it + "_" + name)
+            addAnnotation<JvmName> {
+                setStringMember(JvmName::name, it + "_" + name)
+            }
         }
         builder(name)
     }.build()
