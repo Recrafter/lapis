@@ -9,6 +9,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation
 import com.llamalad7.mixinextras.sugar.Cancellable
 import com.llamalad7.mixinextras.sugar.Local
+import com.llamalad7.mixinextras.sugar.Share
 import com.squareup.kotlinpoet.ksp.writeTo
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
@@ -375,11 +376,21 @@ class MixinGenerator(
                             }
 
                             is IrInjectionParamLocalParameter -> {
-                                val name = parameter.name ?: parameter.index.toString()
-                                buildJavaParameter(name.withInternalPrefix(PARAM), typeName) {
+                                buildJavaParameter(parameter.name.withInternalPrefix(PARAM), typeName) {
                                     addAnnotation<Local> {
                                         setIntMember(Local::index, parameter.localIndex)
                                         setBooleanMember(Local::argsOnly, true)
+                                    }
+                                }
+                            }
+
+                            is IrInjectionShareParameter -> {
+                                buildJavaParameter(parameter.name.withInternalPrefix(SHARE), typeName) {
+                                    addAnnotation<Share> {
+                                        setStringMember(Share::value, parameter.key)
+                                        if (parameter.isExported) {
+                                            setStringMember(Share::namespace, options.modId)
+                                        }
                                     }
                                 }
                             }
@@ -477,6 +488,7 @@ class MixinGenerator(
                         val localName = argument.name.withInternalPrefix(
                             when {
                                 argument.isBody -> LOCAL
+                                argument.isShare -> SHARE
                                 injection is IrInjectInjection -> ARGUMENT
                                 else -> PARAM
                             }

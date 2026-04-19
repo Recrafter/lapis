@@ -405,6 +405,13 @@ class HookBodyLocalParameter(
     isVar: Boolean,
 ) : HookLocalParameter(name, type, isVar)
 
+class HookShareLocalParameter(
+    name: String,
+    type: KSType,
+    val key: String,
+    val isExported: Boolean,
+) : HookLocalParameter(name, type, true)
+
 class FunctionParameter(val name: String, type: KSType) {
     val typeName: IrTypeName = type.asIr()
 }

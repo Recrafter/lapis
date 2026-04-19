@@ -304,8 +304,8 @@ class SymbolParser(
             hasAtLocalAnnotation = atLocalAnnotation != null,
             atLocalOp = atLocalAnnotation?.getArgumentValue(AtLocal::op),
             atLocalType = functionDeclaration.findAnnotation<AtLocal>()?.getArgumentValue(AtLocal::type),
-            atLocalName = atLocalLocalAnnotation?.getArgumentValue(Local::name, explicit = true),
-            atLocalOrdinal = atLocalLocalAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
+            atLocalExplicitName = atLocalLocalAnnotation?.getArgumentValue(Local::name, explicit = true),
+            atLocalExplicitOrdinal = atLocalLocalAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
             atLocalOpOrdinals = atLocalAnnotation?.getArgumentValue(AtLocal::ordinal).orEmpty(),
 
             hasAtInstanceofAnnotation = atInstanceofAnnotation != null,
@@ -320,16 +320,16 @@ class SymbolParser(
             atReturnOrdinals = atReturnAnnotation?.getArgumentValue(AtReturn::ordinal).orEmpty(),
 
             hasAtLiteralAnnotation = atLiteralAnnotation != null,
-            atLiteralZero = atLiteralZeroAnnotation,
+            atLiteralExplicitZero = atLiteralZeroAnnotation,
             atLiteralZeroConditions = atLiteralZeroAnnotation?.getArgumentValue(Zero::conditions).orEmpty(),
-            atLiteralInt = atLiteralAnnotation?.getArgumentValue(AtLiteral::int, explicit = true),
-            atLiteralFloat = atLiteralAnnotation?.getArgumentValue(AtLiteral::float, explicit = true),
-            atLiteralLong = atLiteralAnnotation?.getArgumentValue(AtLiteral::long, explicit = true),
-            atLiteralDouble = atLiteralAnnotation?.getArgumentValue(AtLiteral::double, explicit = true),
-            atLiteralString = atLiteralAnnotation?.getArgumentValue(AtLiteral::string, explicit = true),
-            atLiteralClass = atLiteralClassType,
-            atLiteralClassDeclaration = atLiteralClassType?.toClassDeclaration(),
-            atLiteralNull = atLiteralNullAnnotation,
+            atLiteralExplicitInt = atLiteralAnnotation?.getArgumentValue(AtLiteral::int, explicit = true),
+            atLiteralExplicitFloat = atLiteralAnnotation?.getArgumentValue(AtLiteral::float, explicit = true),
+            atLiteralExplicitLong = atLiteralAnnotation?.getArgumentValue(AtLiteral::long, explicit = true),
+            atLiteralExplicitDouble = atLiteralAnnotation?.getArgumentValue(AtLiteral::double, explicit = true),
+            atLiteralExplicitString = atLiteralAnnotation?.getArgumentValue(AtLiteral::string, explicit = true),
+            atLiteralExplicitClassType = atLiteralClassType,
+            atLiteralExplicitClassDeclaration = atLiteralClassType?.toClassDeclaration(),
+            atLiteralExplicitNull = atLiteralNullAnnotation,
             atLiteralOrdinals = atLiteralAnnotation?.getArgumentValue(AtLiteral::ordinal).orEmpty(),
 
             hasAtFieldAnnotation = atFieldAnnotation != null,
@@ -385,14 +385,14 @@ class SymbolParser(
             hasOrdinalAnnotation = parameter.hasAnnotation<Ordinal>(),
 
             hasParamAnnotation = paramAnnotation != null,
-            paramName = paramAnnotation?.getArgumentValue(Param::name) ?: name,
+            explicitParamName = paramAnnotation?.getArgumentValue(Param::name, explicit = true),
 
             hasLocalAnnotation = localAnnotation != null,
-            localName = localAnnotation?.getArgumentValue(Local::name, explicit = true),
-            localOrdinal = localAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
+            explicitLocalName = localAnnotation?.getArgumentValue(Local::name, explicit = true),
+            explicitLocalOrdinal = localAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
 
             hasShareAnnotation = shareAnnotation != null,
-            shareKey = shareAnnotation?.getArgumentValue(Share::key) ?: name,
+            explicitShareKey = shareAnnotation?.getArgumentValue(Share::key, explicit = true),
             isShareExported = shareAnnotation?.getArgumentValue(Share::exported) == true,
         )
     }

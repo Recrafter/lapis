@@ -34,5 +34,6 @@ object IrHookOrdinalArgument : IrHookArgument
 class IrHookLocalArgument(
     val name: String,
     val isBody: Boolean,
+    val isShare: Boolean,
     val varBuiltin: LocalVarImplBuiltin?,
 ) : IrHookArgument

@@ -286,7 +286,7 @@ class FrontendValidator(
                     descriptor = hookDescriptor,
                     type = atLocalType,
                     ordinals = ordinals(atLocalOpOrdinals),
-                    local = validateLocal(atLocalOrdinal, atLocalName),
+                    local = validateLocal(atLocalExplicitOrdinal, atLocalExplicitName),
                     isSet = atLocalOp == Op.Set,
                     parameters = parameters(),
                 )
@@ -412,20 +412,20 @@ class FrontendValidator(
     private fun validateLiteral(function: ParsedPatchFunction): Literal = with(function) {
         kspRequireNotNull(
             listOfNotNull(
-                atLiteralZero?.let { ZeroLiteral(atLiteralZeroConditions) },
-                atLiteralInt?.let {
+                atLiteralExplicitZero?.let { ZeroLiteral(atLiteralZeroConditions) },
+                atLiteralExplicitInt?.let {
                     kspRequire(it != 0) { "417" }
                     IntLiteral(it)
                 },
-                atLiteralFloat?.let { FloatLiteral(it) },
-                atLiteralLong?.let { LongLiteral(it) },
-                atLiteralDouble?.let { DoubleLiteral(it) },
-                atLiteralString?.let { StringLiteral(it) },
-                atLiteralClass?.let {
-                    kspRequireNotNull(atLiteralClassDeclaration) { "425" }
-                    ClassLiteral(atLiteralClassDeclaration)
+                atLiteralExplicitFloat?.let { FloatLiteral(it) },
+                atLiteralExplicitLong?.let { LongLiteral(it) },
+                atLiteralExplicitDouble?.let { DoubleLiteral(it) },
+                atLiteralExplicitString?.let { StringLiteral(it) },
+                atLiteralExplicitClassType?.let {
+                    kspRequireNotNull(atLiteralExplicitClassDeclaration) { "425" }
+                    ClassLiteral(atLiteralExplicitClassDeclaration)
                 },
-                atLiteralNull?.let { NullLiteral },
+                atLiteralExplicitNull?.let { NullLiteral },
             ).singleOrNull()
         ) { "409" }
     }
@@ -607,7 +607,10 @@ class FrontendValidator(
 
                 hasParamAnnotation -> {
                     kspRequire(at != At.Body) { "576" }
-                    kspRequireNotNull(paramName) { "577" }
+                    if (explicitParamName != null) {
+                        kspRequire(explicitParamName.trim().isNotEmpty()) { "566" }
+                    }
+                    val paramName = explicitParamName ?: name
                     val descriptorParameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == paramName }
                     kspRequireNotNull(descriptorParameterIndex) { "580" }
                     val descriptorParameter = hookDescriptor.parameters[descriptorParameterIndex]
@@ -619,7 +622,24 @@ class FrontendValidator(
                 hasLocalAnnotation -> {
                     kspRequire(at != At.Body) { "587" }
                     val (bodyLocalType, isVar) = validateLocalType(type)
-                    HookBodyLocalParameter(name, bodyLocalType, validateLocal(localOrdinal, localName, name), isVar)
+                    HookBodyLocalParameter(
+                        name,
+                        bodyLocalType,
+                        validateLocal(explicitLocalOrdinal, explicitLocalName, name),
+                        isVar
+                    )
+                }
+
+                hasShareAnnotation -> {
+                    kspRequire(type.toClassDeclaration()?.isInstance(builtins[SimpleBuiltin.LocalVar]) == true) {
+                        "588"
+                    }
+                    val type = kspRequireNotNull(type.getGenericTypeOrNull()) { "535" }
+                    if (explicitShareKey != null) {
+                        kspRequire(explicitShareKey.trim().isNotEmpty()) { "566" }
+                    }
+                    val key = explicitShareKey ?: name
+                    HookShareLocalParameter(name, type, key, isShareExported)
                 }
 
                 else -> skipWithError { "592" }

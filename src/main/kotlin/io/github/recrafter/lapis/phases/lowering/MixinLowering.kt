@@ -202,16 +202,19 @@ class MixinLowering(
                 add(IrInjectionCallbackParameter(hook.descriptor.returnTypeName))
             }
             addAll(
-                hook.parameters.mapNotNull { lowerInjectionLocalBasedParameter(hook, it) }.sortedWith(
+                hook.parameters.mapNotNull { lowerInjectionLocalParameter(hook, it) }.sortedWith(
                     compareBy<IrInjectionLocalParameter> { parameter ->
                         when (parameter) {
                             is IrInjectionParamLocalParameter -> 0
                             is IrInjectionBodyLocalParameter -> if (parameter.local is IrNamedLocal) 1 else 2
+                            is IrInjectionShareParameter -> 3
                         }
                     }.thenBy { parameter ->
                         (parameter as? IrInjectionParamLocalParameter)?.localIndex
                     }.thenBy { parameter ->
                         ((parameter as? IrInjectionBodyLocalParameter)?.local as? IrPositionalLocal)?.ordinal
+                    }.thenBy { parameter ->
+                        (parameter as? IrInjectionShareParameter)?.key
                     }
                 )
             )
@@ -394,7 +397,7 @@ class MixinLowering(
         }
     }
 
-    private fun lowerInjectionLocalBasedParameter(
+    private fun lowerInjectionLocalParameter(
         hook: DomainHook,
         parameter: HookParameter
     ): IrInjectionLocalParameter? =
@@ -410,8 +413,7 @@ class MixinLowering(
                     else 1
                 }
                 IrInjectionParamLocalParameter(
-                    name = descriptorParameter.name,
-                    index = parameter.index,
+                    name = descriptorParameter.name ?: parameter.index.toString(),
                     typeName = descriptorParameter.typeName,
                     varBuiltin = lowerHookLocalVarBuiltin(parameter),
                     localIndex = initialSlot + slotOffset,
@@ -434,6 +436,14 @@ class MixinLowering(
                         IrPositionalLocal(paramsOffset + local.ordinal)
                     }
                 }
+            )
+
+            is HookShareLocalParameter -> IrInjectionShareParameter(
+                name = parameter.name,
+                typeName = parameter.typeName,
+                varBuiltin = LocalVarImplBuiltin.of(parameter.typeName),
+                key = parameter.key,
+                isExported = parameter.isExported,
             )
 
             else -> null
@@ -566,9 +576,10 @@ class MixinLowering(
             is HookOriginInstanceofParameter -> IrHookOriginInstanceofArgument
 
             is HookOrdinalParameter -> IrHookOrdinalArgument
-            is HookParamLocalParameter, is HookBodyLocalParameter -> IrHookLocalArgument(
+            is HookLocalParameter -> IrHookLocalArgument(
                 name = parameter.name,
                 isBody = parameter is HookBodyLocalParameter,
+                isShare = parameter is HookShareLocalParameter,
                 varBuiltin = lowerHookLocalVarBuiltin(parameter),
             )
         }

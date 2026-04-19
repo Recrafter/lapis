@@ -127,8 +127,8 @@ class ParsedPatchFunction(
     val hasAtLocalAnnotation: Boolean,
     val atLocalOp: Op?,
     val atLocalType: KSType?,
-    val atLocalName: String?,
-    val atLocalOrdinal: Int?,
+    val atLocalExplicitName: String?,
+    val atLocalExplicitOrdinal: Int?,
     val atLocalOpOrdinals: List<Int>,
 
     val hasAtInstanceofAnnotation: Boolean,
@@ -139,16 +139,16 @@ class ParsedPatchFunction(
     val atReturnOrdinals: List<Int>,
 
     val hasAtLiteralAnnotation: Boolean,
-    val atLiteralZero: KSAnnotation?,
+    val atLiteralExplicitZero: KSAnnotation?,
     val atLiteralZeroConditions: List<ZeroCondition>,
-    val atLiteralInt: Int?,
-    val atLiteralFloat: Float?,
-    val atLiteralLong: Long?,
-    val atLiteralDouble: Double?,
-    val atLiteralString: String?,
-    val atLiteralClass: KSType?,
-    val atLiteralClassDeclaration: KSClassDeclaration?,
-    val atLiteralNull: KSAnnotation?,
+    val atLiteralExplicitInt: Int?,
+    val atLiteralExplicitFloat: Float?,
+    val atLiteralExplicitLong: Long?,
+    val atLiteralExplicitDouble: Double?,
+    val atLiteralExplicitString: String?,
+    val atLiteralExplicitClassType: KSType?,
+    val atLiteralExplicitClassDeclaration: KSClassDeclaration?,
+    val atLiteralExplicitNull: KSAnnotation?,
     val atLiteralOrdinals: List<Int>,
 
     val hasAtFieldAnnotation: Boolean,
@@ -191,14 +191,14 @@ class ParsedPatchFunctionParameter(
     val hasOrdinalAnnotation: Boolean,
 
     val hasParamAnnotation: Boolean,
-    val paramName: String?,
+    val explicitParamName: String?,
 
     val hasLocalAnnotation: Boolean,
-    val localName: String?,
-    val localOrdinal: Int?,
+    val explicitLocalName: String?,
+    val explicitLocalOrdinal: Int?,
 
     val hasShareAnnotation: Boolean,
-    val shareKey: String?,
+    val explicitShareKey: String?,
     val isShareExported: Boolean,
 ) : SymbolSource(symbol)
 

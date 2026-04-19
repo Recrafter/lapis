@@ -21,5 +21,6 @@ enum class InternalPrefix(val value: String) {
     BUILTIN(LapisMeta.NAME.lowercase()),
     PARAM("param"),
     LOCAL("local"),
+    SHARE("share"),
     ARGUMENT("argument"),
 }
