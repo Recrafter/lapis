@@ -33,8 +33,8 @@ class Schema(
     val removeFinal: Boolean,
     val descriptors: List<Descriptor>,
 ) {
-    val className: IrClassName = classDeclaration.asIr()
-    val targetClassName: IrClassName = targetClassDeclaration?.asIr() ?: IrClassName.fromBinaryName(targetBinaryName)
+    val className: IrClassName = classDeclaration.asIrClassName()
+    val targetClassName: IrClassName = targetClassDeclaration?.asIrClassName() ?: IrClassName.fromBinaryName(targetBinaryName)
     val containingFile: KSFile? = source.containingFile
 }
 
@@ -49,9 +49,9 @@ sealed class Descriptor(
     val makePublic: Boolean,
     val removeFinal: Boolean,
 ) {
-    val className: IrClassName = classDeclaration.asIr()
-    val receiverTypeName: IrTypeName = receiverType.asIr()
-    open val returnTypeName: IrTypeName? = returnType?.asIr()
+    val className: IrClassName = classDeclaration.asIrClassName()
+    val receiverTypeName: IrTypeName = receiverType.asIrTypeName()
+    open val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
 sealed class InvokableDescriptor(
@@ -129,7 +129,7 @@ class FieldDescriptor(
     makePublic,
     removeFinal
 ) {
-    val fieldTypeName: IrTypeName = fieldType.asIr()
+    val fieldTypeName: IrTypeName = fieldType.asIrTypeName()
 }
 
 class Patch(
@@ -146,8 +146,8 @@ class Patch(
 
     val hooks: List<DomainHook>,
 ) {
-    val className: IrClassName = classDeclaration.asIr()
-    val targetClassName: IrClassName = targetClassDeclaration.asIr()
+    val className: IrClassName = classDeclaration.asIrClassName()
+    val targetClassName: IrClassName = targetClassDeclaration.asIrClassName()
     val containingFile: KSFile? = source.containingFile
 }
 
@@ -156,7 +156,7 @@ class SharedProperty(
     type: KSType,
     val isMutable: Boolean,
 ) {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class SharedFunction(
@@ -164,7 +164,7 @@ class SharedFunction(
     val parameters: List<FunctionParameter>,
     returnType: KSType?,
 ) {
-    val returnTypeName: IrTypeName? = returnType?.asIr()
+    val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
 sealed class DomainHook(
@@ -174,7 +174,7 @@ sealed class DomainHook(
     val parameters: List<HookParameter>,
     val ordinals: List<Int>,
 ) {
-    open val returnTypeName: IrTypeName? = returnType?.asIr()
+    open val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 
     open val isInjectBased: Boolean = false
 }
@@ -224,7 +224,7 @@ class LocalHook(
     val local: DomainLocal,
     val isSet: Boolean,
 ) : DomainHook(name, descriptor, type, parameters, ordinals) {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class InstanceofHook(
@@ -235,7 +235,7 @@ class InstanceofHook(
     parameters: List<HookParameter>,
     ordinals: List<Int>,
 ) : DomainHook(name, descriptor, returnType, parameters, ordinals) {
-    val className: IrClassName = classDeclaration.asIr()
+    val className: IrClassName = classDeclaration.asIrClassName()
 }
 
 class ReturnHook(
@@ -256,7 +256,7 @@ class LiteralHook(
     val literal: Literal,
     ordinals: List<Int>,
 ) : DomainHook(name, descriptor, type, parameters, ordinals) {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
 sealed interface Literal {
@@ -286,7 +286,7 @@ class StringLiteral(val value: String) : Literal {
 
 class ClassLiteral(classDeclaration: KSClassDeclaration) : Literal {
     override fun getType(types: KSTypes): KSType = types.any
-    val className: IrClassName = classDeclaration.asIr()
+    val className: IrClassName = classDeclaration.asIrClassName()
 }
 
 object NullLiteral : Literal {
@@ -301,7 +301,7 @@ class FieldGetHook(
     ordinals: List<Int>,
     parameters: List<HookParameter>,
 ) : DomainHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class FieldSetHook(
@@ -312,7 +312,7 @@ class FieldSetHook(
     ordinals: List<Int>,
     parameters: List<HookParameter>,
 ) : DomainHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class ArrayHook(
@@ -325,8 +325,8 @@ class ArrayHook(
     parameters: List<HookParameter>,
     val op: Op,
 ) : DomainHook(name, descriptor, type, parameters, ordinals) {
-    val typeName: IrTypeName = type.asIr()
-    val componentTypeName: IrTypeName = componentType.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
+    val componentTypeName: IrTypeName = componentType.asIrTypeName()
 }
 
 class CallHook(
@@ -365,7 +365,7 @@ class HookOriginDescriptorArrayGetParameter(
     override val descriptor: FieldDescriptor,
     arrayComponentType: KSType
 ) : HookOriginDescriptorParameter(descriptor) {
-    val arrayComponentTypeName: IrTypeName = arrayComponentType.asIr()
+    val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
 object HookOriginInstanceofParameter : HookOriginParameter
@@ -374,7 +374,7 @@ class HookOriginDescriptorArraySetParameter(
     override val descriptor: FieldDescriptor,
     arrayComponentType: KSType
 ) : HookOriginDescriptorParameter(descriptor) {
-    val arrayComponentTypeName: IrTypeName = arrayComponentType.asIr()
+    val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
 class HookOriginDescriptorCallParameter(override val descriptor: InvokableDescriptor) :
@@ -388,7 +388,7 @@ sealed class HookLocalParameter(
     type: KSType,
     val isVar: Boolean,
 ) : HookParameter {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class HookParamLocalParameter(
@@ -413,15 +413,15 @@ class HookShareLocalParameter(
 ) : HookLocalParameter(name, type, true)
 
 class FunctionParameter(val name: String, type: KSType) {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class FunctionTypeParameter(val name: String?, val type: KSType) {
-    val typeName: IrTypeName = type.asIr()
+    val typeName: IrTypeName = type.asIrTypeName()
 }
 
-private fun KSType.asIr(): IrTypeName =
+private fun KSType.asIrTypeName(): IrTypeName =
     toTypeName().asIrTypeName()
 
-private fun KSClassDeclaration.asIr(): IrClassName =
+private fun KSClassDeclaration.asIrClassName(): IrClassName =
     toClassName().asIrClassName()
