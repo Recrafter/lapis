@@ -2,7 +2,12 @@ package io.github.recrafter.lapis.phases.lowering.types
 
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrDynamic
+import io.github.recrafter.lapis.phases.lowering.asIrLambdaTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeVariableName
+import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 
 open class IrTypeName(
@@ -29,12 +34,12 @@ open class IrTypeName(
 
     open val java: JPTypeName by lazy {
         javaPrimitiveType ?: javaArrayType ?: when (val kotlin = kotlin) {
-            is KPClassName -> kotlin.asIr().java
-            is KPParameterizedTypeName -> kotlin.asIr().java
-            is KPWildcardTypeName -> kotlin.asIr().java
-            is KPTypeVariableName -> kotlin.asIr().java
-            is KPLambdaTypeName -> kotlin.asIr().java
-            is KPDynamic -> kotlin.asIr().java
+            is KPClassName -> kotlin.asIrClassName().java
+            is KPParameterizedTypeName -> kotlin.asIrParameterizedTypeName().java
+            is KPWildcardTypeName -> kotlin.asIrWildcardTypeName().java
+            is KPTypeVariableName -> kotlin.asIrTypeVariableName().java
+            is KPLambdaTypeName -> kotlin.asIrLambdaTypeName().java
+            is KPDynamic -> kotlin.asIrDynamic().java
         }
     }
 
@@ -102,7 +107,7 @@ open class IrTypeName(
         kotlin.hashCode()
 
     companion object {
-        val VOID: IrTypeName = Void::class.asIr()
+        val VOID: IrTypeName = Void::class.asIrClassName()
     }
 }
 

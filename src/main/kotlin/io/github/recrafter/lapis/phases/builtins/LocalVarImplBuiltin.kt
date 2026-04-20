@@ -4,7 +4,7 @@ import com.llamalad7.mixinextras.sugar.ref.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin.LocalVar
 import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.IrSetterParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
@@ -20,55 +20,55 @@ enum class LocalVarImplBuiltin(
 ) : Builtin<KPClass> {
 
     ObjectLocalVar(
-        referenceClassName = LocalRef::class.asIr(),
+        referenceClassName = LocalRef::class.asIrClassName(),
         getterCallable = LocalRef<*>::get,
         setterCallable = LocalRef<*>::set,
     ),
     BooleanLocalVar(
-        valueTypeName = KPBoolean.asIr(),
-        referenceClassName = LocalBooleanRef::class.asIr(),
+        valueTypeName = KPBoolean.asIrClassName(),
+        referenceClassName = LocalBooleanRef::class.asIrClassName(),
         getterCallable = LocalBooleanRef::get,
         setterCallable = LocalBooleanRef::set,
     ),
     ByteLocalVar(
-        valueTypeName = KPByte.asIr(),
-        referenceClassName = LocalByteRef::class.asIr(),
+        valueTypeName = KPByte.asIrClassName(),
+        referenceClassName = LocalByteRef::class.asIrClassName(),
         getterCallable = LocalByteRef::get,
         setterCallable = LocalByteRef::set,
     ),
     ShortLocalVar(
-        valueTypeName = KPShort.asIr(),
-        referenceClassName = LocalShortRef::class.asIr(),
+        valueTypeName = KPShort.asIrClassName(),
+        referenceClassName = LocalShortRef::class.asIrClassName(),
         getterCallable = LocalShortRef::get,
         setterCallable = LocalShortRef::set,
     ),
     IntLocalVar(
-        valueTypeName = KPInt.asIr(),
-        referenceClassName = LocalIntRef::class.asIr(),
+        valueTypeName = KPInt.asIrClassName(),
+        referenceClassName = LocalIntRef::class.asIrClassName(),
         getterCallable = LocalIntRef::get,
         setterCallable = LocalIntRef::set,
     ),
     LongLocalVar(
-        valueTypeName = KPLong.asIr(),
-        referenceClassName = LocalLongRef::class.asIr(),
+        valueTypeName = KPLong.asIrClassName(),
+        referenceClassName = LocalLongRef::class.asIrClassName(),
         getterCallable = LocalLongRef::get,
         setterCallable = LocalLongRef::set,
     ),
     CharLocalVar(
-        valueTypeName = KPChar.asIr(),
-        referenceClassName = LocalCharRef::class.asIr(),
+        valueTypeName = KPChar.asIrClassName(),
+        referenceClassName = LocalCharRef::class.asIrClassName(),
         getterCallable = LocalCharRef::get,
         setterCallable = LocalCharRef::set,
     ),
     FloatLocalVar(
-        valueTypeName = KPFloat.asIr(),
-        referenceClassName = LocalFloatRef::class.asIr(),
+        valueTypeName = KPFloat.asIrClassName(),
+        referenceClassName = LocalFloatRef::class.asIrClassName(),
         getterCallable = LocalFloatRef::get,
         setterCallable = LocalFloatRef::set,
     ),
     DoubleLocalVar(
-        valueTypeName = KPDouble.asIr(),
-        referenceClassName = LocalDoubleRef::class.asIr(),
+        valueTypeName = KPDouble.asIrClassName(),
+        referenceClassName = LocalDoubleRef::class.asIrClassName(),
         getterCallable = LocalDoubleRef::get,
         setterCallable = LocalDoubleRef::set,
     );

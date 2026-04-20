@@ -49,7 +49,7 @@ class MixinLowering(
                         makePublic = descriptor.makePublic,
                         callWrapper = findOriginDescriptorWrapper(descriptor.className),
                         cancelWrapper = findCancelDescriptorWrapper(descriptor.className),
-                        parameters = descriptor.parameters.map { it.asIr() },
+                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.className,
                     )
                 } else {
@@ -61,7 +61,7 @@ class MixinLowering(
                         bodyWrapper = findOriginDescriptorWrapper(descriptor.className),
                         callWrapper = findOriginDescriptorWrapper(descriptor.className),
                         cancelWrapper = findCancelDescriptorWrapper(descriptor.className),
-                        parameters = descriptor.parameters.map { it.asIr() },
+                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.returnTypeName,
                     )
                 }
@@ -131,7 +131,7 @@ class MixinLowering(
                 addAll(patch.sharedFunctions.map { function ->
                     IrFunctionCallExtension(
                         name = function.name,
-                        parameters = function.parameters.asIr(),
+                        parameters = function.parameters.asIrParameterList(),
                         returnTypeName = function.returnTypeName,
                     )
                 })
@@ -194,8 +194,8 @@ class MixinLowering(
                 }
 
                 hook is InstanceofHook -> {
-                    add(IrInjectionValueParameter(Object::class.asIr()))
-                    add(IrInjectionOperationParameter(KPBoolean.asIr()))
+                    add(IrInjectionValueParameter(Object::class.asIrClassName()))
+                    add(IrInjectionOperationParameter(KPBoolean.asIrClassName()))
                 }
             }
             if (!hook.isInjectBased && hook.parameters.any { it is HookCancelParameter }) {
@@ -415,7 +415,7 @@ class MixinLowering(
                 IrInjectionParamLocalParameter(
                     name = descriptorParameter.name ?: parameter.index.toString(),
                     typeName = descriptorParameter.typeName,
-                    varBuiltin = lowerHookLocalVarBuiltin(parameter),
+                    varImplBuiltin = lowerHookLocalVarBuiltin(parameter),
                     localIndex = initialSlot + slotOffset,
                 )
             }
@@ -423,7 +423,7 @@ class MixinLowering(
             is HookBodyLocalParameter -> IrInjectionBodyLocalParameter(
                 name = parameter.name,
                 typeName = parameter.typeName,
-                varBuiltin = lowerHookLocalVarBuiltin(parameter),
+                varImplBuiltin = lowerHookLocalVarBuiltin(parameter),
                 local = when (val local = parameter.local) {
                     is NamedLocal -> IrNamedLocal(local.name)
                     is PositionalLocal -> {
@@ -441,7 +441,7 @@ class MixinLowering(
             is HookShareLocalParameter -> IrInjectionShareParameter(
                 name = parameter.name,
                 typeName = parameter.typeName,
-                varBuiltin = LocalVarImplBuiltin.of(parameter.typeName),
+                varImplBuiltin = LocalVarImplBuiltin.of(parameter.typeName),
                 key = parameter.key,
                 isExported = parameter.isExported,
             )
@@ -476,7 +476,7 @@ class MixinLowering(
                     ),
                     descriptorClassName = descriptor.className,
                     builtin = builtins[DescriptorBuiltin.Body],
-                    parameters = descriptor.parameters.map { it.asIr() },
+                    parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
                 )
                 IrHookOriginDescriptorBodyWrapperArgument(wrapper)
@@ -552,7 +552,7 @@ class MixinLowering(
                     descriptorClassName = descriptor.className,
                     builtin = builtins[DescriptorBuiltin.Call],
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
-                    parameters = descriptor.parameters.map { it.asIr() },
+                    parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
                 )
                 IrHookOriginDescriptorCallWrapperArgument(wrapper)
@@ -567,7 +567,7 @@ class MixinLowering(
                     ),
                     descriptorClassName = descriptor.className,
                     builtin = builtins[DescriptorBuiltin.Cancel],
-                    parameters = descriptor.parameters.map { it.asIr() },
+                    parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
                 )
                 IrHookCancelArgument(wrapper)
@@ -608,34 +608,34 @@ class MixinLowering(
             .find { it.descriptorClassName == descriptorClassName }
 }
 
-fun List<FunctionParameter>.asIr(): List<IrParameter> =
+fun List<FunctionParameter>.asIrParameterList(): List<IrParameter> =
     map { parameter -> IrParameter(parameter.name, parameter.typeName) }
 
-fun FunctionTypeParameter.asIr(): IrFunctionTypeParameter =
+fun FunctionTypeParameter.asIrFunctionTypeParameter(): IrFunctionTypeParameter =
     IrFunctionTypeParameter(name, typeName)
 
-fun KClass<*>.asIr(): IrClassName =
-    asClassName().asIr()
+fun KClass<*>.asIrClassName(): IrClassName =
+    asClassName().asIrClassName()
 
 fun KPTypeName.asIrTypeName(): IrTypeName =
     IrTypeName(this)
 
-fun KPClassName.asIr(): IrClassName =
+fun KPClassName.asIrClassName(): IrClassName =
     IrClassName(this)
 
-fun KPParameterizedTypeName.asIr(): IrParameterizedTypeName =
+fun KPParameterizedTypeName.asIrParameterizedTypeName(): IrParameterizedTypeName =
     IrParameterizedTypeName(this)
 
-fun KPWildcardTypeName.asIr(): IrWildcardTypeName =
+fun KPWildcardTypeName.asIrWildcardTypeName(): IrWildcardTypeName =
     IrWildcardTypeName(this)
 
-fun KPTypeVariableName.asIr(): IrTypeVariableName =
+fun KPTypeVariableName.asIrTypeVariableName(): IrTypeVariableName =
     IrTypeVariableName(this)
 
-fun KPLambdaTypeName.asIr(): IrLambdaTypeName =
+fun KPLambdaTypeName.asIrLambdaTypeName(): IrLambdaTypeName =
     IrLambdaTypeName(this)
 
-fun KPDynamic.asIr(): IrDynamic =
+fun KPDynamic.asIrDynamic(): IrDynamic =
     IrDynamic(this)
 
 private fun String.withQualifiedNamePrefix(className: IrClassName): String =

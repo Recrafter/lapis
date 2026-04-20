@@ -2,7 +2,7 @@ package io.github.recrafter.lapis.phases.lowering.types
 
 import io.github.recrafter.lapis.extensions.jp.JPTypeVariableName
 import io.github.recrafter.lapis.extensions.kp.KPTypeVariableName
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrTypeVariableName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 
 class IrTypeVariableName(override val kotlin: KPTypeVariableName) : IrTypeName(kotlin) {
@@ -13,6 +13,6 @@ class IrTypeVariableName(override val kotlin: KPTypeVariableName) : IrTypeName(k
 
     companion object {
         fun of(name: String, vararg bounds: IrTypeName): IrTypeVariableName =
-            KPTypeVariableName(name, bounds.map { it.kotlin }).asIr()
+            KPTypeVariableName(name, bounds.map { it.kotlin }).asIrTypeVariableName()
     }
 }

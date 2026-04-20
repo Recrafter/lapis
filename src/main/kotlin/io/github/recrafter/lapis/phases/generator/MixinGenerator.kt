@@ -32,7 +32,7 @@ import io.github.recrafter.lapis.phases.generator.accessor.MethodEntry
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.binaryName
@@ -78,8 +78,12 @@ class MixinGenerator(
             descriptors.forEach { descriptor ->
                 when (descriptor) {
                     is IrInvokableDescriptor -> {
-                        descriptor.bodyWrapper?.let { builtins.generateDescWrapper(this, DescriptorBuiltin.Body, it) }
-                        descriptor.callWrapper?.let { builtins.generateDescWrapper(this, DescriptorBuiltin.Call, it) }
+                        descriptor.bodyWrapper?.let {
+                            builtins.generateDescWrapper(this, DescriptorBuiltin.Body, it)
+                        }
+                        descriptor.callWrapper?.let {
+                            builtins.generateDescWrapper(this, DescriptorBuiltin.Call, it)
+                        }
                         descriptor.cancelWrapper?.let {
                             builtins.generateDescWrapper(this, DescriptorBuiltin.Cancel, it)
                         }
@@ -156,7 +160,7 @@ class MixinGenerator(
                             arg(patchField)
                             arg(mixin.patchImplClassName)
                             arg(mixin.targetClassName)
-                            arg(Object::class.asIr())
+                            arg(Object::class.asIrClassName())
                         }
                     }
                     return_("%N") { arg(patchField) }
@@ -349,14 +353,14 @@ class MixinGenerator(
                     is IrInjectionOperationParameter -> {
                         buildJavaParameter(
                             originalParameterName,
-                            Operation::class.asIr().parameterizedBy(parameter.returnTypeName.orVoid())
+                            Operation::class.asIrClassName().parameterizedBy(parameter.returnTypeName.orVoid())
                         )
                     }
 
                     is IrInjectionValueParameter -> buildJavaParameter(valueParameterName, parameter.typeName)
 
                     is IrInjectionLocalParameter -> {
-                        val typeName = parameter.varBuiltin?.let {
+                        val typeName = parameter.varImplBuiltin?.let {
                             if (it == LocalVarImplBuiltin.ObjectLocalVar) {
                                 it.referenceClassName.parameterizedBy(parameter.typeName)
                             } else {
@@ -401,8 +405,8 @@ class MixinGenerator(
                         buildJavaParameter(
                             callbackParameterName,
                             parameter.returnTypeName
-                                ?.let { CallbackInfoReturnable::class.asIr().parameterizedBy(it) }
-                                ?: CallbackInfo::class.asIr()
+                                ?.let { CallbackInfoReturnable::class.asIrClassName().parameterizedBy(it) }
+                                ?: CallbackInfo::class.asIrClassName()
                         ) {
                             if (injection !is IrInjectInjection) {
                                 addAnnotation<Cancellable>()
@@ -539,7 +543,7 @@ class MixinGenerator(
                 }
                 if (hasCancelArgument) {
                     try_(
-                        try_ = invokeHook,
+                        block = invokeHook,
                         catchingClassName = builtins[SimpleBuiltin.CancelSignal],
                         catch_ = injection.returnTypeName?.let {
                             { return_(it.javaPrimitiveType?.primitiveDefaultValue ?: "null") }

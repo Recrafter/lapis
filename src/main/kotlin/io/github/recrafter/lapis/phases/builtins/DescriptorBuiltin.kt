@@ -5,7 +5,8 @@ import io.github.recrafter.lapis.extensions.InternalPrefix.ARGUMENT
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.IrLambdaTypeName
@@ -29,7 +30,7 @@ sealed class DescriptorBuiltin<D : IrDescriptor, W : IrDescriptorWrapper>(
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIr().parameterizedBy(wrapper.fieldTypeName),
+                Operation::class.asIrClassName().parameterizedBy(wrapper.fieldTypeName),
                 listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
@@ -99,7 +100,7 @@ sealed class DescriptorBuiltin<D : IrDescriptor, W : IrDescriptorWrapper>(
             )
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIr().parameterizedBy(IrTypeName.VOID),
+                Operation::class.asIrClassName().parameterizedBy(IrTypeName.VOID),
                 listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
@@ -364,7 +365,7 @@ sealed class DescriptorBuiltin<D : IrDescriptor, W : IrDescriptorWrapper>(
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIr().parameterizedBy(wrapper.returnTypeName.orVoid()),
+                Operation::class.asIrClassName().parameterizedBy(wrapper.returnTypeName.orVoid()),
                 listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
@@ -454,7 +455,7 @@ sealed class DescriptorBuiltin<D : IrDescriptor, W : IrDescriptorWrapper>(
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIr().parameterizedBy(wrapper.returnTypeName.orVoid())
+                Operation::class.asIrClassName().parameterizedBy(wrapper.returnTypeName.orVoid())
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
                 setConstructor(listOfNotNull(receiverParameter) + argumentParameters + operationParameter)
@@ -589,8 +590,8 @@ sealed class DescriptorBuiltin<D : IrDescriptor, W : IrDescriptorWrapper>(
             val callbackParameter = IrParameter(
                 "callback".withInternalPrefix(),
                 wrapper.returnTypeName
-                    ?.let { CallbackInfoReturnable::class.asIr().parameterizedBy(it) }
-                    ?: CallbackInfo::class.asIr(),
+                    ?.let { CallbackInfoReturnable::class.asIrClassName().parameterizedBy(it) }
+                    ?: CallbackInfo::class.asIrClassName(),
                 listOf(IrModifier.PUBLIC)
             )
             dest.addType(buildKotlinClass(wrapper.className.simpleName) {
@@ -600,7 +601,7 @@ sealed class DescriptorBuiltin<D : IrDescriptor, W : IrDescriptorWrapper>(
             dest.addFunction(buildKotlinFunction("invoke", jvmNamespace = wrapper.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(wrapper.superClassTypeName)
-                setReturnType(KPNothing.asIr())
+                setReturnType(KPNothing.asIrClassName())
                 val returnValueParameter = wrapper.returnTypeName
                     ?.let { IrParameter("returnValue", it) }
                     ?.also { addParameter(it) }
@@ -635,7 +636,7 @@ sealed class DescriptorBuiltin<D : IrDescriptor, W : IrDescriptorWrapper>(
     override fun generate(typer: BuiltinTyper): KPClass =
         buildKotlinInterface(name) {
             setModifiers(IrModifier.PUBLIC)
-            setVariableTypes(IrTypeVariableName.of("D", typer(builtin).parameterizedBy(KPStar.asIr())))
+            setVariableTypes(IrTypeVariableName.of("D", typer(builtin).parameterizedBy(KPStar.asIrWildcardTypeName())))
         }
 
     companion object {

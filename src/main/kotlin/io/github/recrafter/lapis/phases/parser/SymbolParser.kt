@@ -17,7 +17,7 @@ import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import ksp.com.intellij.psi.PsiElement
 import ksp.com.intellij.psi.util.PsiTreeUtil
 import ksp.org.jetbrains.kotlin.analysis.api.KaImplementationDetail
@@ -77,7 +77,7 @@ class SymbolParser(
 
             accessTarget != null -> accessTarget to accessTarget
             explicitTarget?.isValid == true -> {
-                explicitTarget.toClassName().asIr().run {
+                explicitTarget.toClassName().asIrClassName().run {
                     binaryName to qualifiedName
                 }
             }

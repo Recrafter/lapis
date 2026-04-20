@@ -3,7 +3,8 @@ package io.github.recrafter.lapis.phases.builtins
 import io.github.recrafter.lapis.extensions.kp.KPStar
 import io.github.recrafter.lapis.extensions.kp.KPTypeAlias
 import io.github.recrafter.lapis.extensions.kp.buildKotlinTypeAlias
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import kotlin.reflect.KFunction
 
@@ -11,7 +12,7 @@ enum class TypeAliasBuiltin : Builtin<KPTypeAlias> {
 
     AutoLambda {
         override fun getActualTypeName(typer: BuiltinTyper): IrTypeName =
-            KFunction::class.asIr().parameterizedBy(KPStar.asIr())
+            KFunction::class.asIrClassName().parameterizedBy(KPStar.asIrWildcardTypeName())
     };
 
     override val isInternal: Boolean = false

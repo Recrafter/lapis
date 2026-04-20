@@ -3,7 +3,8 @@ package io.github.recrafter.lapis.phases.builtins
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 import kotlin.reflect.KProperty
@@ -25,7 +26,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                     listOf(
                         IrParameter(
                             "callable",
-                            KProperty::class.asIr().parameterizedBy(fieldTypeVariableName)
+                            KProperty::class.asIrClassName().parameterizedBy(fieldTypeVariableName)
                         )
                     )
                 )
@@ -38,7 +39,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIr().parameterizedBy(KPStar.asIr())
+                    Function::class.asIrClassName().parameterizedBy(KPStar.asIrWildcardTypeName())
                 )
                 setVariableTypes(functionTypeVariableName)
                 setConstructor(IrParameter("callable", functionTypeVariableName))
@@ -51,7 +52,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIr().parameterizedBy(KPStar.asIr())
+                    Function::class.asIrClassName().parameterizedBy(KPStar.asIrWildcardTypeName())
                 )
                 setVariableTypes(functionTypeVariableName)
                 val functionParameter = IrParameter("callable", functionTypeVariableName)
@@ -68,7 +69,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIr().parameterizedBy(KPStar.asIr())
+                    Function::class.asIrClassName().parameterizedBy(KPStar.asIrWildcardTypeName())
                 )
                 setVariableTypes(functionTypeVariableName)
                 val functionParameter = IrParameter("callable", functionTypeVariableName)
@@ -108,12 +109,12 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC)
                 val valueParameter = IrParameter(
                     "value",
-                    KPAny.asIr(),
+                    KPAny.asIrClassName(),
                     listOf(IrModifier.PUBLIC)
                 )
                 val operationParameter = IrParameter(
                     "operation",
-                    Operation::class.asIr().parameterizedBy(KPBoolean.asIr()),
+                    Operation::class.asIrClassName().parameterizedBy(KPBoolean.asIrClassName()),
                     listOf(IrModifier.PRIVATE)
                 )
                 setConstructor(valueParameter, operationParameter)
@@ -125,7 +126,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                         })
                     }
                     addParameter(valueParameter)
-                    setReturnType(KPBoolean.asIr())
+                    setReturnType(KPBoolean.asIrClassName())
                     setBody {
                         return_("%N.%L(%N)") {
                             arg(operationParameter)
@@ -141,7 +142,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             buildKotlinObject(name) {
                 setModifiers(IrModifier.PUBLIC)
                 setSuperClass(
-                    RuntimeException::class.asIr(),
+                    RuntimeException::class.asIrClassName(),
                     listOf(
                         buildKotlinCodeBlock("null"),
                         buildKotlinCodeBlock("null"),
@@ -151,7 +152,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 )
                 addFunction(buildKotlinFunction(RuntimeException::fillInStackTrace.name) {
                     setModifiers(IrModifier.OVERRIDE)
-                    setReturnType(Throwable::class.asIr())
+                    setReturnType(Throwable::class.asIrClassName())
                     setBody { return_("this") }
                 })
             }

@@ -3,7 +3,8 @@ package io.github.recrafter.lapis.phases.lowering.types
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 
 class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
 
@@ -30,14 +31,14 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
     }
 
     fun nested(name: String): IrClassName =
-        kotlin.nestedClass(name).asIr()
+        kotlin.nestedClass(name).asIrClassName()
 
     fun parameterizedBy(vararg argumentTypeNames: IrTypeName): IrParameterizedTypeName =
-        kotlin.parameterizedBy(argumentTypeNames.map { it.kotlin }).asIr()
+        kotlin.parameterizedBy(argumentTypeNames.map { it.kotlin }).asIrParameterizedTypeName()
 
     companion object {
         fun of(packageName: String, vararg names: String): IrClassName =
-            KPClassName(packageName, *names).asIr()
+            KPClassName(packageName, *names).asIrClassName()
 
         fun fromBinaryName(binaryName: String): IrClassName {
             val mainPart = binaryName.substringBefore('$')

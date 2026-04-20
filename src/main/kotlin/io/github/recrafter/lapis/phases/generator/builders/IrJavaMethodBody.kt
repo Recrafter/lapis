@@ -41,13 +41,13 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
 
     @Suppress("LocalVariableName")
     fun IrJavaMethodBody.try_(
-        try_: Builder<IrJavaCodeBlock>,
+        block: Builder<IrJavaCodeBlock>,
         catchingClassName: IrClassName,
         catch_: Builder<IrJavaCodeBlock>? = null,
         finally_: Builder<IrJavaCodeBlock>? = null,
     ) {
         builder.beginControlFlow(buildJavaCodeBlock("try"))
-        buildJavaCodeBlock(try_)
+        buildJavaCodeBlock(block)
         builder.nextControlFlow(buildJavaCodeBlock("catch (%T %L)") {
             arg(catchingClassName)
             arg(if (catch_ == null) "ignored" else "e")

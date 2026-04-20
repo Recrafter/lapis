@@ -19,27 +19,27 @@ class IrInjectionCallbackParameter(val returnTypeName: IrTypeName?) : IrInjectio
 
 sealed class IrInjectionLocalParameter(
     val typeName: IrTypeName,
-    open val varBuiltin: LocalVarImplBuiltin?,
+    val varImplBuiltin: LocalVarImplBuiltin?,
 ) : IrInjectionParameter
 
 class IrInjectionParamLocalParameter(
     val name: String,
     typeName: IrTypeName,
-    varBuiltin: LocalVarImplBuiltin?,
+    varImplBuiltin: LocalVarImplBuiltin?,
     val localIndex: Int,
-) : IrInjectionLocalParameter(typeName, varBuiltin)
+) : IrInjectionLocalParameter(typeName, varImplBuiltin)
 
 class IrInjectionBodyLocalParameter(
     val name: String,
     typeName: IrTypeName,
-    varBuiltin: LocalVarImplBuiltin?,
+    varImplBuiltin: LocalVarImplBuiltin?,
     val local: IrLocal,
-) : IrInjectionLocalParameter(typeName, varBuiltin)
+) : IrInjectionLocalParameter(typeName, varImplBuiltin)
 
 class IrInjectionShareParameter(
     val name: String,
     typeName: IrTypeName,
-    override val varBuiltin: LocalVarImplBuiltin,
+    varImplBuiltin: LocalVarImplBuiltin,
     val key: String,
     val isExported: Boolean,
-) : IrInjectionLocalParameter(typeName, varBuiltin)
+) : IrInjectionLocalParameter(typeName, varImplBuiltin)

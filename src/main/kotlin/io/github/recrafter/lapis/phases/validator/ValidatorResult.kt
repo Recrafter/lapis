@@ -11,7 +11,7 @@ import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.annotations.Side
 import io.github.recrafter.lapis.annotations.ZeroCondition
-import io.github.recrafter.lapis.phases.lowering.asIr
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
@@ -424,4 +424,4 @@ private fun KSType.asIr(): IrTypeName =
     toTypeName().asIrTypeName()
 
 private fun KSClassDeclaration.asIr(): IrClassName =
-    toClassName().asIr()
+    toClassName().asIrClassName()
