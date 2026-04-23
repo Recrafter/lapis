@@ -44,7 +44,7 @@ typealias KPDynamic = Dynamic
 
 typealias KPModifier = KModifier
 
-val KPNothing: KPClassName = KPClassName("kotlin", "Nothing")
+val KPNothing: KPClassName = NOTHING
 
 val KPUnit: KPClassName = UNIT
 val KPBoolean: KPClassName = BOOLEAN

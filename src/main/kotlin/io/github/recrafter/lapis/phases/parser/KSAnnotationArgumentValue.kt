@@ -30,7 +30,7 @@ class KSAnnotationArgumentValue(
         raw.castOrNull<String>()?.filter { it.isEmpty() }
 
     fun asKClass(types: KSTypes): KSType? =
-        raw.castOrNull<KSType>()?.filter { it == types.nothing }
+        raw.castOrNull<KSType>()?.filter { it.isNothing(types) }
 
     inline fun <reified E : Enum<E>> asEnum(default: E? = null): E? {
         val entryName = raw.castOrNull<KSClassDeclaration>()?.name?.filter { it == default?.name }

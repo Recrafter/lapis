@@ -157,11 +157,17 @@ class FrontendValidator(
                 kspRequire(callableReference == null) { "147" }
                 kspRequire(!unfinal) { "149" }
                 kspRequire(genericType.receiverType == null) { "150" }
-                kspRequire(genericType.returnType?.declaration == schemaTargetClassDeclaration) { "150" }
+                kspRequire(genericType.returnType == null) { "150" }
+                kspRequire(!hasBytecodeNameAnnotation) { "151" }
+                val actualTypes = genericType.parameters.map { it.type }
+                val hasExactMatch = schemaTargetClassDeclaration.constructorDeclarations.find { declaration ->
+                    actualTypes == declaration.parameters.map { it.type.resolve() }
+                }
+                kspRequireNotNull(hasExactMatch) { "156" }
                 ConstructorDescriptor(
                     name = name,
                     classDeclaration = classDeclaration,
-                    returnType = genericType.returnType,
+                    returnType = schemaTargetClassDeclaration.type,
                     parameters = parameters,
                     makePublic = hasAccessAnnotation,
                 )

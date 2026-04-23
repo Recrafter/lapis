@@ -5,7 +5,6 @@ import com.google.devtools.ksp.impl.symbol.kotlin.KSClassDeclarationImpl
 import com.google.devtools.ksp.impl.symbol.kotlin.KSFunctionDeclarationImpl
 import com.google.devtools.ksp.impl.symbol.kotlin.KSPropertyDeclarationJavaImpl
 import com.google.devtools.ksp.isAbstract
-import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
@@ -14,7 +13,6 @@ import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.annotations.Origin
 import io.github.recrafter.lapis.extensions.common.castOrNull
-import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
@@ -47,10 +45,12 @@ class SymbolParser(
                 .filter { symbol ->
                     val parent = symbol.parentDeclaration
                     parent == null || !parent.hasAnnotation<Schema>()
-                },
+                }
+                .toList(),
             resolver
                 .getSymbolsAnnotatedWith<Patch>()
-                .filterIsInstance<KSClassDeclaration>(),
+                .filterIsInstance<KSClassDeclaration>()
+                .toList(),
         )
 
     fun parse(): ParserResult =
@@ -97,6 +97,7 @@ class SymbolParser(
 
     private fun parseDescriptor(classDeclaration: KSClassDeclaration): ParsedDescriptor {
         val accessAnnotation = classDeclaration.findAnnotation<Access>()
+        val bytecodeNameAnnotation = classDeclaration.findAnnotation<BytecodeName>()
         val superClassType = classDeclaration.getSuperTypeOrNull()
         val ktSuperTypeListEntry = classDeclaration
             .castOrNull<KSClassDeclarationImpl>()
@@ -113,6 +114,8 @@ class SymbolParser(
             classDeclaration = classDeclaration,
             hasStaticAnnotation = classDeclaration.hasAnnotation<Static>(),
             hasAccessAnnotation = accessAnnotation != null,
+            hasBytecodeNameAnnotation = bytecodeNameAnnotation != null,
+            bytecodeName = bytecodeNameAnnotation?.getArgumentValue(BytecodeName::name),
             unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
 
             genericType = parseDescriptorGenericType(
@@ -153,12 +156,12 @@ class SymbolParser(
                             name = ktFunctionType.parameters.getOrNull(index)?.name,
                         )
                     },
-                returnType = genericTypes.lastOrNull()?.takeNotUnit()
+                returnType = genericTypes.lastOrNull()?.takeIf { !it.isUnit(types) }
             )
         } else {
             ParsedTypeDescriptorGenericType(
                 type = type,
-                arrayComponentType = type?.findArrayComponentType()
+                arrayComponentType = type?.findArrayComponentType(types)
             )
         }
 
@@ -223,14 +226,12 @@ class SymbolParser(
 
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
-            properties = classDeclaration?.propertyDeclarations?.map { parsePatchProperty(it) }.orEmpty(),
+            properties = classDeclaration?.propertyDeclarations?.map { parsePatchProperty(it) }.orEmpty().toList(),
             functions = listOfNotNull(
                 classDeclaration,
                 classDeclaration?.findCompanionObject(),
             ).flatMap { classDeclaration ->
-                classDeclaration.functionDeclarations
-                    .filter { !it.isConstructor() }
-                    .map { parsePatchFunction(it) }
+                classDeclaration.functionDeclarations.map { parsePatchFunction(it) }
             },
         )
     }
@@ -388,28 +389,11 @@ class SymbolParser(
         )
     }
 
-    fun KSType.takeNotUnit(): KSType? =
-        takeIf { it != types.unit }
-
     fun KSClassDeclaration.getSuperTypeOrNull(): KSType? =
-        superTypes.map { it.resolve() }.find { it != types.any }
+        superTypes.map { it.resolve() }.find { !it.isAny(types) }
 
     fun KSFunctionDeclaration.getReturnTypeOrNull(): KSType? =
-        returnType?.resolve()?.takeNotUnit()
-
-    fun KSType.findArrayComponentType(): KSType? =
-        when (declaration.qualifiedName?.asString()) {
-            KPArray.qualifiedName -> arguments.firstOrNull()?.type?.resolve()
-            KPBooleanArray.qualifiedName -> types.boolean
-            KPByteArray.qualifiedName -> types.byte
-            KPShortArray.qualifiedName -> types.short
-            KPIntArray.qualifiedName -> types.int
-            KPLongArray.qualifiedName -> types.long
-            KPCharArray.qualifiedName -> types.char
-            KPFloatArray.qualifiedName -> types.float
-            KPDoubleArray.qualifiedName -> types.double
-            else -> null
-        }
+        returnType?.resolve()?.takeIf { !it.isUnit(types) }
 
     private inline fun <reified A : Annotation> KSAnnotation.findArgumentValue(
         property: KProperty1<A, *>,

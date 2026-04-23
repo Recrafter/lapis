@@ -1,9 +1,7 @@
 package io.github.recrafter.lapis.extensions.ks
 
-import com.google.devtools.ksp.getDeclaredFunctions
-import com.google.devtools.ksp.getDeclaredProperties
+import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
-import com.google.devtools.ksp.validate
 
 val KSClassDeclaration.starProjectedType: KSType
     get() = asStarProjectedType()
@@ -20,14 +18,17 @@ val KSClassDeclaration.isInner: Boolean
 val KSClassDeclaration.isValid: Boolean
     get() = validate()
 
-val KSClassDeclaration.classDeclarations: List<KSClassDeclaration>
-    get() = declarations.filterIsInstance<KSClassDeclaration>().toList()
+val KSClassDeclaration.propertyDeclarations: Sequence<KSPropertyDeclaration>
+    get() = getDeclaredProperties()
 
-val KSClassDeclaration.propertyDeclarations: List<KSPropertyDeclaration>
-    get() = getDeclaredProperties().toList()
+val KSClassDeclaration.constructorDeclarations: Sequence<KSFunctionDeclaration>
+    get() = getConstructors()
 
-val KSClassDeclaration.functionDeclarations: List<KSFunctionDeclaration>
-    get() = getDeclaredFunctions().toList()
+val KSClassDeclaration.functionDeclarations: Sequence<KSFunctionDeclaration>
+    get() = getDeclaredFunctions().filter { !it.isConstructor() }
+
+val KSClassDeclaration.classDeclarations: Sequence<KSClassDeclaration>
+    get() = declarations.filterIsInstance<KSClassDeclaration>()
 
 fun KSClassDeclaration.findCompanionObject(): KSClassDeclaration? =
     classDeclarations.find { it.isCompanionObject }

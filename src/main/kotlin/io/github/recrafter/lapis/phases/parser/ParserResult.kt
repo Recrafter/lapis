@@ -32,6 +32,8 @@ class ParsedDescriptor(
     val classDeclaration: KSClassDeclaration,
     val hasStaticAnnotation: Boolean,
     val hasAccessAnnotation: Boolean,
+    val hasBytecodeNameAnnotation: Boolean,
+    val bytecodeName: String?,
     val unfinal: Boolean,
     val superClassDeclaration: KSClassDeclaration?,
     val genericType: ParsedDescriptorGenericType?,
