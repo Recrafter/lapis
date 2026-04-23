@@ -10,8 +10,6 @@ import io.github.recrafter.lapis.phases.generator.KSuppressWarning
 import io.github.recrafter.lapis.phases.lowering.models.IrDescriptorWrapperImpl
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 
-typealias BuiltinTyper = (Builtin<*>) -> IrClassName
-
 class Builtins(
     generatedPackageName: String,
     private val codeGenerator: CodeGenerator,

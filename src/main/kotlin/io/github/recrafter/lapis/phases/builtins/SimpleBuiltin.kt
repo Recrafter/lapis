@@ -10,13 +10,13 @@ import kotlin.reflect.KProperty
 
 enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPClass> {
     Descriptor {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
             }
     },
     Field {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinClass(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                 val fieldTypeVariableName = IrTypeVariableName.of("T")
@@ -27,11 +27,11 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                         KProperty::class.asIrClassName().parameterizedBy(fieldTypeVariableName)
                     )
                 )
-                addSuperInterface(typer(Descriptor))
+                addSuperInterface(resolve(Descriptor))
             }
     },
     Callable {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
                 val functionTypeVariableName = IrTypeVariableName.of(
@@ -39,11 +39,11 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                     Function::class.asIrClassName().parameterizedByStar()
                 )
                 setVariableTypes(functionTypeVariableName)
-                addSuperInterface(typer(Descriptor))
+                addSuperInterface(resolve(Descriptor))
             }
     },
     Method {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinClass(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                 val functionTypeVariableName = IrTypeVariableName.of(
@@ -52,11 +52,11 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 )
                 setVariableTypes(functionTypeVariableName)
                 setConstructor(IrParameter("reference", functionTypeVariableName))
-                addSuperInterface(typer(Callable).parameterizedBy(functionTypeVariableName))
+                addSuperInterface(resolve(Callable).parameterizedBy(functionTypeVariableName))
             }
     },
     Constructor {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
                 setModifiers(IrModifier.PUBLIC)
                 val functionTypeVariableName = IrTypeVariableName.of(
@@ -64,11 +64,11 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                     Function::class.asIrClassName().parameterizedByStar()
                 )
                 setVariableTypes(functionTypeVariableName)
-                addSuperInterface(typer(Callable).parameterizedBy(functionTypeVariableName))
+                addSuperInterface(resolve(Callable).parameterizedBy(functionTypeVariableName))
             }
     },
     Patch {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinClass(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                 val instanceTypeVariableName = IrTypeVariableName.of("I")
@@ -79,7 +79,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             }
     },
     LocalVar {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
                 val localTypeVariableName = IrTypeVariableName.of("T")
@@ -91,7 +91,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             }
     },
     Instanceof {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinClass(name) {
                 setModifiers(IrModifier.PUBLIC)
                 val valueParameter = IrParameter(
@@ -125,7 +125,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             }
     },
     CancelSignal(isInternal = true) {
-        override fun generate(typer: BuiltinTyper): KPClass =
+        override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinObject(name) {
                 setModifiers(IrModifier.PUBLIC)
                 setSuperClass(
@@ -145,5 +145,5 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             }
     };
 
-    abstract override fun generate(typer: BuiltinTyper): KPClass
+    abstract override fun generate(resolve: BuiltinResolver): KPClass
 }

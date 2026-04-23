@@ -293,7 +293,7 @@ class FrontendValidator(
                     type = atLocalType,
                     ordinals = ordinals(atLocalOpOrdinals),
                     local = validateLocal(atLocalExplicitOrdinal, atLocalExplicitName),
-                    isSet = atLocalOp == Op.Set,
+                    op = atLocalOp,
                     parameters = parameters(),
                 )
             }

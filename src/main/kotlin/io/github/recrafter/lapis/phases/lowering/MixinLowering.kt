@@ -271,7 +271,7 @@ class MixinLowering(
                     parameters = parameters,
                     hookArguments = hookArguments,
                     local = lowerLocal(hook.local, hook.descriptor, hook.typeName),
-                    isSet = hook.isSet,
+                    op = hook.op,
                     ordinal = ordinal,
                     isStatic = hook.descriptor.isStatic,
                 )

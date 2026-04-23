@@ -69,7 +69,7 @@ class IrModifyVariableInjection(
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
     val local: IrLocal,
-    val isSet: Boolean,
+    val op: Op,
     ordinal: Int?,
     isStatic: Boolean,
 ) : IrInjection(name, methodMixinRef, returnTypeName, parameters, hookArguments, isStatic, ordinal)

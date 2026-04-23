@@ -75,7 +75,7 @@ enum class LocalVarImplBuiltin(
 
     override val isInternal: Boolean = true
 
-    override fun generate(typer: BuiltinTyper): KPClass =
+    override fun generate(resolve: BuiltinResolver): KPClass =
         buildKotlinClass(name) {
             setModifiers(IrModifier.PUBLIC)
             val genericTypeName = valueTypeName ?: run {
@@ -87,7 +87,7 @@ enum class LocalVarImplBuiltin(
                 listOf(IrModifier.PRIVATE)
             )
             setConstructor(referenceParameter)
-            addSuperInterface(typer(LocalVar).parameterizedBy(genericTypeName))
+            addSuperInterface(resolve(LocalVar).parameterizedBy(genericTypeName))
             addProperty(buildKotlinProperty("value", genericTypeName) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                 setGetter {

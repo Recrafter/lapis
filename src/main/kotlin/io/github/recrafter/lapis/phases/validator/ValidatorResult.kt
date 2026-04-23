@@ -34,7 +34,8 @@ class Schema(
     val descriptors: List<Descriptor>,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
-    val targetClassName: IrClassName = targetClassDeclaration?.asIrClassName() ?: IrClassName.fromBinaryName(targetBinaryName)
+    val targetClassName: IrClassName = targetClassDeclaration?.asIrClassName()
+        ?: IrClassName.fromBinaryName(targetBinaryName)
     val containingFile: KSFile? = source.containingFile
 }
 
@@ -222,7 +223,7 @@ class LocalHook(
     parameters: List<HookParameter>,
     ordinals: List<Int>,
     val local: DomainLocal,
-    val isSet: Boolean,
+    val op: Op,
 ) : DomainHook(name, descriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }

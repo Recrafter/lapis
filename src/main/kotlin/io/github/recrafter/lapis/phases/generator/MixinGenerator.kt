@@ -245,7 +245,13 @@ class MixinGenerator(
                         is IrPositionalLocal -> setIntMember(ModifyVariable::ordinal, local.ordinal)
                     }
                     setAnnotationMember<ModifyVariable, At>(ModifyVariable::at) {
-                        setStringMember(At::value, if (injection.isSet) "STORE" else "LOAD")
+                        setStringMember(
+                            At::value,
+                            when (injection.op) {
+                                Op.Get -> "LOAD"
+                                Op.Set -> "STORE"
+                            }
+                        )
                         injection.ordinal?.let { setIntMember(At::ordinal, it) }
                         setBooleanMember(At::unsafe, true)
                     }
@@ -314,11 +320,11 @@ class MixinGenerator(
                             At::opcode,
                             if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD
                         )
-                        val argArrayValue = when (injection.op) {
+                        val arrayOp = when (injection.op) {
                             Op.Get -> "get"
                             Op.Set -> "set"
                         }
-                        setStringArrayMember(At::args, "array=$argArrayValue")
+                        setStringArrayMember(At::args, "array=$arrayOp")
                         injection.ordinal?.let { setIntMember(At::ordinal, it) }
                         setBooleanMember(At::unsafe, true)
                     }
