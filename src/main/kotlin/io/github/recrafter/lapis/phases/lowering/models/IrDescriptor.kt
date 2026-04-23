@@ -10,41 +10,48 @@ sealed class IrDescriptor(
 sealed class IrInvokableDescriptor(
     makePublic: Boolean,
     removeFinal: Boolean,
-    val bodyWrapper: IrDescriptorBodyWrapper?,
-    val callWrapper: IrDescriptorCallWrapper?,
-    val cancelWrapper: IrDescriptorCancelWrapper?,
+    val bodyWrapperImpl: IrDescriptorBodyWrapperImpl?,
+    val callWrapperImpl: IrDescriptorCallWrapperImpl?,
+    val cancelWrapperImpl: IrDescriptorCancelWrapperImpl?,
     val parameters: List<IrFunctionTypeParameter>,
     val returnTypeName: IrTypeName?,
 ) : IrDescriptor(makePublic, removeFinal)
 
 class IrConstructorDescriptor(
     makePublic: Boolean,
-    callWrapper: IrDescriptorCallWrapper?,
-    cancelWrapper: IrDescriptorCancelWrapper?,
+    callWrapperImpl: IrDescriptorCallWrapperImpl?,
     parameters: List<IrFunctionTypeParameter>,
     returnTypeName: IrTypeName,
-) : IrInvokableDescriptor(makePublic, false, null, callWrapper, cancelWrapper, parameters, returnTypeName)
+) : IrInvokableDescriptor(makePublic, false, null, callWrapperImpl, null, parameters, returnTypeName)
 
 class IrMethodDescriptor(
     makePublic: Boolean,
     removeFinal: Boolean,
     val name: String,
     val targetName: String,
-    bodyWrapper: IrDescriptorBodyWrapper?,
-    callWrapper: IrDescriptorCallWrapper?,
-    cancelWrapper: IrDescriptorCancelWrapper?,
+    bodyWrapperImpl: IrDescriptorBodyWrapperImpl?,
+    callWrapperImpl: IrDescriptorCallWrapperImpl?,
+    cancelWrapperImpl: IrDescriptorCancelWrapperImpl?,
     parameters: List<IrFunctionTypeParameter>,
     returnTypeName: IrTypeName?,
-) : IrInvokableDescriptor(makePublic, removeFinal, bodyWrapper, callWrapper, cancelWrapper, parameters, returnTypeName)
+) : IrInvokableDescriptor(
+    makePublic,
+    removeFinal,
+    bodyWrapperImpl,
+    callWrapperImpl,
+    cancelWrapperImpl,
+    parameters,
+    returnTypeName
+)
 
 class IrFieldDescriptor(
     makePublic: Boolean,
     removeFinal: Boolean,
     val name: String,
     val targetName: String,
-    val fieldGetWrapper: IrDescriptorFieldGetWrapper?,
-    val fieldSetWrapper: IrDescriptorFieldSetWrapper?,
-    val arrayGetWrapper: IrDescriptorArrayGetWrapper?,
-    val arraySetWrapper: IrDescriptorArraySetWrapper?,
+    val fieldGetWrapperImpl: IrDescriptorFieldGetWrapperImpl?,
+    val fieldSetWrapperImpl: IrDescriptorFieldSetWrapperImpl?,
+    val arrayGetWrapperImpl: IrDescriptorArrayGetWrapperImpl?,
+    val arraySetWrapperImpl: IrDescriptorArraySetWrapperImpl?,
     val typeName: IrTypeName,
 ) : IrDescriptor(makePublic, removeFinal)

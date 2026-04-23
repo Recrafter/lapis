@@ -53,8 +53,6 @@ val JPList: JPClassName = JPClassName.get(List::class.java)
 val JPSet: JPClassName = JPClassName.get(Set::class.java)
 val JPMap: JPClassName = JPClassName.get(Map::class.java)
 
-val JPStar: JPWildcardTypeName = JPWildcardTypeName.subtypeOf(JPObject)
-
 inline fun <reified A : Annotation> buildJavaAnnotation(builder: Builder<JPAnnotationBuilder> = {}): JPAnnotation =
     JPAnnotation.builder(JPClassName.get(A::class.java)).apply(builder).build()
 

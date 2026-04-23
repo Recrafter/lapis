@@ -2,13 +2,7 @@ package io.github.recrafter.lapis.phases.lowering.types
 
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.phases.lowering.asIrDynamic
-import io.github.recrafter.lapis.phases.lowering.asIrLambdaTypeName
-import io.github.recrafter.lapis.phases.lowering.asIrTypeVariableName
-import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
-import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
-import io.github.recrafter.lapis.phases.lowering.asIrClassName
-import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.*
 
 open class IrTypeName(
     open val kotlin: KPTypeName,

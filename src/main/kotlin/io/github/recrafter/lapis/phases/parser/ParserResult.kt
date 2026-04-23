@@ -34,45 +34,35 @@ class ParsedDescriptor(
     val hasAccessAnnotation: Boolean,
     val unfinal: Boolean,
     val superClassDeclaration: KSClassDeclaration?,
-    val generic: ParsedDescriptorGeneric?,
-    val callable: ParsedDescriptorCallable?,
+    val genericType: ParsedDescriptorGenericType?,
+    val callableReference: ParsedDescriptorCallableReference?,
 ) : SymbolSource(symbol)
 
-sealed interface ParsedDescriptorGeneric
+sealed interface ParsedDescriptorGenericType
 
-class ParsedFunctionTypeDescriptorGeneric(
+class ParsedFunctionTypeDescriptorGenericType(
     val receiverType: KSType?,
     val parameters: List<ParsedParameter>,
     val returnType: KSType?,
-) : ParsedDescriptorGeneric
+) : ParsedDescriptorGenericType
 
-class ParsedTypeDescriptorGeneric(
+class ParsedTypeDescriptorGenericType(
     val type: KSType?,
     val arrayComponentType: KSType?,
-) : ParsedDescriptorGeneric
+) : ParsedDescriptorGenericType
 
-sealed class ParsedDescriptorCallable(val name: String?)
-
-class InvisibleCallableReference(name: String?) : ParsedDescriptorCallable(name)
-
-class ParsedFieldDescriptorCallable(
+sealed class ParsedDescriptorCallableReference(val name: String?)
+class ParsedFieldDescriptorCallableReference(
     val receiverClassDeclaration: KSClassDeclaration?,
     name: String?,
-    val type: KSType?,
-) : ParsedDescriptorCallable(name)
+) : ParsedDescriptorCallableReference(name)
 
-class ParsedMethodDescriptorCallable(
+class ParsedMethodDescriptorCallableReference(
     val receiverClassDeclaration: KSClassDeclaration?,
     name: String?,
-    val parameters: List<ParsedParameter>,
-    val returnType: KSType?,
-) : ParsedDescriptorCallable(name)
+) : ParsedDescriptorCallableReference(name)
 
-class ParsedConstructorDescriptorCallable(
-    val receiverClassDeclaration: KSClassDeclaration?,
-    val parameters: List<ParsedParameter>,
-    val returnType: KSType?,
-) : ParsedDescriptorCallable(null)
+class InvisibleCallableReference(name: String?) : ParsedDescriptorCallableReference(name)
 
 class ParsedPatch(
     override val symbol: KSAnnotated,

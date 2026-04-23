@@ -3,7 +3,6 @@ package io.github.recrafter.lapis.phases.builtins
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
@@ -13,7 +12,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
     Descriptor {
         override fun generate(typer: BuiltinTyper): KPClass =
             buildKotlinInterface(name) {
-                setModifiers(IrModifier.PRIVATE, IrModifier.SEALED)
+                setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
             }
     },
     Field {
@@ -23,11 +22,9 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 val fieldTypeVariableName = IrTypeVariableName.of("T")
                 setVariableTypes(fieldTypeVariableName)
                 setConstructor(
-                    listOf(
-                        IrParameter(
-                            "callable",
-                            KProperty::class.asIrClassName().parameterizedBy(fieldTypeVariableName)
-                        )
+                    IrParameter(
+                        "callable",
+                        KProperty::class.asIrClassName().parameterizedBy(fieldTypeVariableName)
                     )
                 )
                 addSuperInterface(typer(Descriptor))
@@ -35,14 +32,13 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
     },
     Callable {
         override fun generate(typer: BuiltinTyper): KPClass =
-            buildKotlinClass(name) {
+            buildKotlinInterface(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIrClassName().parameterizedBy(KPStar.asIrWildcardTypeName())
+                    Function::class.asIrClassName().parameterizedByStar()
                 )
                 setVariableTypes(functionTypeVariableName)
-                setConstructor(IrParameter("callable", functionTypeVariableName))
                 addSuperInterface(typer(Descriptor))
             }
     },
@@ -52,32 +48,23 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIrClassName().parameterizedBy(KPStar.asIrWildcardTypeName())
+                    Function::class.asIrClassName().parameterizedByStar()
                 )
                 setVariableTypes(functionTypeVariableName)
-                val functionParameter = IrParameter("callable", functionTypeVariableName)
-                setConstructor(functionParameter)
-                setSuperClass(
-                    typer(Callable).parameterizedBy(functionTypeVariableName),
-                    listOf(buildKotlinCodeBlock("%N") { arg(functionParameter) })
-                )
+                setConstructor(IrParameter("reference", functionTypeVariableName))
+                addSuperInterface(typer(Callable).parameterizedBy(functionTypeVariableName))
             }
     },
     Constructor {
         override fun generate(typer: BuiltinTyper): KPClass =
-            buildKotlinClass(name) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
+            buildKotlinInterface(name) {
+                setModifiers(IrModifier.PUBLIC)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIrClassName().parameterizedBy(KPStar.asIrWildcardTypeName())
+                    Function::class.asIrClassName().parameterizedByStar()
                 )
                 setVariableTypes(functionTypeVariableName)
-                val functionParameter = IrParameter("callable", functionTypeVariableName)
-                setConstructor(functionParameter)
-                setSuperClass(
-                    typer(Callable).parameterizedBy(functionTypeVariableName),
-                    listOf(buildKotlinCodeBlock("%N") { arg(functionParameter) })
-                )
+                addSuperInterface(typer(Callable).parameterizedBy(functionTypeVariableName))
             }
     },
     Patch {

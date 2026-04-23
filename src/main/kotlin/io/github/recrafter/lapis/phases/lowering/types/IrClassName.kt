@@ -3,8 +3,10 @@ package io.github.recrafter.lapis.phases.lowering.types
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.extensions.lastIndexOfOrNull
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
 
 class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
 
@@ -36,6 +38,9 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
     fun parameterizedBy(vararg argumentTypeNames: IrTypeName): IrParameterizedTypeName =
         kotlin.parameterizedBy(argumentTypeNames.map { it.kotlin }).asIrParameterizedTypeName()
 
+    fun parameterizedByStar(): IrParameterizedTypeName =
+        parameterizedBy(KPStar.asIrWildcardTypeName())
+
     companion object {
         fun of(packageName: String, vararg names: String): IrClassName =
             KPClassName(packageName, *names).asIrClassName()
@@ -48,7 +53,7 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
                 emptyList()
             }
 
-            val lastDotIndex = mainPart.lastIndexOf('.').takeIf { it != -1 }
+            val lastDotIndex = mainPart.lastIndexOfOrNull('.')
 
             val packageName = if (lastDotIndex != null) {
                 mainPart.substring(0, lastDotIndex)

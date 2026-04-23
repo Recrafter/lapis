@@ -2,7 +2,6 @@ package io.github.recrafter.lapis.phases.lowering.types
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.JPObject
-import io.github.recrafter.lapis.extensions.jp.JPStar
 import io.github.recrafter.lapis.extensions.jp.JPWildcardTypeName
 import io.github.recrafter.lapis.extensions.kp.KPStar
 import io.github.recrafter.lapis.extensions.kp.KPWildcardTypeName
@@ -19,7 +18,7 @@ class IrWildcardTypeName(override val kotlin: KPWildcardTypeName) : IrTypeName(k
             )
         }
         if (kotlin == KPStar) {
-            return@lazy JPStar
+            return@lazy JPWildcardTypeName.subtypeOf(JPObject)
         }
         val inBound = kotlin.inTypes.singleOrNull()?.asIrTypeName()?.java
         return@lazy if (inBound != null) {

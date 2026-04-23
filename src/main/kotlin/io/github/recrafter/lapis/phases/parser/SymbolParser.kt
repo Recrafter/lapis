@@ -27,7 +27,6 @@ import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaErrorCallInfo
 import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaSuccessCallInfo
 import ksp.org.jetbrains.kotlin.analysis.api.session.KaSessionProvider
 import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
-import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
 import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaJavaFieldSymbol
 import ksp.org.jetbrains.kotlin.analysis.api.types.KaClassType
@@ -63,9 +62,7 @@ class SymbolParser(
         }
 
     private fun parseSchema(symbol: KSClassDeclaration, parentBinaryName: String? = null): ParsedSchema {
-        val (nestedSchemas, descriptors) = symbol.declarations
-            .filterIsInstance<KSClassDeclaration>()
-            .partition { it.getSuperClassTypeOrNull() == null }
+        val (nestedSchemas, descriptors) = symbol.classDeclarations.partition { it.getSuperTypeOrNull() == null }
         val accessAnnotation = symbol.findAnnotation<Access>()
         val accessTarget = accessAnnotation?.getArgumentValue(Access::target)
         val explicitTarget = symbol.findAnnotation<Schema>()?.getArgumentValue(Schema::target)?.toClassDeclaration()
@@ -100,15 +97,14 @@ class SymbolParser(
 
     private fun parseDescriptor(classDeclaration: KSClassDeclaration): ParsedDescriptor {
         val accessAnnotation = classDeclaration.findAnnotation<Access>()
-        val superClassType = classDeclaration.getSuperClassTypeOrNull()
-        val ktSuperTypeCallEntry = classDeclaration
+        val superClassType = classDeclaration.getSuperTypeOrNull()
+        val ktSuperTypeListEntry = classDeclaration
             .castOrNull<KSClassDeclarationImpl>()
             ?.ktDeclarationSymbol
             ?.castOrNull<KaClassSymbol>()
             ?.psi
             ?.castOrNull<KtClassOrObject>()
             ?.superTypeListEntries
-            ?.filterIsInstance<KtSuperTypeCallEntry>()
             ?.firstOrNull()
         return ParsedDescriptor(
             symbol = classDeclaration,
@@ -119,31 +115,33 @@ class SymbolParser(
             hasAccessAnnotation = accessAnnotation != null,
             unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
 
-            generic = parseDescriptorGeneric(
-                superClassType,
-                ktSuperTypeCallEntry
+            genericType = parseDescriptorGenericType(
+                superClassType?.genericTypes?.firstOrNull(),
+                ktSuperTypeListEntry
+                    ?.typeReference
+                    ?.typeElement
+                    ?.castOrNull<KtUserType>()
                     ?.typeArguments
                     ?.firstOrNull()
                     ?.typeReference
                     ?.typeElement
                     ?.castOrNull<KtFunctionType>()
             ),
-            callable = parseDescriptorCallable(ktSuperTypeCallEntry),
+            callableReference = parseDescriptorCallableReference(ktSuperTypeListEntry as? KtSuperTypeCallEntry),
             superClassDeclaration = superClassType?.toClassDeclaration(),
         )
     }
 
-    private fun parseDescriptorGeneric(
-        superClassType: KSType?,
+    private fun parseDescriptorGenericType(
+        type: KSType?,
         ktFunctionType: KtFunctionType?
-    ): ParsedDescriptorGeneric {
-        val superClassGenericType = superClassType?.genericTypes?.firstOrNull()
-        return if (superClassGenericType?.isFunctionType == true) {
-            val functionGenericTypes = superClassGenericType.genericTypes
-            val receiverType = if (ktFunctionType?.receiver != null) functionGenericTypes.firstOrNull() else null
-            ParsedFunctionTypeDescriptorGeneric(
+    ): ParsedDescriptorGenericType =
+        if (type?.isFunctionType == true && ktFunctionType != null) {
+            val genericTypes = type.genericTypes
+            val receiverType = if (ktFunctionType.receiver != null) genericTypes.firstOrNull() else null
+            ParsedFunctionTypeDescriptorGenericType(
                 receiverType = receiverType,
-                parameters = functionGenericTypes
+                parameters = genericTypes
                     .drop(
                         if (receiverType != null) 1
                         else 0
@@ -152,24 +150,26 @@ class SymbolParser(
                     .mapIndexed { index, type ->
                         ParsedParameter(
                             type = type,
-                            name = ktFunctionType?.parameters?.getOrNull(index)?.name,
+                            name = ktFunctionType.parameters.getOrNull(index)?.name,
                         )
                     },
-                returnType = functionGenericTypes.lastOrNull()?.takeNotUnit()
+                returnType = genericTypes.lastOrNull()?.takeNotUnit()
             )
         } else {
-            ParsedTypeDescriptorGeneric(
-                type = superClassGenericType,
-                arrayComponentType = superClassGenericType?.findArrayComponentType()
+            ParsedTypeDescriptorGenericType(
+                type = type,
+                arrayComponentType = type?.findArrayComponentType()
             )
         }
-    }
 
-    private fun parseDescriptorCallable(ktSuperTypeCallEntry: KtSuperTypeCallEntry?): ParsedDescriptorCallable? {
-        ktSuperTypeCallEntry?.useAnalysis {
-            it.typeReference?.type?.castOrNull<KaClassType>()?.typeArguments?.firstOrNull()?.type
-        }
-        return ktSuperTypeCallEntry
+    private fun parseDescriptorCallableReference(
+        ktSuperTypeCallEntry: KtSuperTypeCallEntry?
+    ): ParsedDescriptorCallableReference? =
+        ktSuperTypeCallEntry
+            ?.useAnalysis {
+                it.typeReference?.type?.castOrNull<KaClassType>()?.typeArguments?.firstOrNull()?.type
+                return@useAnalysis it
+            }
             ?.getChildOfType<KtValueArgumentList>()
             ?.arguments
             ?.firstOrNull()
@@ -180,53 +180,37 @@ class SymbolParser(
                 if (callInfo is KaErrorCallInfo && callInfo.diagnostic.factoryName == "INVISIBLE_REFERENCE") {
                     return@useAnalysis InvisibleCallableReference(callable.callableReference.text)
                 }
-                val successCallInfo = callInfo as? KaSuccessCallInfo ?: return@useAnalysis null
-                val call = successCallInfo.call as? KaCallableMemberCall<*, *> ?: return@useAnalysis null
-                val symbol = call.partiallyAppliedSymbol.signature.symbol
-                val containingClassSymbol = symbol.containingSymbol as? KaClassSymbol
-                val receiverClassDecl = containingClassSymbol?.let { KSClassDeclarationImpl.getCached(it) }
+                val symbol = callInfo
+                    ?.castOrNull<KaSuccessCallInfo>()
+                    ?.call
+                    ?.castOrNull<KaCallableMemberCall<*, *>>()
+                    ?.partiallyAppliedSymbol
+                    ?.signature
+                    ?.symbol
+                    ?: return@useAnalysis null
+                val receiverClassDeclaration = symbol
+                    .containingSymbol
+                    ?.castOrNull<KaClassSymbol>()
+                    ?.let { KSClassDeclarationImpl.getCached(it) }
                 when (symbol) {
-                    is KaConstructorSymbol -> {
-                        val declaration = KSFunctionDeclarationImpl.getCached(symbol)
-                        ParsedConstructorDescriptorCallable(
-                            receiverClassDeclaration = receiverClassDecl,
-                            parameters = declaration.parameters.map {
-                                ParsedParameter(it.type.resolve(), it.name?.asString())
-                            },
-                            returnType = declaration.getReturnTypeOrNull(),
-                        )
-                    }
+                    is KaFunctionSymbol -> ParsedMethodDescriptorCallableReference(
+                        receiverClassDeclaration = receiverClassDeclaration,
+                        name = KSFunctionDeclarationImpl.getCached(symbol).name,
+                    )
 
-                    is KaFunctionSymbol -> {
-                        val declaration = KSFunctionDeclarationImpl.getCached(symbol)
-                        ParsedMethodDescriptorCallable(
-                            receiverClassDeclaration = receiverClassDecl,
-                            name = declaration.name,
-                            parameters = declaration.parameters.map {
-                                ParsedParameter(it.type.resolve(), it.name?.asString())
-                            },
-                            returnType = declaration.getReturnTypeOrNull(),
-                        )
-                    }
-
-                    is KaJavaFieldSymbol -> {
-                        val declaration = KSPropertyDeclarationJavaImpl.getCached(symbol)
-                        ParsedFieldDescriptorCallable(
-                            receiverClassDeclaration = receiverClassDecl,
-                            name = declaration.name,
-                            type = declaration.type.resolve(),
-                        )
-                    }
+                    is KaJavaFieldSymbol -> ParsedFieldDescriptorCallableReference(
+                        receiverClassDeclaration = receiverClassDeclaration,
+                        name = KSPropertyDeclarationJavaImpl.getCached(symbol).name,
+                    )
 
                     else -> null
                 }
             }
-    }
 
     private fun parsePatch(symbol: KSAnnotated): ParsedPatch {
-        val classDeclaration = symbol.castOrNull<KSClassDeclaration>()
-        val superClassType = classDeclaration?.getSuperClassTypeOrNull()
         val patchAnnotation = symbol.findAnnotation<Patch>()
+        val classDeclaration = symbol.castOrNull<KSClassDeclaration>()
+        val superClassType = classDeclaration?.getSuperTypeOrNull()
         return ParsedPatch(
             symbol = symbol,
 
@@ -235,7 +219,7 @@ class SymbolParser(
             classDeclaration = classDeclaration,
 
             superClassDeclaration = superClassType?.toClassDeclaration(),
-            superGenericClassDeclaration = superClassType?.getGenericTypeOrNull()?.toClassDeclaration(),
+            superGenericClassDeclaration = superClassType?.findGenericType()?.toClassDeclaration(),
 
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
@@ -265,19 +249,26 @@ class SymbolParser(
         )
 
     private fun parsePatchFunction(functionDeclaration: KSFunctionDeclaration): ParsedPatchFunction {
+        val hookAnnotation = functionDeclaration.findAnnotation<Hook>()
+
         val atConstructorHeadAnnotation = functionDeclaration.findAnnotation<AtConstructorHead>()
+
         val atLocalAnnotation = functionDeclaration.findAnnotation<AtLocal>()
-        val atLocalLocalAnnotation = atLocalAnnotation?.getArgumentValue(AtLocal::local)
+        val (atLocalExplicitName, atLocalExplicitOrdinal) = atLocalAnnotation?.getArgumentValue(AtLocal::local).let {
+            it?.getArgumentValue(Local::name, explicit = true) to it?.getArgumentValue(Local::ordinal, explicit = true)
+        }
+
         val atInstanceofAnnotation = functionDeclaration.findAnnotation<AtInstanceof>()
         val atReturnAnnotation = functionDeclaration.findAnnotation<AtReturn>()
+
         val atLiteralAnnotation = functionDeclaration.findAnnotation<AtLiteral>()
         val atLiteralZeroAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::zero, explicit = true)
         val atLiteralClassType = atLiteralAnnotation?.getArgumentValue(AtLiteral::`class`, explicit = true)
         val atLiteralNullAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::`null`, explicit = true)
+
         val atFieldAnnotation = functionDeclaration.findAnnotation<AtField>()
         val atArrayAnnotation = functionDeclaration.findAnnotation<AtArray>()
         val atCallAnnotation = functionDeclaration.findAnnotation<AtCall>()
-        val hookAnnotation = functionDeclaration.findAnnotation<Hook>()
         return ParsedPatchFunction(
             symbol = functionDeclaration,
 
@@ -304,8 +295,8 @@ class SymbolParser(
             hasAtLocalAnnotation = atLocalAnnotation != null,
             atLocalOp = atLocalAnnotation?.getArgumentValue(AtLocal::op),
             atLocalType = functionDeclaration.findAnnotation<AtLocal>()?.getArgumentValue(AtLocal::type),
-            atLocalExplicitName = atLocalLocalAnnotation?.getArgumentValue(Local::name, explicit = true),
-            atLocalExplicitOrdinal = atLocalLocalAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
+            atLocalExplicitName = atLocalExplicitName,
+            atLocalExplicitOrdinal = atLocalExplicitOrdinal,
             atLocalOpOrdinals = atLocalAnnotation?.getArgumentValue(AtLocal::ordinal).orEmpty(),
 
             hasAtInstanceofAnnotation = atInstanceofAnnotation != null,
@@ -374,12 +365,12 @@ class SymbolParser(
 
             hasOriginAnnotation = originAnnotation != null,
             originGenericClassDeclaration = if (originAnnotation != null) {
-                type.getGenericTypeOrNull()?.toClassDeclaration()
+                type.findGenericType()?.toClassDeclaration()
             } else null,
 
             hasCancelAnnotation = cancelAnnotation != null,
             cancelGenericClassDeclaration = if (cancelAnnotation != null) {
-                type.getGenericTypeOrNull()?.toClassDeclaration()
+                type.findGenericType()?.toClassDeclaration()
             } else null,
 
             hasOrdinalAnnotation = parameter.hasAnnotation<Ordinal>(),
@@ -400,10 +391,8 @@ class SymbolParser(
     fun KSType.takeNotUnit(): KSType? =
         takeIf { it != types.unit }
 
-    fun KSClassDeclaration.getSuperClassTypeOrNull(): KSType? =
-        superTypes
-            .map { it.resolve() }
-            .find { it.takeIf { it != types.any }?.toClassDeclaration()?.isClass == true }
+    fun KSClassDeclaration.getSuperTypeOrNull(): KSType? =
+        superTypes.map { it.resolve() }.find { it != types.any }
 
     fun KSFunctionDeclaration.getReturnTypeOrNull(): KSType? =
         returnType?.resolve()?.takeNotUnit()

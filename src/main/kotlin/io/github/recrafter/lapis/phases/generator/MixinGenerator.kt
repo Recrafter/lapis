@@ -22,7 +22,7 @@ import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ksp.createResourceFile
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.builtins.Builtins
-import io.github.recrafter.lapis.phases.builtins.DescriptorBuiltin
+import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin
 import io.github.recrafter.lapis.phases.generator.accessor.AccessorConfigEntry
@@ -78,29 +78,29 @@ class MixinGenerator(
             descriptors.forEach { descriptor ->
                 when (descriptor) {
                     is IrInvokableDescriptor -> {
-                        descriptor.bodyWrapper?.let {
-                            builtins.generateDescWrapper(this, DescriptorBuiltin.Body, it)
+                        descriptor.bodyWrapperImpl?.let {
+                            builtins.generateDescriptorWrapperImpl(this, DescriptorWrapperBuiltin.Body, it)
                         }
-                        descriptor.callWrapper?.let {
-                            builtins.generateDescWrapper(this, DescriptorBuiltin.Call, it)
+                        descriptor.callWrapperImpl?.let {
+                            builtins.generateDescriptorWrapperImpl(this, DescriptorWrapperBuiltin.Call, it)
                         }
-                        descriptor.cancelWrapper?.let {
-                            builtins.generateDescWrapper(this, DescriptorBuiltin.Cancel, it)
+                        descriptor.cancelWrapperImpl?.let {
+                            builtins.generateDescriptorWrapperImpl(this, DescriptorWrapperBuiltin.Cancel, it)
                         }
                     }
 
                     is IrFieldDescriptor -> {
-                        descriptor.fieldGetWrapper?.let {
-                            builtins.generateDescWrapper(this, DescriptorBuiltin.FieldGet, it)
+                        descriptor.fieldGetWrapperImpl?.let {
+                            builtins.generateDescriptorWrapperImpl(this, DescriptorWrapperBuiltin.FieldGet, it)
                         }
-                        descriptor.fieldSetWrapper?.let {
-                            builtins.generateDescWrapper(this, DescriptorBuiltin.FieldSet, it)
+                        descriptor.fieldSetWrapperImpl?.let {
+                            builtins.generateDescriptorWrapperImpl(this, DescriptorWrapperBuiltin.FieldSet, it)
                         }
-                        descriptor.arrayGetWrapper?.let {
-                            builtins.generateDescWrapper(this, DescriptorBuiltin.ArrayGet, it)
+                        descriptor.arrayGetWrapperImpl?.let {
+                            builtins.generateDescriptorWrapperImpl(this, DescriptorWrapperBuiltin.ArrayGet, it)
                         }
-                        descriptor.arraySetWrapper?.let {
-                            builtins.generateDescWrapper(this, DescriptorBuiltin.ArraySet, it)
+                        descriptor.arraySetWrapperImpl?.let {
+                            builtins.generateDescriptorWrapperImpl(this, DescriptorWrapperBuiltin.ArraySet, it)
                         }
                     }
                 }
@@ -424,9 +424,9 @@ class MixinGenerator(
                         }
                     }
 
-                    is IrHookOriginDescriptorWrapperArgument<*> -> {
+                    is IrHookOriginDescriptorWrapperImplArgument<*> -> {
                         val descriptorWrapperConstructorArgumentCodeBlocks = buildList {
-                            val wrapper = argument.wrapper
+                            val wrapper = argument.impl
                             if (
                                 injection is IrTargetInjection &&
                                 injection !is IrWrapMethodInjection &&
@@ -438,7 +438,7 @@ class MixinGenerator(
                             if (injection is IrFieldSetInjection) {
                                 add(buildJavaCodeBlock("value".withInternalPrefix(ARGUMENT)))
                             }
-                            if (wrapper is IrInvokableDescWrapper) {
+                            if (wrapper is IrInvokableDescriptorWrapper) {
                                 addAll(wrapper.parameters.mapIndexed { index, parameter ->
                                     val name = parameter.name ?: index.toString()
                                     buildJavaCodeBlock(name.withInternalPrefix(ARGUMENT))
@@ -462,7 +462,7 @@ class MixinGenerator(
                             append(descriptorWrapperConstructorArgumentCodeBlocks.joinToString { "%L" })
                             append(")")
                         }) {
-                            arg(argument.wrapper.className)
+                            arg(argument.impl.className)
                             descriptorWrapperConstructorArgumentCodeBlocks.forEach { arg(it) }
                         }
                     }
@@ -477,7 +477,7 @@ class MixinGenerator(
 
                     is IrHookCancelArgument -> {
                         buildJavaCodeBlock("new %T(%L)") {
-                            arg(argument.wrapper.className)
+                            arg(argument.impl.className)
                             arg(callbackParameterName)
                         }
                     }

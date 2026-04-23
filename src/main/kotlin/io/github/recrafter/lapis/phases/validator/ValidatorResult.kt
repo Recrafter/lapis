@@ -347,38 +347,38 @@ sealed interface HookParameter
 sealed interface HookOriginParameter : HookParameter
 object HookOriginValueParameter : HookOriginParameter
 
-sealed class HookOriginDescriptorParameter(open val descriptor: Descriptor) : HookOriginParameter
+sealed class HookOriginDescriptorWrapperParameter(open val descriptor: Descriptor) : HookOriginParameter
 
-class HookOriginDescriptorBodyParameter(
+class HookOriginDescriptorBodyWrapperParameter(
     override val descriptor: InvokableDescriptor
-) : HookOriginDescriptorParameter(descriptor)
+) : HookOriginDescriptorWrapperParameter(descriptor)
 
-class HookOriginDescriptorFieldGetParameter(
+class HookOriginDescriptorFieldGetWrapperParameter(
     override val descriptor: FieldDescriptor
-) : HookOriginDescriptorParameter(descriptor)
+) : HookOriginDescriptorWrapperParameter(descriptor)
 
-class HookOriginDescriptorFieldSetParameter(
+class HookOriginDescriptorFieldSetWrapperParameter(
     override val descriptor: FieldDescriptor
-) : HookOriginDescriptorParameter(descriptor)
+) : HookOriginDescriptorWrapperParameter(descriptor)
 
-class HookOriginDescriptorArrayGetParameter(
+class HookOriginDescriptorArrayGetWrapperParameter(
     override val descriptor: FieldDescriptor,
     arrayComponentType: KSType
-) : HookOriginDescriptorParameter(descriptor) {
+) : HookOriginDescriptorWrapperParameter(descriptor) {
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
 object HookOriginInstanceofParameter : HookOriginParameter
 
-class HookOriginDescriptorArraySetParameter(
+class HookOriginDescriptorArraySetWrapperParameter(
     override val descriptor: FieldDescriptor,
     arrayComponentType: KSType
-) : HookOriginDescriptorParameter(descriptor) {
+) : HookOriginDescriptorWrapperParameter(descriptor) {
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
-class HookOriginDescriptorCallParameter(override val descriptor: InvokableDescriptor) :
-    HookOriginDescriptorParameter(descriptor)
+class HookOriginDescriptorCallWrapperParameter(override val descriptor: InvokableDescriptor) :
+    HookOriginDescriptorWrapperParameter(descriptor)
 
 class HookCancelParameter(val descriptor: InvokableDescriptor) : HookParameter
 object HookOrdinalParameter : HookParameter

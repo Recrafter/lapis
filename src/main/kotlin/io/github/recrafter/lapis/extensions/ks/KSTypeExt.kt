@@ -10,7 +10,7 @@ val KSType.isValid: Boolean
 val KSType.genericTypes: List<KSType>
     get() = arguments.mapNotNull { it.type?.resolve() }
 
-fun KSType.getGenericTypeOrNull(): KSType? =
+fun KSType.findGenericType(): KSType? =
     genericTypes.firstOrNull()
 
 fun KSType.toClassDeclaration(): KSClassDeclaration? =

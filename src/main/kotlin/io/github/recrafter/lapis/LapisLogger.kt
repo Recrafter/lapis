@@ -11,7 +11,7 @@ class LapisLogger(private val logger: KSPLogger) {
     private var currentPhase: LapisPhase = LapisPhase.entries.first()
 
     fun info(message: String, symbol: KSNode? = null) {
-        println(buildFullMessage(message, symbol))
+        logger.info(buildFullMessage(message, symbol))
     }
 
     fun warn(message: String, symbol: KSNode? = null) {
@@ -22,10 +22,7 @@ class LapisLogger(private val logger: KSPLogger) {
         logger.error(buildFullMessage(message, symbol))
     }
 
-    fun fatal(
-        message: String,
-        symbol: KSNode? = null,
-    ): Nothing {
+    fun fatal(message: String, symbol: KSNode? = null): Nothing {
         error(message, symbol)
         throw LapisException(message)
     }

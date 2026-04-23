@@ -8,7 +8,7 @@ import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.builtins.Builtins
-import io.github.recrafter.lapis.phases.builtins.DescriptorBuiltin
+import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.*
@@ -47,8 +47,7 @@ class MixinLowering(
                 if (descriptor is ConstructorDescriptor) {
                     IrConstructorDescriptor(
                         makePublic = descriptor.makePublic,
-                        callWrapper = findOriginDescriptorWrapper(descriptor.className),
-                        cancelWrapper = findCancelDescriptorWrapper(descriptor.className),
+                        callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.className,
                     )
@@ -58,9 +57,9 @@ class MixinLowering(
                         removeFinal = descriptor.removeFinal,
                         name = descriptor.name,
                         targetName = descriptor.targetName,
-                        bodyWrapper = findOriginDescriptorWrapper(descriptor.className),
-                        callWrapper = findOriginDescriptorWrapper(descriptor.className),
-                        cancelWrapper = findCancelDescriptorWrapper(descriptor.className),
+                        bodyWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                        callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                        cancelWrapperImpl = findCancelDescriptorWrapperImpl(descriptor.className),
                         parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.returnTypeName,
                     )
@@ -73,10 +72,10 @@ class MixinLowering(
                     removeFinal = descriptor.removeFinal,
                     name = descriptor.name,
                     targetName = descriptor.targetName,
-                    fieldGetWrapper = findOriginDescriptorWrapper(descriptor.className),
-                    fieldSetWrapper = findOriginDescriptorWrapper(descriptor.className),
-                    arrayGetWrapper = findOriginDescriptorWrapper(descriptor.className),
-                    arraySetWrapper = findOriginDescriptorWrapper(descriptor.className),
+                    fieldGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                    fieldSetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                    arrayGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                    arraySetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                     typeName = descriptor.fieldTypeName,
                 )
             }
@@ -131,7 +130,7 @@ class MixinLowering(
                 addAll(patch.sharedFunctions.map { function ->
                     IrFunctionCallExtension(
                         name = function.name,
-                        parameters = function.parameters.asIrParameterList(),
+                        parameters = function.parameters.map { it.asIrParameter() },
                         returnTypeName = function.returnTypeName,
                     )
                 })
@@ -467,110 +466,110 @@ class MixinLowering(
         when (parameter) {
             is HookOriginValueParameter -> IrHookOriginValueArgument
 
-            is HookOriginDescriptorBodyParameter -> {
+            is HookOriginDescriptorBodyWrapperParameter -> {
                 val descriptor = parameter.descriptor
-                val wrapper = IrDescriptorBodyWrapper(
+                val impl = IrDescriptorBodyWrapperImpl(
                     className = IrClassName.of(
                         options.generatedPackageName,
-                        DescriptorBuiltin.Body.name.withQualifiedNamePrefix(descriptor.className)
+                        DescriptorWrapperBuiltin.Body.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorBuiltin.Body],
+                    builtin = builtins[DescriptorWrapperBuiltin.Body],
                     parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
                 )
-                IrHookOriginDescriptorBodyWrapperArgument(wrapper)
+                IrHookOriginDescriptorBodyWrapperImplArgument(impl)
             }
 
-            is HookOriginDescriptorFieldGetParameter -> {
+            is HookOriginDescriptorFieldGetWrapperParameter -> {
                 val descriptor = parameter.descriptor
-                val wrapper = IrDescriptorFieldGetWrapper(
+                val impl = IrDescriptorFieldGetWrapperImpl(
                     className = IrClassName.of(
                         options.generatedPackageName,
-                        DescriptorBuiltin.FieldGet.name.withQualifiedNamePrefix(descriptor.className)
+                        DescriptorWrapperBuiltin.FieldGet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorBuiltin.FieldGet],
+                    builtin = builtins[DescriptorWrapperBuiltin.FieldGet],
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                     fieldTypeName = descriptor.fieldTypeName,
                 )
-                IrHookOriginDescriptorFieldGetWrapperArgument(wrapper)
+                IrHookOriginDescriptorFieldGetWrapperImplArgument(impl)
             }
 
-            is HookOriginDescriptorFieldSetParameter -> {
+            is HookOriginDescriptorFieldSetWrapperParameter -> {
                 val descriptor = parameter.descriptor
-                val wrapper = IrDescriptorFieldSetWrapper(
+                val impl = IrDescriptorFieldSetWrapperImpl(
                     className = IrClassName.of(
                         options.generatedPackageName,
-                        DescriptorBuiltin.FieldSet.name.withQualifiedNamePrefix(descriptor.className)
+                        DescriptorWrapperBuiltin.FieldSet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorBuiltin.FieldSet],
+                    builtin = builtins[DescriptorWrapperBuiltin.FieldSet],
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                     fieldTypeName = descriptor.fieldTypeName,
                 )
-                IrHookOriginDescriptorFieldSetWrapperArgument(wrapper)
+                IrHookOriginDescriptorFieldSetWrapperImplArgument(impl)
             }
 
-            is HookOriginDescriptorArrayGetParameter -> {
+            is HookOriginDescriptorArrayGetWrapperParameter -> {
                 val descriptor = parameter.descriptor
-                val wrapper = IrDescriptorArrayGetWrapper(
+                val impl = IrDescriptorArrayGetWrapperImpl(
                     className = IrClassName.of(
                         options.generatedPackageName,
-                        DescriptorBuiltin.ArrayGet.name.withQualifiedNamePrefix(descriptor.className)
+                        DescriptorWrapperBuiltin.ArrayGet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorBuiltin.ArrayGet],
+                    builtin = builtins[DescriptorWrapperBuiltin.ArrayGet],
                     arrayTypeName = descriptor.fieldTypeName,
                     arrayComponentTypeName = parameter.arrayComponentTypeName,
                 )
-                IrHookOriginDescriptorArrayGetWrapperArgument(wrapper)
+                IrHookOriginDescriptorArrayGetWrapperImplArgument(impl)
             }
 
-            is HookOriginDescriptorArraySetParameter -> {
+            is HookOriginDescriptorArraySetWrapperParameter -> {
                 val descriptor = parameter.descriptor
-                val wrapper = IrDescriptorArraySetWrapper(
+                val impl = IrDescriptorArraySetWrapperImpl(
                     className = IrClassName.of(
                         options.generatedPackageName,
-                        DescriptorBuiltin.ArraySet.name.withQualifiedNamePrefix(descriptor.className)
+                        DescriptorWrapperBuiltin.ArraySet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorBuiltin.ArraySet],
+                    builtin = builtins[DescriptorWrapperBuiltin.ArraySet],
                     arrayTypeName = descriptor.fieldTypeName,
                     arrayComponentTypeName = parameter.arrayComponentTypeName,
                 )
-                IrHookOriginDescriptorArraySetWrapperArgument(wrapper)
+                IrHookOriginDescriptorArraySetWrapperImplArgument(impl)
             }
 
-            is HookOriginDescriptorCallParameter -> {
+            is HookOriginDescriptorCallWrapperParameter -> {
                 val descriptor = parameter.descriptor
-                val wrapper = IrDescriptorCallWrapper(
+                val impl = IrDescriptorCallWrapperImpl(
                     className = IrClassName.of(
                         options.generatedPackageName,
-                        DescriptorBuiltin.Call.name.withQualifiedNamePrefix(descriptor.className)
+                        DescriptorWrapperBuiltin.Call.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorBuiltin.Call],
+                    builtin = builtins[DescriptorWrapperBuiltin.Call],
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                     parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
                 )
-                IrHookOriginDescriptorCallWrapperArgument(wrapper)
+                IrHookOriginDescriptorCallWrapperImplArgument(impl)
             }
 
             is HookCancelParameter -> {
                 val descriptor = parameter.descriptor
-                val wrapper = IrDescriptorCancelWrapper(
+                val impl = IrDescriptorCancelWrapperImpl(
                     className = IrClassName.of(
                         options.generatedPackageName,
-                        DescriptorBuiltin.Cancel.name.withQualifiedNamePrefix(descriptor.className)
+                        DescriptorWrapperBuiltin.Cancel.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorBuiltin.Cancel],
+                    builtin = builtins[DescriptorWrapperBuiltin.Cancel],
                     parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
                 )
-                IrHookCancelArgument(wrapper)
+                IrHookCancelArgument(impl)
             }
 
             is HookOriginInstanceofParameter -> IrHookOriginInstanceofArgument
@@ -588,28 +587,28 @@ class MixinLowering(
         if (parameter.isVar) LocalVarImplBuiltin.of(parameter.typeName)
         else null
 
-    private inline fun <reified W : IrDescriptorWrapper> findOriginDescriptorWrapper(
+    private inline fun <reified T : IrDescriptorWrapperImpl> findOriginDescriptorWrapperImpl(
         descriptorClassName: IrClassName
-    ): W? =
+    ): T? =
         mixins.asSequence()
             .flatMap { it.injections }
             .flatMap { it.hookArguments }
-            .filterIsInstance<IrHookOriginDescriptorWrapperArgument<*>>()
-            .map { it.wrapper }
-            .filterIsInstance<W>()
+            .filterIsInstance<IrHookOriginDescriptorWrapperImplArgument<*>>()
+            .map { it.impl }
+            .filterIsInstance<T>()
             .find { it.descriptorClassName == descriptorClassName }
 
-    private fun findCancelDescriptorWrapper(descriptorClassName: IrClassName): IrDescriptorCancelWrapper? =
+    private fun findCancelDescriptorWrapperImpl(descriptorClassName: IrClassName): IrDescriptorCancelWrapperImpl? =
         mixins.asSequence()
             .flatMap { it.injections }
             .flatMap { it.hookArguments }
             .filterIsInstance<IrHookCancelArgument>()
-            .map { it.wrapper }
+            .map { it.impl }
             .find { it.descriptorClassName == descriptorClassName }
 }
 
-fun List<FunctionParameter>.asIrParameterList(): List<IrParameter> =
-    map { parameter -> IrParameter(parameter.name, parameter.typeName) }
+fun FunctionParameter.asIrParameter(): IrParameter =
+    IrParameter(name, typeName)
 
 fun FunctionTypeParameter.asIrFunctionTypeParameter(): IrFunctionTypeParameter =
     IrFunctionTypeParameter(name, typeName)

@@ -2,8 +2,8 @@ package io.github.recrafter.lapis.phases.lowering.types
 
 import io.github.recrafter.lapis.extensions.jp.JPTypeVariableName
 import io.github.recrafter.lapis.extensions.kp.KPTypeVariableName
-import io.github.recrafter.lapis.phases.lowering.asIrTypeVariableName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeVariableName
 
 class IrTypeVariableName(override val kotlin: KPTypeVariableName) : IrTypeName(kotlin) {
 

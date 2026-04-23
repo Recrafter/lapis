@@ -7,8 +7,7 @@ import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.generator.KSuppressWarning
-import io.github.recrafter.lapis.phases.lowering.models.IrDescriptor
-import io.github.recrafter.lapis.phases.lowering.models.IrDescriptorWrapper
+import io.github.recrafter.lapis.phases.lowering.models.IrDescriptorWrapperImpl
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 
 typealias BuiltinTyper = (Builtin<*>) -> IrClassName
@@ -84,11 +83,11 @@ class Builtins(
         return rootClassName.nested(builtin.name)
     }
 
-    fun <D : IrDescriptor, W : IrDescriptorWrapper> generateDescWrapper(
+    fun <T : IrDescriptorWrapperImpl> generateDescriptorWrapperImpl(
         dest: KPFileBuilder,
-        builtin: DescriptorBuiltin<D, W>,
-        wrapper: W
+        builtin: DescriptorWrapperBuiltin<T>,
+        impl: T,
     ) {
-        builtin.generateWrapper(dest, wrapper, ::get)
+        builtin.generateImpl(dest, impl, ::get)
     }
 }
