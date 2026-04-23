@@ -426,7 +426,7 @@ class MixinGenerator(
 
                     is IrHookOriginDescriptorWrapperImplArgument<*> -> {
                         val descriptorWrapperConstructorArgumentCodeBlocks = buildList {
-                            val wrapper = argument.impl
+                            val impl = argument.impl
                             if (
                                 injection is IrTargetInjection &&
                                 injection !is IrWrapMethodInjection &&
@@ -438,8 +438,8 @@ class MixinGenerator(
                             if (injection is IrFieldSetInjection) {
                                 add(buildJavaCodeBlock("value".withInternalPrefix(ARGUMENT)))
                             }
-                            if (wrapper is IrInvokableDescriptorWrapper) {
-                                addAll(wrapper.parameters.mapIndexed { index, parameter ->
+                            if (impl is IrInvokableDescriptorWrapperImpl) {
+                                addAll(impl.parameters.mapIndexed { index, parameter ->
                                     val name = parameter.name ?: index.toString()
                                     buildJavaCodeBlock(name.withInternalPrefix(ARGUMENT))
                                 })

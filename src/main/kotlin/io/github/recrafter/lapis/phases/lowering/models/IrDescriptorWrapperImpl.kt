@@ -13,7 +13,7 @@ sealed class IrDescriptorWrapperImpl(
     val superClassTypeName: IrParameterizedTypeName = builtin.parameterizedBy(descriptorClassName)
 }
 
-sealed interface IrInvokableDescriptorWrapper {
+sealed interface IrInvokableDescriptorWrapperImpl {
     val parameters: List<IrFunctionTypeParameter>
 }
 
@@ -23,7 +23,7 @@ class IrDescriptorBodyWrapperImpl(
     builtin: IrClassName,
     override val parameters: List<IrFunctionTypeParameter>,
     val returnTypeName: IrTypeName?,
-) : IrDescriptorWrapperImpl(className, descriptorClassName, builtin, null), IrInvokableDescriptorWrapper
+) : IrDescriptorWrapperImpl(className, descriptorClassName, builtin, null), IrInvokableDescriptorWrapperImpl
 
 class IrDescriptorFieldGetWrapperImpl(
     className: IrClassName,
@@ -64,7 +64,7 @@ class IrDescriptorCallWrapperImpl(
     receiverTypeName: IrTypeName?,
     override val parameters: List<IrFunctionTypeParameter>,
     val returnTypeName: IrTypeName?,
-) : IrDescriptorWrapperImpl(className, descriptorClassName, builtin, receiverTypeName), IrInvokableDescriptorWrapper
+) : IrDescriptorWrapperImpl(className, descriptorClassName, builtin, receiverTypeName), IrInvokableDescriptorWrapperImpl
 
 class IrDescriptorCancelWrapperImpl(
     className: IrClassName,
@@ -72,4 +72,4 @@ class IrDescriptorCancelWrapperImpl(
     builtin: IrClassName,
     override val parameters: List<IrFunctionTypeParameter>,
     val returnTypeName: IrTypeName?,
-) : IrDescriptorWrapperImpl(className, descriptorClassName, builtin, null), IrInvokableDescriptorWrapper
+) : IrDescriptorWrapperImpl(className, descriptorClassName, builtin, null), IrInvokableDescriptorWrapperImpl
