@@ -109,30 +109,39 @@ class MixinGenerator(
     }
 
     private fun generateMixin(mixin: IrMixin) {
-        if (mixin.isNotEmpty()) {
-            val originatingFiles = listOfNotNull(mixin.containingFile)
-            buildKotlinFile(mixin.patchImplClassName) {
-                suppressWarnings(KSuppressWarning.RedundantVisibilityModifier)
-                addType(buildPatchImplClass(mixin))
-            }.writeTo(codeGenerator, aggregating = false, originatingFiles)
+        val originatingFiles = listOfNotNull(mixin.containingFile)
+        buildKotlinFile(mixin.patchImpl.className) {
+            suppressWarnings(KSuppressWarning.RedundantVisibilityModifier)
+            addType(buildPatchImplClass(mixin))
+        }.writeTo(codeGenerator, aggregating = false, originatingFiles)
 
-            buildJavaFile(mixin.className) {
-                buildMixinClass(mixin)
-            }.writeTo(codeGenerator, aggregating = false, originatingFiles)
-        }
+        buildJavaFile(mixin.className) {
+            buildMixinClass(mixin)
+        }.writeTo(codeGenerator, aggregating = false, originatingFiles)
         mixin.extension?.let { generateMixinExtension(mixin, it) }
     }
 
     private fun buildPatchImplClass(mixin: IrMixin): KPClass =
-        buildKotlinClass(mixin.patchImplClassName.simpleName) {
+        buildKotlinClass(mixin.patchImpl.className.simpleName) {
             setModifiers(IrModifier.PUBLIC)
-            setSuperClass(mixin.patchClassName)
-            setConstructor(
-                IrParameter(
-                    "instance",
-                    mixin.instanceClassName,
-                    listOf(IrModifier.PUBLIC, IrModifier.OVERRIDE)
-                )
+            val instanceParameterName = "instance"
+            val constructorParameters = mixin.patchImpl.constructorArguments.map { constructorParameter ->
+                when (constructorParameter) {
+                    is IrPatchImplConstructorInstanceArgument -> {
+                        IrParameter(instanceParameterName, mixin.instanceClassName)
+                    }
+                }
+            }
+            if (constructorParameters.isNotEmpty()) {
+                setConstructor(constructorParameters)
+            }
+            setSuperClass(
+                mixin.patchClassName,
+                mixin.patchImpl.patchConstructorArguments.map { patchConstructorArgument ->
+                    when (patchConstructorArgument) {
+                        is IrPatchConstructorOriginArgument -> buildKotlinCodeBlock("%L") { arg(instanceParameterName) }
+                    }
+                }
             )
         }
 
@@ -142,41 +151,55 @@ class MixinGenerator(
                 setStringArrayMember(Mixin::targets, mixin.bytecodeTargetName)
             }
             setModifiers(IrModifier.PUBLIC)
-            val patchField = buildJavaField("patch".withInternalPrefix(), mixin.patchClassName) {
+            val patchImplField = buildJavaField("patchImpl".withInternalPrefix(), mixin.patchImpl.className) {
                 addAnnotation<Unique>()
                 setModifiers(IrModifier.PRIVATE)
             }
-            addField(patchField)
-            val getOrInitPatchMethod = buildJavaMethod("getOrInitPatch".withInternalPrefix()) {
+            addField(patchImplField)
+            val getOrInitPatchImplMethod = buildJavaMethod("getOrInitPatchImpl".withInternalPrefix()) {
                 addAnnotation<Unique>()
                 setModifiers(IrModifier.PRIVATE)
-                setReturnType(mixin.patchClassName)
+                setReturnType(mixin.patchImpl.className)
                 setBody {
-                    val isNotInitializedCondition = buildJavaCodeBlock("%N == null") {
-                        arg(patchField)
+                    val isImplNotInitializedCondition = buildJavaCodeBlock("%N == null") {
+                        arg(patchImplField)
                     }
-                    if_(isNotInitializedCondition) {
-                        val isDoubleCastRequired = mixin.instanceClassName != KPAny.asIrClassName()
+                    if_(isImplNotInitializedCondition) {
+                        val implConstructorArgumentCodeBlocks = mixin.patchImpl.constructorArguments.map { argument ->
+                            when (argument) {
+                                is IrPatchImplConstructorInstanceArgument -> {
+                                    val isDoubleCastRequired = mixin.instanceClassName != KPAny.asIrClassName()
+                                    buildJavaCodeBlock(
+                                        buildString {
+                                            if (isDoubleCastRequired) {
+                                                append("(%T) (%T) ")
+                                            }
+                                            append("this")
+                                        }
+                                    ) {
+                                        if (isDoubleCastRequired) {
+                                            arg(mixin.instanceClassName)
+                                            arg(Object::class.asIrClassName())
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         val format = buildString {
                             append("%N = new %T(")
-                            if (isDoubleCastRequired) {
-                                append("(%T) (%T) ")
-                            }
-                            append("this)")
+                            append(implConstructorArgumentCodeBlocks.joinToString { "%L" })
+                            append(")")
                         }
                         code_(format) {
-                            arg(patchField)
-                            arg(mixin.patchImplClassName)
-                            if (isDoubleCastRequired) {
-                                arg(mixin.instanceClassName)
-                                arg(Object::class.asIrClassName())
-                            }
+                            arg(patchImplField)
+                            arg(mixin.patchImpl.className)
+                            implConstructorArgumentCodeBlocks.forEach { arg(it) }
                         }
                     }
-                    return_("%N") { arg(patchField) }
+                    return_("%N") { arg(patchImplField) }
                 }
             }
-            addMethod(getOrInitPatchMethod)
+            addMethod(getOrInitPatchImplMethod)
             mixin.extension?.let { extension ->
                 addSuperInterface(extension.className)
                 addMethods(extension.kinds.map { method ->
@@ -189,7 +212,7 @@ class MixinGenerator(
                                 format = "%N().%L(%L)",
                                 isReturn = method.returnTypeName != null
                             ) {
-                                arg(getOrInitPatchMethod)
+                                arg(getOrInitPatchImplMethod)
                                 arg(
                                     when (method) {
                                         is IrPropertyGetterExtension -> "get" + method.name.capitalize()
@@ -204,14 +227,14 @@ class MixinGenerator(
                 })
             }
             addMethods(mixin.injections.map {
-                buildMixinInjectionMethod(it, mixin, getOrInitPatchMethod)
+                buildMixinInjectionMethod(it, mixin, getOrInitPatchImplMethod)
             })
         }
 
     private fun buildMixinInjectionMethod(
         injection: IrInjection,
         mixin: IrMixin,
-        getOrInitPatchMethod: JPMethod
+        getOrInitPatchImplMethod: JPMethod,
     ): JPMethod =
         buildJavaMethod(buildString {
             append(injection.name)
@@ -442,7 +465,7 @@ class MixinGenerator(
 
                     is IrHookOriginDescriptorWrapperImplArgument<*> -> {
                         val descriptorWrapperConstructorArgumentCodeBlocks = buildList {
-                            val impl = argument.impl
+                            val impl = argument.wrapperImpl
                             if (
                                 injection is IrTargetInjection &&
                                 injection !is IrWrapMethodInjection &&
@@ -473,12 +496,14 @@ class MixinGenerator(
                                 add(buildJavaCodeBlock(originalParameterName))
                             }
                         }
-                        buildJavaCodeBlock(buildString {
-                            append("new %T(")
-                            append(descriptorWrapperConstructorArgumentCodeBlocks.joinToString { "%L" })
-                            append(")")
-                        }) {
-                            arg(argument.impl.className)
+                        buildJavaCodeBlock(
+                            buildString {
+                                append("new %T(")
+                                append(descriptorWrapperConstructorArgumentCodeBlocks.joinToString { "%L" })
+                                append(")")
+                            }
+                        ) {
+                            arg(argument.wrapperImpl.className)
                             descriptorWrapperConstructorArgumentCodeBlocks.forEach { arg(it) }
                         }
                     }
@@ -493,7 +518,7 @@ class MixinGenerator(
 
                     is IrHookCancelArgument -> {
                         buildJavaCodeBlock("new %T(%L)") {
-                            arg(argument.impl.className)
+                            arg(argument.wrapperImpl.className)
                             arg(callbackParameterName)
                         }
                     }
@@ -549,9 +574,9 @@ class MixinGenerator(
                         isReturn = injection.returnTypeName != null,
                     ) {
                         if (injection.isStatic) {
-                            arg(mixin.patchImplClassName)
+                            arg(mixin.patchImpl.className)
                         } else {
-                            arg(getOrInitPatchMethod)
+                            arg(getOrInitPatchImplMethod)
                         }
                         arg(injection.name)
                         hookArgumentCodeBlocks.forEach { arg(it) }
@@ -649,13 +674,7 @@ class MixinGenerator(
             MixinConfig.of(
                 mixinPackage = options.mixinPackageName,
                 qualifiedNames = mixins.groupBy { it.side }.mapValues { (_, mixins) ->
-                    mixins.mapNotNull { mixin ->
-                        if (mixin.isNotEmpty()) {
-                            mixin.className.qualifiedName
-                        } else {
-                            null
-                        }
-                    }
+                    mixins.map { it.className.qualifiedName }
                 },
             )
         )

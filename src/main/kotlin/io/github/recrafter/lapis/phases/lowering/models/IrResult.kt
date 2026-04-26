@@ -24,14 +24,24 @@ class IrMixin(
 
     val className: IrClassName,
     val patchClassName: IrClassName,
-    val patchImplClassName: IrClassName,
+    val patchImpl: IrPatchImpl,
     val instanceClassName: IrClassName,
     val bytecodeTargetName: String,
 
     val side: Side,
     val extension: IrExtension?,
     val injections: List<IrInjection>,
-) {
-    fun isNotEmpty(): Boolean =
-        extension != null || injections.isNotEmpty()
-}
+)
+
+class IrPatchImpl(
+    val className: IrClassName,
+
+    val constructorArguments: List<IrPatchImplConstructorArgument>,
+    val patchConstructorArguments: List<IrPatchConstructorArgument>,
+)
+
+sealed interface IrPatchImplConstructorArgument
+object IrPatchImplConstructorInstanceArgument : IrPatchImplConstructorArgument
+
+sealed interface IrPatchConstructorArgument
+object IrPatchConstructorOriginArgument : IrPatchConstructorArgument

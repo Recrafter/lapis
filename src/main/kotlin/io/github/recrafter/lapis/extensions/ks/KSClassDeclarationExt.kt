@@ -30,7 +30,7 @@ val KSClassDeclaration.functionDeclarations: Sequence<KSFunctionDeclaration>
 val KSClassDeclaration.classDeclarations: Sequence<KSClassDeclaration>
     get() = declarations.filterIsInstance<KSClassDeclaration>()
 
-fun KSClassDeclaration.findCompanionObject(): KSClassDeclaration? =
+fun KSClassDeclaration.findCompanionObjectClassDeclaration(): KSClassDeclaration? =
     classDeclarations.find { it.isCompanionObject }
 
 fun KSClassDeclaration.isAssignableFrom(other: KSClassDeclaration): Boolean =

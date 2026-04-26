@@ -221,7 +221,11 @@ class SymbolParser(
     private fun parsePatch(symbol: KSAnnotated): ParsedPatch {
         val patchAnnotation = symbol.findAnnotation<Patch>()
         val classDeclaration = symbol.castOrNull<KSClassDeclaration>()
-        val superClassType = classDeclaration?.getSuperTypeOrNull()
+        val constructorPropertyNames = classDeclaration?.primaryConstructor
+            ?.parameters
+            ?.filter { it.isVal || it.isVar }
+            ?.mapNotNull { it.name?.asString() }
+            ?.toSet() ?: emptySet()
         return ParsedPatch(
             symbol = symbol,
 
@@ -229,20 +233,37 @@ class SymbolParser(
             side = patchAnnotation?.getArgumentValue(Patch::side),
             classDeclaration = classDeclaration,
 
-            superClassDeclaration = superClassType?.toClassDeclaration(),
-            superClassGenericTypeClassDeclaration = superClassType?.findGenericType()?.toClassDeclaration(),
-
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
-            properties = classDeclaration?.propertyDeclarations?.map { parsePatchProperty(it) }.orEmpty().toList(),
+            constructors = classDeclaration?.constructorDeclarations?.map {
+                parsePatchConstructor(it)
+            }.orEmpty().toList(),
+            properties = classDeclaration?.propertyDeclarations
+                ?.filterNot { it.simpleName.asString() in constructorPropertyNames }                ?.map { parsePatchProperty(it) }
+                .orEmpty().toList(),
             functions = listOfNotNull(
                 classDeclaration,
-                classDeclaration?.findCompanionObject(),
+                classDeclaration?.findCompanionObjectClassDeclaration(),
             ).flatMap { classDeclaration ->
                 classDeclaration.functionDeclarations.map { parsePatchFunction(it) }
             },
         )
     }
+
+    private fun parsePatchConstructor(constructorDeclaration: KSFunctionDeclaration): ParsedPatchConstructor =
+        ParsedPatchConstructor(
+            symbol = constructorDeclaration,
+
+            parameters = constructorDeclaration.parameters.map { parsePatchConstructorParameter(it) },
+        )
+
+    private fun parsePatchConstructorParameter(parameter: KSValueParameter): ParsedPatchConstructorParameter =
+        ParsedPatchConstructorParameter(
+            symbol = parameter,
+
+            type = parameter.type.resolve(),
+            hasOriginAnnotation = parameter.hasAnnotation<Origin>()
+        )
 
     private fun parsePatchProperty(propertyDeclaration: KSPropertyDeclaration): ParsedPatchProperty =
         ParsedPatchProperty(

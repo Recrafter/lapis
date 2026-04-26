@@ -90,10 +90,7 @@ class MixinLowering(
                 "Mixin".withQualifiedNamePrefix(patch.className)
             ),
             patchClassName = patch.className,
-            patchImplClassName = IrClassName.of(
-                options.generatedPackageName,
-                "Impl".withQualifiedNamePrefix(patch.className)
-            ),
+            patchImpl = lowerPatchImpl(patch),
             instanceClassName = patch.schema.originClassName,
             bytecodeTargetName = patch.schema.originBinaryName,
 
@@ -101,6 +98,28 @@ class MixinLowering(
             extension = lowerExtension(patch),
             injections = patch.hooks.flatMap { lowerInjections(it) },
         )
+
+    private fun lowerPatchImpl(patch: Patch): IrPatchImpl {
+        val patchConstructorArguments = patch.constructorParameters.map { lowerPatchConstructorArgument(it) }
+        val constructorParameters = buildList {
+            if (patchConstructorArguments.any { it is IrPatchConstructorOriginArgument }) {
+                add(IrPatchImplConstructorInstanceArgument)
+            }
+        }
+        return IrPatchImpl(
+            className = IrClassName.of(
+                options.generatedPackageName,
+                "Impl".withQualifiedNamePrefix(patch.className)
+            ),
+            constructorArguments = constructorParameters,
+            patchConstructorArguments = patchConstructorArguments,
+        )
+    }
+
+    private fun lowerPatchConstructorArgument(parameter: PatchConstructorParameter): IrPatchConstructorArgument =
+        when (parameter) {
+            is PatchConstructorOriginParameter -> IrPatchConstructorOriginArgument
+        }
 
     private fun lowerExtension(patch: Patch): IrExtension? {
         if (patch.sharedProperties.isEmpty() && patch.sharedFunctions.isEmpty()) {
@@ -139,7 +158,7 @@ class MixinLowering(
         )
     }
 
-    private fun lowerInjections(hook: DomainHook): List<IrInjection> {
+    private fun lowerInjections(hook: PatchHook): List<IrInjection> {
         val parameters = buildList {
             when {
                 hook.isInjectBased -> {
@@ -398,8 +417,8 @@ class MixinLowering(
     }
 
     private fun lowerInjectionLocalParameter(
-        hook: DomainHook,
-        parameter: HookParameter
+        hook: PatchHook,
+        parameter: HookParameter,
     ): IrInjectionLocalParameter? =
         when (parameter) {
             is HookParamLocalParameter -> {
@@ -595,7 +614,7 @@ class MixinLowering(
             .flatMap { it.injections }
             .flatMap { it.hookArguments }
             .filterIsInstance<IrHookOriginDescriptorWrapperImplArgument<*>>()
-            .map { it.impl }
+            .map { it.wrapperImpl }
             .filterIsInstance<T>()
             .find { it.descriptorClassName == descriptorClassName }
 
@@ -604,7 +623,7 @@ class MixinLowering(
             .flatMap { it.injections }
             .flatMap { it.hookArguments }
             .filterIsInstance<IrHookCancelArgument>()
-            .map { it.impl }
+            .map { it.wrapperImpl }
             .find { it.descriptorClassName == descriptorClassName }
 }
 

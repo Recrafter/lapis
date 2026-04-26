@@ -8,35 +8,35 @@ sealed interface IrHookOriginArgument : IrHookArgument
 object IrHookOriginValueArgument : IrHookOriginArgument
 
 sealed class IrHookOriginDescriptorWrapperImplArgument<T : IrDescriptorWrapperImpl>(
-    open val impl: T
+    open val wrapperImpl: T
 ) : IrHookOriginArgument
 
 class IrHookOriginDescriptorBodyWrapperImplArgument(
-    override val impl: IrDescriptorBodyWrapperImpl
-) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorBodyWrapperImpl>(impl)
+    override val wrapperImpl: IrDescriptorBodyWrapperImpl
+) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorBodyWrapperImpl>(wrapperImpl)
 
 class IrHookOriginDescriptorFieldGetWrapperImplArgument(
-    override val impl: IrDescriptorFieldGetWrapperImpl
-) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorFieldGetWrapperImpl>(impl)
+    override val wrapperImpl: IrDescriptorFieldGetWrapperImpl
+) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorFieldGetWrapperImpl>(wrapperImpl)
 
 class IrHookOriginDescriptorFieldSetWrapperImplArgument(
-    override val impl: IrDescriptorFieldSetWrapperImpl
-) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorFieldSetWrapperImpl>(impl)
+    override val wrapperImpl: IrDescriptorFieldSetWrapperImpl
+) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorFieldSetWrapperImpl>(wrapperImpl)
 
 class IrHookOriginDescriptorArrayGetWrapperImplArgument(
-    override val impl: IrDescriptorArrayGetWrapperImpl
-) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorArrayGetWrapperImpl>(impl)
+    override val wrapperImpl: IrDescriptorArrayGetWrapperImpl
+) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorArrayGetWrapperImpl>(wrapperImpl)
 
 class IrHookOriginDescriptorArraySetWrapperImplArgument(
-    override val impl: IrDescriptorArraySetWrapperImpl
-) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorArraySetWrapperImpl>(impl)
+    override val wrapperImpl: IrDescriptorArraySetWrapperImpl
+) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorArraySetWrapperImpl>(wrapperImpl)
 
 class IrHookOriginDescriptorCallWrapperImplArgument(
-    override val impl: IrDescriptorCallWrapperImpl
-) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorCallWrapperImpl>(impl)
+    override val wrapperImpl: IrDescriptorCallWrapperImpl
+) : IrHookOriginDescriptorWrapperImplArgument<IrDescriptorCallWrapperImpl>(wrapperImpl)
 
 object IrHookOriginInstanceofArgument : IrHookOriginArgument
-class IrHookCancelArgument(val impl: IrDescriptorCancelWrapperImpl) : IrHookArgument
+class IrHookCancelArgument(val wrapperImpl: IrDescriptorCancelWrapperImpl) : IrHookArgument
 object IrHookOrdinalArgument : IrHookArgument
 
 class IrHookLocalArgument(

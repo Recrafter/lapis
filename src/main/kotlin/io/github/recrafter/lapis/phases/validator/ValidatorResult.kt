@@ -29,8 +29,7 @@ class Schema(
     val originBinaryName: String,
     val originClassDeclaration: KSClassDeclaration,
 
-    val isLocal: Boolean,
-    val isAnonymous: Boolean,
+    val isAccessible: Boolean,
 
     val makePublic: Boolean,
     val removeFinal: Boolean,
@@ -144,19 +143,21 @@ class Patch(
     classDeclaration: KSClassDeclaration,
 
     val schema: Schema,
-    instanceClassDeclaration: KSClassDeclaration,
 
-    val sharedProperties: List<SharedProperty>,
-    val sharedFunctions: List<SharedFunction>,
+    val constructorParameters: List<PatchConstructorParameter>,
+    val sharedProperties: List<PatchSharedProperty>,
+    val sharedFunctions: List<PatchSharedFunction>,
 
-    val hooks: List<DomainHook>,
+    val hooks: List<PatchHook>,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
-    val instanceClassName: IrClassName = instanceClassDeclaration.asIrClassName()
     val containingFile: KSFile? = source.containingFile
 }
 
-class SharedProperty(
+sealed interface PatchConstructorParameter
+object PatchConstructorOriginParameter : PatchConstructorParameter
+
+class PatchSharedProperty(
     val name: String,
     type: KSType,
     val isMutable: Boolean,
@@ -164,7 +165,7 @@ class SharedProperty(
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
-class SharedFunction(
+class PatchSharedFunction(
     val name: String,
     val parameters: List<FunctionParameter>,
     returnType: KSType?,
@@ -172,7 +173,7 @@ class SharedFunction(
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
-sealed class DomainHook(
+sealed class PatchHook(
     val name: String,
     val descriptor: Descriptor,
     returnType: KSType?,
@@ -192,7 +193,7 @@ class MethodHeadHook(
     name: String,
     descriptor: MethodDescriptor,
     parameters: List<HookParameter>,
-) : DomainHook(name, descriptor, null, parameters, emptyList()) {
+) : PatchHook(name, descriptor, null, parameters, emptyList()) {
     override val isInjectBased: Boolean = true
 }
 
@@ -201,7 +202,7 @@ class ConstructorHeadHook(
     descriptor: ConstructorDescriptor,
     parameters: List<HookParameter>,
     val phase: ConstructorHeadPhase,
-) : DomainHook(name, descriptor, null, parameters, emptyList()) {
+) : PatchHook(name, descriptor, null, parameters, emptyList()) {
     override val isInjectBased: Boolean = true
 }
 
@@ -210,13 +211,13 @@ class BodyHook(
     override val targetDescriptor: MethodDescriptor,
     returnType: KSType?,
     parameters: List<HookParameter>,
-) : DomainHook(name, targetDescriptor, returnType, parameters, emptyList()), HookWithTarget
+) : PatchHook(name, targetDescriptor, returnType, parameters, emptyList()), HookWithTarget
 
 class TailHook(
     name: String,
     descriptor: InvokableDescriptor,
     parameters: List<HookParameter>,
-) : DomainHook(name, descriptor, null, parameters, emptyList()) {
+) : PatchHook(name, descriptor, null, parameters, emptyList()) {
     override val isInjectBased: Boolean = true
 }
 
@@ -228,7 +229,7 @@ class LocalHook(
     ordinals: List<Int>,
     val local: DomainLocal,
     val op: Op,
-) : DomainHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(name, descriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
@@ -239,7 +240,7 @@ class InstanceofHook(
     returnType: KSType,
     parameters: List<HookParameter>,
     ordinals: List<Int>,
-) : DomainHook(name, descriptor, returnType, parameters, ordinals) {
+) : PatchHook(name, descriptor, returnType, parameters, ordinals) {
     val className: IrClassName = classDeclaration.asIrClassName()
 }
 
@@ -249,7 +250,7 @@ class ReturnHook(
     type: KSType?,
     parameters: List<HookParameter>,
     ordinals: List<Int>,
-) : DomainHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(name, descriptor, type, parameters, ordinals) {
     override val isInjectBased: Boolean = type == null
 }
 
@@ -260,7 +261,7 @@ class LiteralHook(
     type: KSType,
     val literal: Literal,
     ordinals: List<Int>,
-) : DomainHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(name, descriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
@@ -305,7 +306,7 @@ class FieldGetHook(
     override val targetDescriptor: FieldDescriptor,
     ordinals: List<Int>,
     parameters: List<HookParameter>,
-) : DomainHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
+) : PatchHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
@@ -316,7 +317,7 @@ class FieldSetHook(
     override val targetDescriptor: FieldDescriptor,
     ordinals: List<Int>,
     parameters: List<HookParameter>,
-) : DomainHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
+) : PatchHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
@@ -329,7 +330,7 @@ class ArrayHook(
     ordinals: List<Int>,
     parameters: List<HookParameter>,
     val op: Op,
-) : DomainHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(name, descriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
     val componentTypeName: IrTypeName = componentType.asIrTypeName()
 }
@@ -341,7 +342,7 @@ class CallHook(
     parameters: List<HookParameter>,
     override val targetDescriptor: InvokableDescriptor,
     ordinals: List<Int>,
-) : DomainHook(name, descriptor, returnType, parameters, ordinals), HookWithTarget
+) : PatchHook(name, descriptor, returnType, parameters, ordinals), HookWithTarget
 
 sealed interface DomainLocal
 class NamedLocal(val name: String) : DomainLocal

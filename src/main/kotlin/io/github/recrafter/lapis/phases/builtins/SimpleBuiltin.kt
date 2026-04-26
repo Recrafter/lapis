@@ -67,17 +67,6 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 addSuperInterface(resolve(Callable).parameterizedBy(functionTypeVariableName))
             }
     },
-    Patch {
-        override fun generate(resolve: BuiltinResolver): KPClass =
-            buildKotlinClass(name) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
-                val instanceTypeVariableName = IrTypeVariableName.of("I")
-                setVariableTypes(instanceTypeVariableName)
-                addProperty(buildKotlinProperty("instance", instanceTypeVariableName) {
-                    setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
-                })
-            }
-    },
     LocalVar {
         override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {

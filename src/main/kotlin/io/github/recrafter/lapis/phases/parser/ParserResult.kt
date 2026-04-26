@@ -44,7 +44,6 @@ class ParsedDescriptor(
 ) : SymbolSource(symbol)
 
 sealed interface ParsedDescriptorGenericType
-
 class ParsedFunctionTypeDescriptorGenericType(
     val receiverType: KSType?,
     val parameters: List<ParsedParameter>,
@@ -75,14 +74,24 @@ class ParsedPatch(
     val name: String?,
     val side: Side?,
     val classDeclaration: KSClassDeclaration?,
-
-    val superClassDeclaration: KSClassDeclaration?,
-    val superClassGenericTypeClassDeclaration: KSClassDeclaration?,
-
     val schemaClassDeclaration: KSClassDeclaration?,
 
+    val constructors: List<ParsedPatchConstructor>,
     val properties: List<ParsedPatchProperty>,
     val functions: List<ParsedPatchFunction>,
+) : SymbolSource(symbol)
+
+class ParsedPatchConstructor(
+    symbol: KSNode,
+
+    val parameters: List<ParsedPatchConstructorParameter>,
+) : SymbolSource(symbol)
+
+class ParsedPatchConstructorParameter(
+    symbol: KSNode,
+
+    val type: KSType,
+    val hasOriginAnnotation: Boolean,
 ) : SymbolSource(symbol)
 
 class ParsedPatchProperty(
