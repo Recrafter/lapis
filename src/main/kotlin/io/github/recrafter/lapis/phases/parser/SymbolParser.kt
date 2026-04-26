@@ -8,14 +8,12 @@ import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
-import com.squareup.kotlinpoet.ksp.toClassName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.annotations.Origin
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
-import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import ksp.com.intellij.psi.PsiElement
 import ksp.com.intellij.psi.util.PsiTreeUtil
 import ksp.org.jetbrains.kotlin.analysis.api.KaImplementationDetail
@@ -42,10 +40,7 @@ class SymbolParser(
             resolver
                 .getSymbolsAnnotatedWith<Schema>()
                 .filterIsInstance<KSClassDeclaration>()
-                .filter { symbol ->
-                    val parent = symbol.parentDeclaration
-                    parent == null || !parent.hasAnnotation<Schema>()
-                }
+                .filterNot { it.parentDeclaration != null }
                 .toList(),
             resolver
                 .getSymbolsAnnotatedWith<Patch>()
@@ -62,36 +57,49 @@ class SymbolParser(
         }
 
     private fun parseSchema(symbol: KSClassDeclaration, parentBinaryName: String? = null): ParsedSchema {
-        val (nestedSchemas, descriptors) = symbol.classDeclarations.partition { it.getSuperTypeOrNull() == null }
-        val accessAnnotation = symbol.findAnnotation<Access>()
-        val accessTarget = accessAnnotation?.getArgumentValue(Access::target)
-        val explicitTarget = symbol.findAnnotation<Schema>()?.getArgumentValue(Schema::target)?.toClassDeclaration()
-        val (targetBinaryName, targetQualifiedName) = when {
-            parentBinaryName != null && accessTarget != null -> {
-                val innerName = accessTarget.removePrefix(".")
-                parentBinaryName + "$" + innerName to parentBinaryName + "." + innerName
+        val schemaAnnotation = symbol.findAnnotation<Schema>()
+        val currentQualifiedName = schemaAnnotation?.getArgumentValue(Schema::value)?.replace('/', '.')
+        val localSchemaAnnotation = symbol.findAnnotation<LocalSchema>()
+        val anonymousSchemaAnnotation = symbol.findAnnotation<AnonymousSchema>()
+        val (originBinaryName, originClassDeclaration) = when {
+            parentBinaryName == null -> {
+                currentQualifiedName to currentQualifiedName?.let { resolver.getClassDeclarationByName(it) }
             }
 
-            accessTarget != null -> accessTarget to accessTarget
-            explicitTarget?.isValid == true -> {
-                explicitTarget.toClassName().asIrClassName().run {
-                    binaryName to qualifiedName
-                }
+            localSchemaAnnotation != null -> {
+                val index = localSchemaAnnotation.getArgumentValue(LocalSchema::index)
+                val name = localSchemaAnnotation.getArgumentValue(LocalSchema::name)
+                val delegateClassDeclaration = localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)
+                    ?.toClassDeclaration()
+                parentBinaryName + "$" + index + name to delegateClassDeclaration
             }
 
-            else -> null to null
+            anonymousSchemaAnnotation != null -> {
+                val index = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::index)
+                val delegateClassDeclaration = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)
+                    ?.toClassDeclaration()
+                parentBinaryName + "$" + index to delegateClassDeclaration
+            }
+
+            else -> {
+                val originQualifiedName = parentBinaryName + "." + currentQualifiedName
+                parentBinaryName + "$" + currentQualifiedName to resolver.getClassDeclarationByName(originQualifiedName)
+            }
         }
+        val accessAnnotation = symbol.findAnnotation<Access>()
+        val (nestedSchemas, descriptors) = symbol.classDeclarations.partition { it.getSuperTypeOrNull() == null }
         return ParsedSchema(
             symbol = symbol,
             classDeclaration = symbol,
-            targetClassDeclaration = targetQualifiedName?.let {
-                resolver.getClassDeclarationByName(targetQualifiedName)
-            },
-            targetBinaryName = targetBinaryName,
-            hasAccess = accessTarget != null,
+            originClassDeclaration = originClassDeclaration,
+            originBinaryName = originBinaryName,
+            hasSchemaAnnotation = schemaAnnotation != null,
+            hasLocalSchemaAnnotation = localSchemaAnnotation != null,
+            hasAnonymousSchemaAnnotation = anonymousSchemaAnnotation != null,
+            hasAccessAnnotation = accessAnnotation != null,
             unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
             descriptors = descriptors.map { parseDescriptor(it) },
-            nestedSchemas = nestedSchemas.map { parseSchema(it, targetBinaryName) },
+            nestedSchemas = nestedSchemas.map { parseSchema(it, originBinaryName) },
         )
     }
 
@@ -222,7 +230,7 @@ class SymbolParser(
             classDeclaration = classDeclaration,
 
             superClassDeclaration = superClassType?.toClassDeclaration(),
-            superGenericClassDeclaration = superClassType?.findGenericType()?.toClassDeclaration(),
+            superClassGenericTypeClassDeclaration = superClassType?.findGenericType()?.toClassDeclaration(),
 
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
@@ -263,9 +271,9 @@ class SymbolParser(
         val atReturnAnnotation = functionDeclaration.findAnnotation<AtReturn>()
 
         val atLiteralAnnotation = functionDeclaration.findAnnotation<AtLiteral>()
-        val atLiteralZeroAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::zero, explicit = true)
-        val atLiteralClassType = atLiteralAnnotation?.getArgumentValue(AtLiteral::`class`, explicit = true)
-        val atLiteralNullAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::`null`, explicit = true)
+        val atLiteralExplicitZeroAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::zero, explicit = true)
+        val atLiteralExplicitClassType = atLiteralAnnotation?.getArgumentValue(AtLiteral::`class`, explicit = true)
+        val atLiteralExplicitNullAnnotation = atLiteralAnnotation?.getArgumentValue(AtLiteral::`null`, explicit = true)
 
         val atFieldAnnotation = functionDeclaration.findAnnotation<AtField>()
         val atArrayAnnotation = functionDeclaration.findAnnotation<AtArray>()
@@ -312,16 +320,16 @@ class SymbolParser(
             atReturnOrdinals = atReturnAnnotation?.getArgumentValue(AtReturn::ordinal).orEmpty(),
 
             hasAtLiteralAnnotation = atLiteralAnnotation != null,
-            atLiteralExplicitZero = atLiteralZeroAnnotation,
-            atLiteralZeroConditions = atLiteralZeroAnnotation?.getArgumentValue(Zero::conditions).orEmpty(),
+            atLiteralExplicitZero = atLiteralExplicitZeroAnnotation,
+            atLiteralZeroConditions = atLiteralExplicitZeroAnnotation?.getArgumentValue(Zero::conditions).orEmpty(),
             atLiteralExplicitInt = atLiteralAnnotation?.getArgumentValue(AtLiteral::int, explicit = true),
             atLiteralExplicitFloat = atLiteralAnnotation?.getArgumentValue(AtLiteral::float, explicit = true),
             atLiteralExplicitLong = atLiteralAnnotation?.getArgumentValue(AtLiteral::long, explicit = true),
             atLiteralExplicitDouble = atLiteralAnnotation?.getArgumentValue(AtLiteral::double, explicit = true),
             atLiteralExplicitString = atLiteralAnnotation?.getArgumentValue(AtLiteral::string, explicit = true),
-            atLiteralExplicitClassType = atLiteralClassType,
-            atLiteralExplicitClassDeclaration = atLiteralClassType?.toClassDeclaration(),
-            atLiteralExplicitNull = atLiteralNullAnnotation,
+            atLiteralExplicitClassType = atLiteralExplicitClassType,
+            atLiteralExplicitClassDeclaration = atLiteralExplicitClassType?.toClassDeclaration(),
+            atLiteralExplicitNull = atLiteralExplicitNullAnnotation,
             atLiteralOrdinals = atLiteralAnnotation?.getArgumentValue(AtLiteral::ordinal).orEmpty(),
 
             hasAtFieldAnnotation = atFieldAnnotation != null,
@@ -365,12 +373,12 @@ class SymbolParser(
             hasDefaultArgument = parameter.hasDefault,
 
             hasOriginAnnotation = originAnnotation != null,
-            originGenericClassDeclaration = if (originAnnotation != null) {
+            originGenericTypeClassDeclaration = if (originAnnotation != null) {
                 type.findGenericType()?.toClassDeclaration()
             } else null,
 
             hasCancelAnnotation = cancelAnnotation != null,
-            cancelGenericClassDeclaration = if (cancelAnnotation != null) {
+            cancelGenericTypeClassDeclaration = if (cancelAnnotation != null) {
                 type.findGenericType()?.toClassDeclaration()
             } else null,
 

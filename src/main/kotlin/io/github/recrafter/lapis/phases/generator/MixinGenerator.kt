@@ -130,7 +130,7 @@ class MixinGenerator(
             setConstructor(
                 IrParameter(
                     "instance",
-                    mixin.targetClassName,
+                    mixin.instanceClassName,
                     listOf(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                 )
             )
@@ -139,7 +139,7 @@ class MixinGenerator(
     private fun buildMixinClass(mixin: IrMixin): JPClass =
         buildJavaClass(mixin.className.simpleName) {
             addAnnotation<Mixin> {
-                setClassArrayMember(Mixin::value, mixin.targetClassName)
+                setStringArrayMember(Mixin::targets, mixin.bytecodeTargetName)
             }
             setModifiers(IrModifier.PUBLIC)
             val patchField = buildJavaField("patch".withInternalPrefix(), mixin.patchClassName) {
@@ -156,11 +156,21 @@ class MixinGenerator(
                         arg(patchField)
                     }
                     if_(isNotInitializedCondition) {
-                        code_("%N = new %T((%T) (%T) this)") {
+                        val isDoubleCastRequired = mixin.instanceClassName != KPAny.asIrClassName()
+                        val format = buildString {
+                            append("%N = new %T(")
+                            if (isDoubleCastRequired) {
+                                append("(%T) (%T) ")
+                            }
+                            append("this)")
+                        }
+                        code_(format) {
                             arg(patchField)
                             arg(mixin.patchImplClassName)
-                            arg(mixin.targetClassName)
-                            arg(Object::class.asIrClassName())
+                            if (isDoubleCastRequired) {
+                                arg(mixin.instanceClassName)
+                                arg(Object::class.asIrClassName())
+                            }
                         }
                     }
                     return_("%N") { arg(patchField) }
@@ -577,7 +587,7 @@ class MixinGenerator(
 
         extensionProperties += extension.kinds.filterIsInstance<IrPropertyGetterExtension>().map { getter ->
             buildKotlinProperty(getter.name, getter.typeName) {
-                setReceiverType(mixin.targetClassName)
+                setReceiverType(mixin.instanceClassName)
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
@@ -605,7 +615,7 @@ class MixinGenerator(
         extensionFunctions += extension.kinds.filterIsInstance<IrFunctionCallExtension>().map { method ->
             buildKotlinFunction(method.name) {
                 setModifiers(IrModifier.INLINE)
-                setReceiverType(mixin.targetClassName)
+                setReceiverType(mixin.instanceClassName)
                 setParameters(method.parameters)
                 setReturnType(method.returnTypeName)
                 setBody {
@@ -665,7 +675,7 @@ class MixinGenerator(
         schemas.forEach { schema ->
             if (schema.makePublic) {
                 entries += ClassEntry(
-                    ownerClassName = schema.targetClassName,
+                    ownerClassName = schema.originClassName,
                     removeFinal = schema.removeFinal,
                 )
             }
@@ -673,7 +683,7 @@ class MixinGenerator(
                 entries += when (descriptor) {
                     is IrInvokableDescriptor -> {
                         MethodEntry(
-                            ownerClassName = schema.targetClassName,
+                            ownerClassName = schema.originClassName,
                             name = descriptor.binaryName,
                             parameterTypes = descriptor.parameters.map { it.typeName },
                             returnTypeName = when (descriptor) {
@@ -687,7 +697,7 @@ class MixinGenerator(
 
                     is IrFieldDescriptor -> {
                         FieldEntry(
-                            ownerClassName = schema.targetClassName,
+                            ownerClassName = schema.originClassName,
                             name = descriptor.targetName,
                             typeName = descriptor.typeName,
                             removeFinal = descriptor.removeFinal,

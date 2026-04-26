@@ -33,7 +33,7 @@ class MixinLowering(
                     makePublic = schema.makePublic,
                     removeFinal = schema.removeFinal,
                     className = schema.className,
-                    targetClassName = schema.targetClassName,
+                    originClassName = schema.originClassName,
                     descriptors = schema.descriptors.map { lowerDescriptor(it) },
                 )
             },
@@ -94,21 +94,22 @@ class MixinLowering(
                 options.generatedPackageName,
                 "Impl".withQualifiedNamePrefix(patch.className)
             ),
-            targetClassName = patch.targetClassName,
+            instanceClassName = patch.schema.originClassName,
+            bytecodeTargetName = patch.schema.originBinaryName,
 
             side = patch.side,
-            extension = lowerExtension(patch, patch.className),
+            extension = lowerExtension(patch),
             injections = patch.hooks.flatMap { lowerInjections(it) },
         )
 
-    private fun lowerExtension(patch: Patch, patchClassName: IrClassName): IrExtension? {
+    private fun lowerExtension(patch: Patch): IrExtension? {
         if (patch.sharedProperties.isEmpty() && patch.sharedFunctions.isEmpty()) {
             return null
         }
         return IrExtension(
             className = IrClassName.of(
                 options.generatedPackageName,
-                "Extension".withQualifiedNamePrefix(patchClassName)
+                "Extension".withQualifiedNamePrefix(patch.className)
             ),
             kinds = buildList {
                 patch.sharedProperties.forEach { property ->
@@ -147,7 +148,7 @@ class MixinLowering(
                     })
                     add(
                         IrInjectionCallbackParameter(
-                            if (hook is ConstructorHeadHook) null
+                            if (hook.descriptor is ConstructorDescriptor) null
                             else hook.descriptor.returnTypeName
                         )
                     )
@@ -474,7 +475,7 @@ class MixinLowering(
                         DescriptorWrapperBuiltin.Body.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorWrapperBuiltin.Body],
+                    wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.Body],
                     parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
                 )
@@ -489,7 +490,7 @@ class MixinLowering(
                         DescriptorWrapperBuiltin.FieldGet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorWrapperBuiltin.FieldGet],
+                    wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.FieldGet],
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                     fieldTypeName = descriptor.fieldTypeName,
                 )
@@ -504,7 +505,7 @@ class MixinLowering(
                         DescriptorWrapperBuiltin.FieldSet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorWrapperBuiltin.FieldSet],
+                    wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.FieldSet],
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                     fieldTypeName = descriptor.fieldTypeName,
                 )
@@ -519,7 +520,7 @@ class MixinLowering(
                         DescriptorWrapperBuiltin.ArrayGet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorWrapperBuiltin.ArrayGet],
+                    wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.ArrayGet],
                     arrayTypeName = descriptor.fieldTypeName,
                     arrayComponentTypeName = parameter.arrayComponentTypeName,
                 )
@@ -534,7 +535,7 @@ class MixinLowering(
                         DescriptorWrapperBuiltin.ArraySet.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorWrapperBuiltin.ArraySet],
+                    wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.ArraySet],
                     arrayTypeName = descriptor.fieldTypeName,
                     arrayComponentTypeName = parameter.arrayComponentTypeName,
                 )
@@ -549,7 +550,7 @@ class MixinLowering(
                         DescriptorWrapperBuiltin.Call.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorWrapperBuiltin.Call],
+                    wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.Call],
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                     parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
@@ -565,7 +566,7 @@ class MixinLowering(
                         DescriptorWrapperBuiltin.Cancel.name.withQualifiedNamePrefix(descriptor.className)
                     ),
                     descriptorClassName = descriptor.className,
-                    builtin = builtins[DescriptorWrapperBuiltin.Cancel],
+                    wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.Cancel],
                     parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
                 )

@@ -15,7 +15,7 @@ class IrSchema(
     val makePublic: Boolean,
     val removeFinal: Boolean,
     val className: IrClassName,
-    val targetClassName: IrClassName,
+    val originClassName: IrClassName,
     val descriptors: List<IrDescriptor>,
 )
 
@@ -25,7 +25,8 @@ class IrMixin(
     val className: IrClassName,
     val patchClassName: IrClassName,
     val patchImplClassName: IrClassName,
-    val targetClassName: IrClassName,
+    val instanceClassName: IrClassName,
+    val bytecodeTargetName: String,
 
     val side: Side,
     val extension: IrExtension?,

@@ -17,9 +17,12 @@ class ParsedSchema(
     override val symbol: KSAnnotated,
 
     val classDeclaration: KSClassDeclaration?,
-    val targetClassDeclaration: KSClassDeclaration?,
-    val targetBinaryName: String?,
-    val hasAccess: Boolean,
+    val originClassDeclaration: KSClassDeclaration?,
+    val originBinaryName: String?,
+    val hasSchemaAnnotation: Boolean,
+    val hasLocalSchemaAnnotation: Boolean,
+    val hasAnonymousSchemaAnnotation: Boolean,
+    val hasAccessAnnotation: Boolean,
     val unfinal: Boolean,
     val descriptors: List<ParsedDescriptor>,
     val nestedSchemas: List<ParsedSchema>,
@@ -74,7 +77,7 @@ class ParsedPatch(
     val classDeclaration: KSClassDeclaration?,
 
     val superClassDeclaration: KSClassDeclaration?,
-    val superGenericClassDeclaration: KSClassDeclaration?,
+    val superClassGenericTypeClassDeclaration: KSClassDeclaration?,
 
     val schemaClassDeclaration: KSClassDeclaration?,
 
@@ -175,10 +178,10 @@ class ParsedPatchFunctionParameter(
     val hasDefaultArgument: Boolean,
 
     val hasOriginAnnotation: Boolean,
-    val originGenericClassDeclaration: KSClassDeclaration?,
+    val originGenericTypeClassDeclaration: KSClassDeclaration?,
 
     val hasCancelAnnotation: Boolean,
-    val cancelGenericClassDeclaration: KSClassDeclaration?,
+    val cancelGenericTypeClassDeclaration: KSClassDeclaration?,
 
     val hasOrdinalAnnotation: Boolean,
 

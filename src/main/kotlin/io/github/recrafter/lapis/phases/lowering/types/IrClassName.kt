@@ -3,7 +3,6 @@ package io.github.recrafter.lapis.phases.lowering.types
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.lastIndexOfOrNull
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrWildcardTypeName
@@ -44,31 +43,5 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
     companion object {
         fun of(packageName: String, vararg names: String): IrClassName =
             KPClassName(packageName, *names).asIrClassName()
-
-        fun fromBinaryName(binaryName: String): IrClassName {
-            val mainPart = binaryName.substringBefore('$')
-            val nestedParts = if (binaryName.contains('$')) {
-                binaryName.substringAfter('$').split('$')
-            } else {
-                emptyList()
-            }
-
-            val lastDotIndex = mainPart.lastIndexOfOrNull('.')
-
-            val packageName = if (lastDotIndex != null) {
-                mainPart.substring(0, lastDotIndex)
-            } else {
-                ""
-            }
-
-            val topLevelClassName = if (lastDotIndex != null) {
-                mainPart.substring(lastDotIndex + 1)
-            } else {
-                mainPart
-            }
-
-            val allNames = listOf(topLevelClassName) + nestedParts
-            return of(packageName, *allNames.toTypedArray())
-        }
     }
 }

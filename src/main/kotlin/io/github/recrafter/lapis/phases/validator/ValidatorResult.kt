@@ -26,16 +26,18 @@ class Schema(
     source: KSNode,
 
     classDeclaration: KSClassDeclaration,
-    val targetClassDeclaration: KSClassDeclaration?,
-    targetBinaryName: String,
+    val originBinaryName: String,
+    val originClassDeclaration: KSClassDeclaration,
+
+    val isLocal: Boolean,
+    val isAnonymous: Boolean,
 
     val makePublic: Boolean,
     val removeFinal: Boolean,
     val descriptors: List<Descriptor>,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
-    val targetClassName: IrClassName = targetClassDeclaration?.asIrClassName()
-        ?: IrClassName.fromBinaryName(targetBinaryName)
+    val originClassName: IrClassName = originClassDeclaration.asIrClassName()
     val containingFile: KSFile? = source.containingFile
 }
 
@@ -84,7 +86,7 @@ class ConstructorDescriptor(
     parameters: List<FunctionTypeParameter>,
     makePublic: Boolean,
 ) : InvokableDescriptor(
-    name, "", classDeclaration, returnType, parameters, returnType, true, makePublic, false
+    name, "", classDeclaration, returnType, parameters, returnType, false, makePublic, false
 )
 
 open class MethodDescriptor(
@@ -140,7 +142,9 @@ class Patch(
     val side: Side,
 
     classDeclaration: KSClassDeclaration,
-    targetClassDeclaration: KSClassDeclaration,
+
+    val schema: Schema,
+    instanceClassDeclaration: KSClassDeclaration,
 
     val sharedProperties: List<SharedProperty>,
     val sharedFunctions: List<SharedFunction>,
@@ -148,7 +152,7 @@ class Patch(
     val hooks: List<DomainHook>,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
-    val targetClassName: IrClassName = targetClassDeclaration.asIrClassName()
+    val instanceClassName: IrClassName = instanceClassDeclaration.asIrClassName()
     val containingFile: KSFile? = source.containingFile
 }
 
