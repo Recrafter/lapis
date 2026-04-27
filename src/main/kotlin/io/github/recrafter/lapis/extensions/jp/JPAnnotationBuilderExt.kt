@@ -6,65 +6,62 @@ import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 
-inline fun <reified A : Annotation> JPAnnotationBuilder.setIntMember(property: KProperty1<A, Int>, int: Int) {
-    addMember(property.name, buildJavaCodeBlock("%L") { arg(int) })
-}
-
-fun <A : Annotation> JPAnnotationBuilder.setBooleanMember(property: KProperty1<A, Boolean>, boolean: Boolean) {
+fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A, Boolean>, boolean: Boolean) {
     addMember(property.name, buildJavaCodeBlock("%L") { arg(boolean) })
 }
 
-fun <A : Annotation> JPAnnotationBuilder.setStringMember(property: KProperty1<A, String>, string: String) {
+fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A, Int>, int: Int) {
+    addMember(property.name, buildJavaCodeBlock("%L") { arg(int) })
+}
+
+fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A, String>, string: String) {
     addMember(property.name, buildJavaCodeBlock("%S") { arg(string) })
 }
 
-fun <A : Annotation> JPAnnotationBuilder.setClassMember(property: KProperty1<A, KClass<*>>, className: IrClassName) {
+fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A, KClass<*>>, className: IrClassName) {
     addMember(property.name, buildJavaCodeBlock("%T.class") { arg(className) })
 }
 
-inline fun <reified O : Annotation, reified I : Annotation> JPAnnotationBuilder.setAnnotationMember(
-    property: KProperty1<O, I>,
+inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, Embedded>,
     crossinline builder: Builder<JPAnnotationBuilder> = {},
 ) {
-    addMember(property.name, buildJavaCodeBlock("%L") { arg(buildJavaAnnotation<I>(builder)) })
+    addMember(property.name, buildJavaCodeBlock("%L") { arg(buildJavaAnnotation<Embedded>(builder)) })
 }
 
-inline fun <reified A : Annotation> JPAnnotationBuilder.setStringArrayMember(
-    property: KProperty1<A, Array<String>>,
+@JvmName("setStringArrayArgumentValue")
+inline fun <reified A : Annotation> JPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, Array<out String>>,
     vararg strings: String
 ) {
-    setArrayMember(property, strings, "%S") {
+    setArrayArgumentValue(property, strings, "%S") {
         strings.forEach { arg(it) }
     }
 }
 
-inline fun <reified A : Annotation> JPAnnotationBuilder.setClassArrayMember(
-    property: KProperty1<A, Array<KClass<*>>>,
+@JvmName("setClassArrayArgumentValue")
+inline fun <reified A : Annotation> JPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, Array<out KClass<*>>>,
     vararg classNames: IrClassName
 ) {
-    setArrayMember(property, classNames, "%T.class") {
+    setArrayArgumentValue(property, classNames, "%T.class") {
         classNames.forEach { arg(it) }
     }
 }
 
-inline fun <reified O : Annotation, reified I : Annotation> JPAnnotationBuilder.setAnnotationArrayMember(
-    property: KProperty1<O, Array<I>>,
-    vararg annotations: JPAnnotation,
+@JvmName("setAnnotationArrayArgumentValue")
+inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, Array<out Embedded>>,
+    crossinline builder: Builder<JPAnnotationBuilder> = {},
 ) {
-    setArrayMember(property, annotations, "%L") {
+    val annotations = arrayOf(buildJavaAnnotation<Embedded>(builder))
+    setArrayArgumentValue(property, annotations, "%L") {
         annotations.forEach { arg(it) }
     }
 }
 
-inline fun <reified O : Annotation, reified I : Annotation> JPAnnotationBuilder.setAnnotationArrayMember(
-    property: KProperty1<O, Array<I>>,
-    crossinline builder: Builder<JPAnnotationBuilder> = {},
-) {
-    setAnnotationArrayMember(property, buildJavaAnnotation<I>(builder))
-}
-
-inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayMember(
-    property: KProperty1<A, Array<*>>,
+inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayArgumentValue(
+    property: KProperty1<A, *>,
     array: Array<*>,
     placeholder: String,
     noinline arguments: Builder<IrJavaCodeBlock.Arguments> = {}

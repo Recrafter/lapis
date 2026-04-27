@@ -13,7 +13,7 @@ inline fun <reified A : Annotation> KPFileBuilder.addAnnotation(
 
 fun KPFileBuilder.suppressWarnings(warnings: List<KSuppressWarning>) {
     addAnnotation<Suppress> {
-        setStringVarargMember(
+        setArgumentValue(
             Suppress::names,
             *warnings.map { it.suppressionKey }.toTypedArray()
         )

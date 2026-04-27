@@ -151,7 +151,7 @@ class MixinGenerator(
     private fun buildMixinClass(patch: IrPatch): JPClass =
         buildJavaClass(patch.mixin.className.simpleName) {
             addAnnotation<Mixin> {
-                setStringArrayMember(Mixin::targets, patch.mixin.bytecodeTargetName)
+                setArgumentValue(Mixin::targets, patch.mixin.bytecodeTargetName)
             }
             setModifiers(IrModifier.PUBLIC)
             val patchField = buildJavaField("patch".withInternalPrefix(), patch.className) {
@@ -244,13 +244,13 @@ class MixinGenerator(
             val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelArgument }
             when (injection) {
                 is IrWrapMethodInjection -> addAnnotation<WrapMethod> {
-                    setStringArrayMember(WrapMethod::method, injection.methodMixinRef)
+                    setArgumentValue(WrapMethod::method, injection.methodMixinRef)
                 }
 
                 is IrInjectInjection -> addAnnotation<Inject> {
-                    setStringArrayMember(Inject::method, injection.methodMixinRef)
-                    setAnnotationArrayMember<Inject, At>(Inject::at) {
-                        setStringMember(
+                    setArgumentValue(Inject::method, injection.methodMixinRef)
+                    setArgumentValue<Inject, At>(Inject::at) {
+                        setArgumentValue(
                             At::value,
                             when (injection) {
                                 is IrConstructorHeadInjection -> "CTOR_HEAD"
@@ -259,75 +259,75 @@ class MixinGenerator(
                             }
                         )
                         if (injection is IrConstructorHeadInjection) {
-                            setStringArrayMember(
+                            setArgumentValue(
                                 At::args,
                                 *injection.atArgs.map { "${it.first}=${it.second}" }.toTypedArray()
                             )
                         }
-                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
-                        setBooleanMember(At::unsafe, true)
+                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                        setArgumentValue(At::unsafe, true)
                     }
                     if (hasCancelArgument) {
-                        setBooleanMember(Inject::cancellable, true)
+                        setArgumentValue(Inject::cancellable, true)
                     }
                 }
 
                 is IrModifyVariableInjection -> addAnnotation<ModifyVariable> {
-                    setStringArrayMember(ModifyVariable::method, injection.methodMixinRef)
+                    setArgumentValue(ModifyVariable::method, injection.methodMixinRef)
                     when (val local = injection.local) {
-                        is IrNamedLocal -> setStringArrayMember(ModifyVariable::name, local.name)
-                        is IrPositionalLocal -> setIntMember(ModifyVariable::ordinal, local.ordinal)
+                        is IrNamedLocal -> setArgumentValue(ModifyVariable::name, local.name)
+                        is IrPositionalLocal -> setArgumentValue(ModifyVariable::ordinal, local.ordinal)
                     }
-                    setAnnotationMember<ModifyVariable, At>(ModifyVariable::at) {
-                        setStringMember(
+                    setArgumentValue<ModifyVariable, At>(ModifyVariable::at) {
+                        setArgumentValue(
                             At::value,
                             when (injection.op) {
                                 Op.Get -> "LOAD"
                                 Op.Set -> "STORE"
                             }
                         )
-                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
-                        setBooleanMember(At::unsafe, true)
+                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                        setArgumentValue(At::unsafe, true)
                     }
                 }
 
                 is IrModifyReturnValueInjection -> addAnnotation<ModifyReturnValue> {
-                    setStringArrayMember(ModifyReturnValue::method, injection.methodMixinRef)
-                    setAnnotationArrayMember<ModifyReturnValue, At>(ModifyReturnValue::at) {
-                        setStringMember(At::value, "RETURN")
-                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
-                        setBooleanMember(At::unsafe, true)
+                    setArgumentValue(ModifyReturnValue::method, injection.methodMixinRef)
+                    setArgumentValue<ModifyReturnValue, At>(ModifyReturnValue::at) {
+                        setArgumentValue(At::value, "RETURN")
+                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                        setArgumentValue(At::unsafe, true)
                     }
                 }
 
                 is IrWrapOperationInjection -> addAnnotation<WrapOperation> {
-                    setStringArrayMember(WrapOperation::method, injection.methodMixinRef)
-                    setAnnotationArrayMember<WrapOperation, At>(WrapOperation::at) {
-                        setStringMember(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
-                        setStringMember(At::target, injection.targetMixinRef)
-                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
-                        setBooleanMember(At::unsafe, true)
+                    setArgumentValue(WrapOperation::method, injection.methodMixinRef)
+                    setArgumentValue<WrapOperation, At>(WrapOperation::at) {
+                        setArgumentValue(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
+                        setArgumentValue(At::target, injection.targetMixinRef)
+                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                        setArgumentValue(At::unsafe, true)
                     }
                 }
 
                 is IrModifyExpressionValueInjection -> addAnnotation<ModifyExpressionValue> {
-                    setStringArrayMember(ModifyExpressionValue::method, injection.methodMixinRef)
-                    setAnnotationArrayMember<ModifyExpressionValue, At>(ModifyExpressionValue::at) {
-                        setStringMember(At::value, "CONSTANT")
-                        setStringArrayMember(
+                    setArgumentValue(ModifyExpressionValue::method, injection.methodMixinRef)
+                    setArgumentValue<ModifyExpressionValue, At>(ModifyExpressionValue::at) {
+                        setArgumentValue(At::value, "CONSTANT")
+                        setArgumentValue(
                             At::args,
                             *injection.atArgs.map { "${it.first}=${it.second}" }.toTypedArray()
                         )
-                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
-                        setBooleanMember(At::unsafe, true)
+                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                        setArgumentValue(At::unsafe, true)
                     }
                 }
 
                 is IrFieldGetInjection, is IrFieldSetInjection -> addAnnotation<WrapOperation> {
-                    setStringArrayMember(WrapOperation::method, injection.methodMixinRef)
-                    setAnnotationArrayMember<WrapOperation, At>(WrapOperation::at) {
-                        setStringMember(At::value, "FIELD")
-                        setStringMember(At::target, injection.targetMixinRef)
+                    setArgumentValue(WrapOperation::method, injection.methodMixinRef)
+                    setArgumentValue<WrapOperation, At>(WrapOperation::at) {
+                        setArgumentValue(At::value, "FIELD")
+                        setArgumentValue(At::target, injection.targetMixinRef)
                         val opcode = when (injection) {
                             is IrFieldGetInjection -> {
                                 if (injection.isStaticTarget) Opcodes.GETSTATIC
@@ -339,18 +339,18 @@ class MixinGenerator(
                                 else Opcodes.PUTFIELD
                             }
                         }
-                        setIntMember(At::opcode, opcode)
-                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
-                        setBooleanMember(At::unsafe, true)
+                        setArgumentValue(At::opcode, opcode)
+                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                        setArgumentValue(At::unsafe, true)
                     }
                 }
 
                 is IrArrayInjection -> addAnnotation<Redirect> {
-                    setStringArrayMember(Redirect::method, injection.methodMixinRef)
-                    setAnnotationMember<Redirect, At>(Redirect::at) {
-                        setStringMember(At::value, "FIELD")
-                        setStringMember(At::target, injection.targetMixinRef)
-                        setIntMember(
+                    setArgumentValue(Redirect::method, injection.methodMixinRef)
+                    setArgumentValue<Redirect, At>(Redirect::at) {
+                        setArgumentValue(At::value, "FIELD")
+                        setArgumentValue(At::target, injection.targetMixinRef)
+                        setArgumentValue(
                             At::opcode,
                             if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD
                         )
@@ -358,17 +358,17 @@ class MixinGenerator(
                             Op.Get -> "get"
                             Op.Set -> "set"
                         }
-                        setStringArrayMember(At::args, "array=$arrayOp")
-                        injection.ordinal?.let { setIntMember(At::ordinal, it) }
-                        setBooleanMember(At::unsafe, true)
+                        setArgumentValue(At::args, "array=$arrayOp")
+                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                        setArgumentValue(At::unsafe, true)
                     }
                 }
 
                 is IrInstanceofInjection -> addAnnotation<WrapOperation> {
-                    setStringArrayMember(WrapOperation::method, injection.methodMixinRef)
-                    setAnnotationArrayMember<WrapOperation, Constant>(WrapOperation::constant) {
-                        setClassMember(Constant::classValue, injection.className)
-                        injection.ordinal?.let { setIntMember(Constant::ordinal, it) }
+                    setArgumentValue(WrapOperation::method, injection.methodMixinRef)
+                    setArgumentValue<WrapOperation, Constant>(WrapOperation::constant) {
+                        setArgumentValue(Constant::classValue, injection.className)
+                        injection.ordinal?.let { setArgumentValue(Constant::ordinal, it) }
                     }
                 }
             }
@@ -412,8 +412,8 @@ class MixinGenerator(
                                 buildJavaParameter(parameter.name.withInternalPrefix(LOCAL), typeName) {
                                     addAnnotation<Local> {
                                         when (val local = parameter.local) {
-                                            is IrNamedLocal -> setStringArrayMember(Local::name, local.name)
-                                            is IrPositionalLocal -> setIntMember(Local::ordinal, local.ordinal)
+                                            is IrNamedLocal -> setArgumentValue(Local::name, local.name)
+                                            is IrPositionalLocal -> setArgumentValue(Local::ordinal, local.ordinal)
                                         }
                                     }
                                 }
@@ -422,8 +422,8 @@ class MixinGenerator(
                             is IrInjectionParamLocalParameter -> {
                                 buildJavaParameter(parameter.name.withInternalPrefix(PARAM), typeName) {
                                     addAnnotation<Local> {
-                                        setIntMember(Local::index, parameter.localIndex)
-                                        setBooleanMember(Local::argsOnly, true)
+                                        setArgumentValue(Local::index, parameter.localIndex)
+                                        setArgumentValue(Local::argsOnly, true)
                                     }
                                 }
                             }
@@ -431,9 +431,9 @@ class MixinGenerator(
                             is IrInjectionShareParameter -> {
                                 buildJavaParameter(parameter.name.withInternalPrefix(SHARE), typeName) {
                                     addAnnotation<Share> {
-                                        setStringMember(Share::value, parameter.key)
+                                        setArgumentValue(Share::value, parameter.key)
                                         if (parameter.isExported) {
-                                            setStringMember(Share::namespace, options.modId)
+                                            setArgumentValue(Share::namespace, options.modId)
                                         }
                                     }
                                 }

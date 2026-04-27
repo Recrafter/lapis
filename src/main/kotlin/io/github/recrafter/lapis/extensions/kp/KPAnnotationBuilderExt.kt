@@ -4,23 +4,34 @@ import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrKotlinCodeBlock
 import kotlin.reflect.KProperty1
 
-fun <A : Annotation> KPAnnotationBuilder.setStringMember(property: KProperty1<A, String>, string: String) {
+fun <A : Annotation> KPAnnotationBuilder.setArgumentValue(property: KProperty1<A, String>, string: String) {
     addMember(buildKotlinCodeBlock("%L = %S") {
         arg(property.name)
         arg(string)
     })
 }
 
-inline fun <reified A : Annotation> KPAnnotationBuilder.setStringVarargMember(
-    property: KProperty1<A, Array<out String>>,
+@JvmName("setStringArrayArgumentValue")
+inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, Array<String>>,
     vararg strings: String,
 ) {
-    setArrayMember<A>(property, strings, "%S", isVararg = true) {
+    setArrayArgumentValue<A>(property, strings, "%S", false) {
         strings.forEach { arg(it) }
     }
 }
 
-inline fun <reified A : Annotation> KPAnnotationBuilder.setArrayMember(
+@JvmName("setStringVarargArgumentValue")
+inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, Array<out String>>,
+    vararg strings: String,
+) {
+    setArrayArgumentValue<A>(property, strings, "%S", true) {
+        strings.forEach { arg(it) }
+    }
+}
+
+inline fun <reified A : Annotation> KPAnnotationBuilder.setArrayArgumentValue(
     property: KProperty1<A, Array<*>>,
     array: Array<*>,
     placeholder: String,

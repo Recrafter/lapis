@@ -116,7 +116,7 @@ fun buildKotlinProperty(
     }
     useSiteTargets.forEach { useSiteTarget ->
         finalBuilder.addAnnotation<JvmName>(useSiteTarget) {
-            setStringMember(
+            setArgumentValue(
                 JvmName::name,
                 jvmNamespace.simpleName + "_" + useSiteTarget.name.lowercase() + name.capitalize()
             )
@@ -139,7 +139,7 @@ fun buildKotlinFunction(
     KPFunction.builder(name).apply {
         jvmNamespace?.simpleName?.let {
             addAnnotation<JvmName> {
-                setStringMember(JvmName::name, it + "_" + name)
+                setArgumentValue(JvmName::name, it + "_" + name)
             }
         }
         builder(name)

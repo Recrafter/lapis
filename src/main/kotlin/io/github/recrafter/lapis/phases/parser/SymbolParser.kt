@@ -477,8 +477,8 @@ class SymbolParser(
     ): E? =
         findArgumentValue(property, explicit)?.asEnum(default)
 
-    private inline fun <reified A : Annotation> KSAnnotation.getArgumentValue(
-        property: KProperty1<A, Annotation>,
+    private inline fun <reified A : Annotation, reified Embedded : Annotation> KSAnnotation.getArgumentValue(
+        property: KProperty1<A, Embedded>,
         explicit: Boolean = false,
     ): KSAnnotation? =
         findArgumentValue(property, explicit)?.asAnnotation()
@@ -488,14 +488,20 @@ class SymbolParser(
         property: KProperty1<A, IntArray>,
         explicit: Boolean = false,
     ): List<Int>? =
-        findArgumentValue(property, explicit)?.asArray()?.mapNotNull { it.asInt() }
+        getArrayArgumentValue(property, explicit)?.mapNotNull { it.asInt() }
 
     @JvmName("getEnumArrayArgumentValue")
     private inline fun <reified A : Annotation, reified E : Enum<E>> KSAnnotation.getArgumentValue(
         property: KProperty1<A, Array<out E>>,
         explicit: Boolean = false,
     ): List<E>? =
-        findArgumentValue(property, explicit)?.asArray()?.mapNotNull { it.asEnum() }
+        getArrayArgumentValue(property, explicit)?.mapNotNull { it.asEnum() }
+
+    private inline fun <reified A : Annotation> KSAnnotation.getArrayArgumentValue(
+        property: KProperty1<A, *>,
+        explicit: Boolean = false,
+    ): Iterable<KSAnnotationArgumentValue>? =
+        findArgumentValue(property, explicit)?.asArray()
 }
 
 inline fun <reified T : PsiElement> PsiElement.getChildOfType(): T? =
