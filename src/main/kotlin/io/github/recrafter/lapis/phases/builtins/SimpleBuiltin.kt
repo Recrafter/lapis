@@ -119,7 +119,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC)
                 setSuperClass(
                     RuntimeException::class.asIrClassName(),
-                    listOf(
+                    constructorArguments = listOf(
                         buildKotlinCodeBlock("null"),
                         buildKotlinCodeBlock("null"),
                         buildKotlinCodeBlock("false"),

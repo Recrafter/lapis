@@ -6,11 +6,11 @@ import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 
 class IrResult(
     val schemas: List<IrSchema>,
-    val mixins: List<IrMixin>,
+    val patches: List<IrPatch>,
 )
 
 class IrSchema(
-    val containingFile: KSFile?,
+    val originatingFile: KSFile?,
 
     val makePublic: Boolean,
     val removeFinal: Boolean,
@@ -19,29 +19,31 @@ class IrSchema(
     val descriptors: List<IrDescriptor>,
 )
 
-class IrMixin(
-    val containingFile: KSFile?,
-
-    val className: IrClassName,
-    val patchClassName: IrClassName,
-    val patchImpl: IrPatchImpl,
-    val instanceClassName: IrClassName,
-    val bytecodeTargetName: String,
+class IrPatch(
+    val originatingFile: KSFile?,
 
     val side: Side,
+    val className: IrClassName,
+    val constructorArguments: List<IrPatchConstructorArgument>,
+    val impl: IrPatchImpl,
+    val mixin: IrMixin,
     val extension: IrExtension?,
+)
+
+class IrMixin(
+    val className: IrClassName,
+    val instanceClassName: IrClassName,
+    val bytecodeTargetName: String,
     val injections: List<IrInjection>,
 )
 
-class IrPatchImpl(
-    val className: IrClassName,
-
-    val constructorArguments: List<IrPatchImplConstructorArgument>,
-    val patchConstructorArguments: List<IrPatchConstructorArgument>,
-)
-
-sealed interface IrPatchImplConstructorArgument
-object IrPatchImplConstructorInstanceArgument : IrPatchImplConstructorArgument
-
 sealed interface IrPatchConstructorArgument
 object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
+
+class IrPatchImpl(
+    val className: IrClassName,
+    val constructorParameters: List<IrPatchImplConstructorParameter>,
+)
+
+sealed interface IrPatchImplConstructorParameter
+object IrPatchImplConstructorInstanceParameter : IrPatchImplConstructorParameter

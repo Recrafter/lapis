@@ -25,9 +25,9 @@ fun KPClassBuilder.setConstructor(vararg parameters: IrParameter) {
     setConstructor(parameters.toList())
 }
 
-fun KPClassBuilder.setSuperClass(typeName: IrTypeName, constructorParameters: List<KPCodeBlock> = emptyList()) {
+fun KPClassBuilder.setSuperClass(typeName: IrTypeName, constructorArguments: List<KPCodeBlock> = emptyList()) {
     superclass(typeName.kotlin)
-    constructorParameters.forEach {
+    constructorArguments.forEach {
         addSuperclassConstructorParameter(it)
     }
 }

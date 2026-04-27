@@ -221,11 +221,6 @@ class SymbolParser(
     private fun parsePatch(symbol: KSAnnotated): ParsedPatch {
         val patchAnnotation = symbol.findAnnotation<Patch>()
         val classDeclaration = symbol.castOrNull<KSClassDeclaration>()
-        val constructorPropertyNames = classDeclaration?.primaryConstructor
-            ?.parameters
-            ?.filter { it.isVal || it.isVar }
-            ?.mapNotNull { it.name?.asString() }
-            ?.toSet() ?: emptySet()
         return ParsedPatch(
             symbol = symbol,
 
@@ -235,11 +230,11 @@ class SymbolParser(
 
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
-            constructors = classDeclaration?.constructorDeclarations?.map {
-                parsePatchConstructor(it)
-            }.orEmpty().toList(),
-            properties = classDeclaration?.propertyDeclarations
-                ?.filterNot { it.simpleName.asString() in constructorPropertyNames }                ?.map { parsePatchProperty(it) }
+            constructors = classDeclaration?.constructorDeclarations
+                ?.map { parsePatchConstructor(it) }
+                .orEmpty().toList(),
+            properties = classDeclaration?.bodyPropertyDeclarations
+                ?.map { parsePatchProperty(it) }
                 .orEmpty().toList(),
             functions = listOfNotNull(
                 classDeclaration,

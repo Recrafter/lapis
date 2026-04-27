@@ -18,8 +18,19 @@ val KSClassDeclaration.isInner: Boolean
 val KSClassDeclaration.isValid: Boolean
     get() = validate()
 
-val KSClassDeclaration.propertyDeclarations: Sequence<KSPropertyDeclaration>
-    get() = getDeclaredProperties()
+val KSClassDeclaration.constructorPropertyDeclarations: Sequence<KSPropertyDeclaration>
+    get() {
+        val constructorPropertyNames = primaryConstructor
+            ?.parameters
+            ?.filter { it.isVal || it.isVar }
+            ?.mapNotNull { it.name?.asString() }
+            ?.toSet()
+            ?: emptySet()
+        return getDeclaredProperties().filter { it.simpleName.asString() in constructorPropertyNames }
+    }
+
+val KSClassDeclaration.bodyPropertyDeclarations: Sequence<KSPropertyDeclaration>
+    get() = getDeclaredProperties() - constructorPropertyDeclarations.toSet()
 
 val KSClassDeclaration.constructorDeclarations: Sequence<KSFunctionDeclaration>
     get() = getConstructors()

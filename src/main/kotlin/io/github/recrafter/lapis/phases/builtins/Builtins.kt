@@ -82,10 +82,10 @@ class Builtins(
     }
 
     fun <T : IrDescriptorWrapperImpl> generateDescriptorWrapperImpl(
-        dest: KPFileBuilder,
+        destination: KPFileBuilder,
         builtin: DescriptorWrapperBuiltin<T>,
         impl: T,
     ) {
-        builtin.generateImpl(dest, impl, ::get)
+        builtin.generateImpl(destination, impl, ::get)
     }
 }

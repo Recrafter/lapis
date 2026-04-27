@@ -21,14 +21,14 @@ class MixinLowering(
     private val builtins: Builtins,
     @Suppress("unused") private val logger: LapisLogger,
 ) {
-    private val mixins: MutableList<IrMixin> = mutableListOf()
+    private val patches: MutableList<IrPatch> = mutableListOf()
 
     fun lower(validatorResult: ValidatorResult): IrResult {
-        mixins += validatorResult.patches.map { lowerMixin(it) }
+        patches += validatorResult.patches.map { lowerPatch(it) }
         return IrResult(
             schemas = validatorResult.schemas.map { schema ->
                 IrSchema(
-                    containingFile = schema.containingFile,
+                    originatingFile = schema.containingFile,
 
                     makePublic = schema.makePublic,
                     removeFinal = schema.removeFinal,
@@ -37,7 +37,7 @@ class MixinLowering(
                     descriptors = schema.descriptors.map { lowerDescriptor(it) },
                 )
             },
-            mixins = mixins,
+            patches = patches,
         )
     }
 
@@ -81,38 +81,17 @@ class MixinLowering(
             }
         }
 
-    private fun lowerMixin(patch: Patch): IrMixin =
-        IrMixin(
-            containingFile = patch.containingFile,
-
-            className = IrClassName.of(
-                options.mixinPackageName,
-                "Mixin".withQualifiedNamePrefix(patch.className)
-            ),
-            patchClassName = patch.className,
-            patchImpl = lowerPatchImpl(patch),
-            instanceClassName = patch.schema.originClassName,
-            bytecodeTargetName = patch.schema.originBinaryName,
+    private fun lowerPatch(patch: Patch): IrPatch {
+        val constructorArguments = patch.constructorParameters.map { lowerPatchConstructorArgument(it) }
+        return IrPatch(
+            originatingFile = patch.containingFile,
 
             side = patch.side,
+            className = patch.className,
+            constructorArguments = constructorArguments,
+            impl = lowerPatchImpl(patch, constructorArguments),
+            mixin = lowerMixin(patch),
             extension = lowerExtension(patch),
-            injections = patch.hooks.flatMap { lowerInjections(it) },
-        )
-
-    private fun lowerPatchImpl(patch: Patch): IrPatchImpl {
-        val patchConstructorArguments = patch.constructorParameters.map { lowerPatchConstructorArgument(it) }
-        val constructorParameters = buildList {
-            if (patchConstructorArguments.any { it is IrPatchConstructorOriginArgument }) {
-                add(IrPatchImplConstructorInstanceArgument)
-            }
-        }
-        return IrPatchImpl(
-            className = IrClassName.of(
-                options.generatedPackageName,
-                "Impl".withQualifiedNamePrefix(patch.className)
-            ),
-            constructorArguments = constructorParameters,
-            patchConstructorArguments = patchConstructorArguments,
         )
     }
 
@@ -120,6 +99,30 @@ class MixinLowering(
         when (parameter) {
             is PatchConstructorOriginParameter -> IrPatchConstructorOriginArgument
         }
+
+    private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl =
+        IrPatchImpl(
+            className = IrClassName.of(
+                options.generatedPackageName,
+                "Impl".withQualifiedNamePrefix(patch.className)
+            ),
+            constructorParameters = buildList {
+                if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
+                    add(IrPatchImplConstructorInstanceParameter)
+                }
+            },
+        )
+
+    private fun lowerMixin(patch: Patch): IrMixin =
+        IrMixin(
+            className = IrClassName.of(
+                options.mixinPackageName,
+                "Mixin".withQualifiedNamePrefix(patch.className)
+            ),
+            instanceClassName = patch.schema.originClassName,
+            bytecodeTargetName = patch.schema.originBinaryName,
+            injections = patch.hooks.flatMap { lowerInjections(it) },
+        )
 
     private fun lowerExtension(patch: Patch): IrExtension? {
         if (patch.sharedProperties.isEmpty() && patch.sharedFunctions.isEmpty()) {
@@ -416,10 +419,7 @@ class MixinLowering(
         }
     }
 
-    private fun lowerInjectionLocalParameter(
-        hook: PatchHook,
-        parameter: HookParameter,
-    ): IrInjectionLocalParameter? =
+    private fun lowerInjectionLocalParameter(hook: PatchHook, parameter: HookParameter): IrInjectionLocalParameter? =
         when (parameter) {
             is HookParamLocalParameter -> {
                 if (hook.isInjectBased) {
@@ -610,8 +610,8 @@ class MixinLowering(
     private inline fun <reified T : IrDescriptorWrapperImpl> findOriginDescriptorWrapperImpl(
         descriptorClassName: IrClassName
     ): T? =
-        mixins.asSequence()
-            .flatMap { it.injections }
+        patches.asSequence()
+            .flatMap { it.mixin.injections }
             .flatMap { it.hookArguments }
             .filterIsInstance<IrHookOriginDescriptorWrapperImplArgument<*>>()
             .map { it.wrapperImpl }
@@ -619,8 +619,8 @@ class MixinLowering(
             .find { it.descriptorClassName == descriptorClassName }
 
     private fun findCancelDescriptorWrapperImpl(descriptorClassName: IrClassName): IrDescriptorCancelWrapperImpl? =
-        mixins.asSequence()
-            .flatMap { it.injections }
+        patches.asSequence()
+            .flatMap { it.mixin.injections }
             .flatMap { it.hookArguments }
             .filterIsInstance<IrHookCancelArgument>()
             .map { it.wrapperImpl }

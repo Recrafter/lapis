@@ -54,14 +54,16 @@ class MixinGenerator(
     private val extensionProperties: MutableList<KPProperty> = mutableListOf()
     private val extensionFunctions: MutableList<KPFunction> = mutableListOf()
 
-    fun generate(schemas: List<IrSchema>, mixins: List<IrMixin>) {
-        val schemaContainingFiles = schemas.mapNotNull { it.containingFile }
-        generateDescriptorWrappers(schemas.flatMap { it.descriptors }, schemaContainingFiles)
-        mixins.forEach { generateMixin(it) }
+    fun generate(schemas: List<IrSchema>, patches: List<IrPatch>) {
+        val schemaOriginatingFiles = schemas.mapNotNull { it.originatingFile }
+        val patchOriginatingFiles = patches.mapNotNull { it.originatingFile }
 
-        generateExtensions(schemaContainingFiles + mixins.mapNotNull { it.containingFile })
+        generateDescriptorWrappers(schemas.flatMap { it.descriptors }, schemaOriginatingFiles + patchOriginatingFiles)
+        patches.forEach { generateMixin(it) }
 
-        generateMixinConfig(mixins)
+        generateExtensions(schemaOriginatingFiles + patchOriginatingFiles)
+
+        generateMixinConfig(patches)
         generateAccessorConfig(schemas)
     }
 
@@ -108,27 +110,26 @@ class MixinGenerator(
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
     }
 
-    private fun generateMixin(mixin: IrMixin) {
-        val originatingFiles = listOfNotNull(mixin.containingFile)
-        buildKotlinFile(mixin.patchImpl.className) {
+    private fun generateMixin(patch: IrPatch) {
+        val originatingFiles = listOfNotNull(patch.originatingFile)
+        buildKotlinFile(patch.impl.className) {
             suppressWarnings(KSuppressWarning.RedundantVisibilityModifier)
-            addType(buildPatchImplClass(mixin))
+            addType(buildPatchImplClass(patch))
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
-
-        buildJavaFile(mixin.className) {
-            buildMixinClass(mixin)
+        buildJavaFile(patch.mixin.className) {
+            buildMixinClass(patch)
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
-        mixin.extension?.let { generateMixinExtension(mixin, it) }
+        patch.extension?.let { generateMixinExtension(patch, it) }
     }
 
-    private fun buildPatchImplClass(mixin: IrMixin): KPClass =
-        buildKotlinClass(mixin.patchImpl.className.simpleName) {
+    private fun buildPatchImplClass(patch: IrPatch): KPClass =
+        buildKotlinClass(patch.impl.className.simpleName) {
             setModifiers(IrModifier.PUBLIC)
             val instanceParameterName = "instance"
-            val constructorParameters = mixin.patchImpl.constructorArguments.map { constructorParameter ->
-                when (constructorParameter) {
-                    is IrPatchImplConstructorInstanceArgument -> {
-                        IrParameter(instanceParameterName, mixin.instanceClassName)
+            val constructorParameters = patch.impl.constructorParameters.map { parameter ->
+                when (parameter) {
+                    is IrPatchImplConstructorInstanceParameter -> {
+                        IrParameter(instanceParameterName, patch.mixin.instanceClassName)
                     }
                 }
             }
@@ -136,39 +137,37 @@ class MixinGenerator(
                 setConstructor(constructorParameters)
             }
             setSuperClass(
-                mixin.patchClassName,
-                mixin.patchImpl.patchConstructorArguments.map { patchConstructorArgument ->
-                    when (patchConstructorArgument) {
-                        is IrPatchConstructorOriginArgument -> buildKotlinCodeBlock("%L") { arg(instanceParameterName) }
+                patch.className,
+                constructorArguments = patch.constructorArguments.map { argument ->
+                    when (argument) {
+                        is IrPatchConstructorOriginArgument -> {
+                            buildKotlinCodeBlock("%L") { arg(instanceParameterName) }
+                        }
                     }
                 }
             )
         }
 
-    private fun buildMixinClass(mixin: IrMixin): JPClass =
-        buildJavaClass(mixin.className.simpleName) {
+    private fun buildMixinClass(patch: IrPatch): JPClass =
+        buildJavaClass(patch.mixin.className.simpleName) {
             addAnnotation<Mixin> {
-                setStringArrayMember(Mixin::targets, mixin.bytecodeTargetName)
+                setStringArrayMember(Mixin::targets, patch.mixin.bytecodeTargetName)
             }
             setModifiers(IrModifier.PUBLIC)
-            val patchImplField = buildJavaField("patchImpl".withInternalPrefix(), mixin.patchImpl.className) {
+            val patchField = buildJavaField("patch".withInternalPrefix(), patch.className) {
                 addAnnotation<Unique>()
                 setModifiers(IrModifier.PRIVATE)
             }
-            addField(patchImplField)
-            val getOrInitPatchImplMethod = buildJavaMethod("getOrInitPatchImpl".withInternalPrefix()) {
+            val getOrInitPatchMethod = buildJavaMethod("getOrInitPatch".withInternalPrefix()) {
                 addAnnotation<Unique>()
                 setModifiers(IrModifier.PRIVATE)
-                setReturnType(mixin.patchImpl.className)
+                setReturnType(patch.className)
                 setBody {
-                    val isImplNotInitializedCondition = buildJavaCodeBlock("%N == null") {
-                        arg(patchImplField)
-                    }
-                    if_(isImplNotInitializedCondition) {
-                        val implConstructorArgumentCodeBlocks = mixin.patchImpl.constructorArguments.map { argument ->
-                            when (argument) {
-                                is IrPatchImplConstructorInstanceArgument -> {
-                                    val isDoubleCastRequired = mixin.instanceClassName != KPAny.asIrClassName()
+                    if_(buildJavaCodeBlock("%N == null") { arg(patchField) }) {
+                        val constructorArgumentCodeBlocks = patch.impl.constructorParameters.map { parameter ->
+                            when (parameter) {
+                                is IrPatchImplConstructorInstanceParameter -> {
+                                    val isDoubleCastRequired = patch.mixin.instanceClassName != KPAny.asIrClassName()
                                     buildJavaCodeBlock(
                                         buildString {
                                             if (isDoubleCastRequired) {
@@ -178,29 +177,31 @@ class MixinGenerator(
                                         }
                                     ) {
                                         if (isDoubleCastRequired) {
-                                            arg(mixin.instanceClassName)
+                                            arg(patch.mixin.instanceClassName)
                                             arg(Object::class.asIrClassName())
                                         }
                                     }
                                 }
                             }
                         }
-                        val format = buildString {
-                            append("%N = new %T(")
-                            append(implConstructorArgumentCodeBlocks.joinToString { "%L" })
-                            append(")")
-                        }
-                        code_(format) {
-                            arg(patchImplField)
-                            arg(mixin.patchImpl.className)
-                            implConstructorArgumentCodeBlocks.forEach { arg(it) }
+                        code_(
+                            buildString {
+                                append("%N = new %T(")
+                                append(constructorArgumentCodeBlocks.joinToString { "%L" })
+                                append(")")
+                            }
+                        ) {
+                            arg(patchField)
+                            arg(patch.impl.className)
+                            constructorArgumentCodeBlocks.forEach { arg(it) }
                         }
                     }
-                    return_("%N") { arg(patchImplField) }
+                    return_("%N") { arg(patchField) }
                 }
             }
-            addMethod(getOrInitPatchImplMethod)
-            mixin.extension?.let { extension ->
+            addField(patchField)
+            addMethod(getOrInitPatchMethod)
+            patch.extension?.let { extension ->
                 addSuperInterface(extension.className)
                 addMethods(extension.kinds.map { method ->
                     buildJavaMethod(method.methodName) {
@@ -212,7 +213,7 @@ class MixinGenerator(
                                 format = "%N().%L(%L)",
                                 isReturn = method.returnTypeName != null
                             ) {
-                                arg(getOrInitPatchImplMethod)
+                                arg(getOrInitPatchMethod)
                                 arg(
                                     when (method) {
                                         is IrPropertyGetterExtension -> "get" + method.name.capitalize()
@@ -226,14 +227,14 @@ class MixinGenerator(
                     }
                 })
             }
-            addMethods(mixin.injections.map {
-                buildMixinInjectionMethod(it, mixin, getOrInitPatchImplMethod)
+            addMethods(patch.mixin.injections.map {
+                buildMixinInjectionMethod(it, patch, getOrInitPatchMethod)
             })
         }
 
     private fun buildMixinInjectionMethod(
         injection: IrInjection,
-        mixin: IrMixin,
+        patch: IrPatch,
         getOrInitPatchImplMethod: JPMethod,
     ): JPMethod =
         buildJavaMethod(buildString {
@@ -538,20 +539,21 @@ class MixinGenerator(
                                 else -> PARAM
                             }
                         )
-                        val format = buildString {
-                            if (argument.varBuiltin != null) {
-                                append("new %T")
-                                if (argument.varBuiltin == LocalVarImplBuiltin.ObjectLocalVar) {
-                                    append("<>")
+                        buildJavaCodeBlock(
+                            buildString {
+                                if (argument.varBuiltin != null) {
+                                    append("new %T")
+                                    if (argument.varBuiltin == LocalVarImplBuiltin.ObjectLocalVar) {
+                                        append("<>")
+                                    }
+                                    append("(")
                                 }
-                                append("(")
+                                append("%L")
+                                if (argument.varBuiltin != null) {
+                                    append(")")
+                                }
                             }
-                            append("%L")
-                            if (argument.varBuiltin != null) {
-                                append(")")
-                            }
-                        }
-                        buildJavaCodeBlock(format) {
+                        ) {
                             argument.varBuiltin?.let { arg(builtins[it]) }
                             arg(localName)
                         }
@@ -574,7 +576,7 @@ class MixinGenerator(
                         isReturn = injection.returnTypeName != null,
                     ) {
                         if (injection.isStatic) {
-                            arg(mixin.patchImpl.className)
+                            arg(patch.className)
                         } else {
                             arg(getOrInitPatchImplMethod)
                         }
@@ -596,7 +598,7 @@ class MixinGenerator(
             }
         }
 
-    private fun generateMixinExtension(mixin: IrMixin, extension: IrExtension) {
+    private fun generateMixinExtension(patch: IrPatch, extension: IrExtension) {
         buildKotlinFile(extension.className) {
             addType(buildKotlinInterface(extension.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
@@ -608,11 +610,11 @@ class MixinGenerator(
                     }
                 })
             })
-        }.writeTo(codeGenerator, aggregating = false, listOfNotNull(mixin.containingFile))
+        }.writeTo(codeGenerator, aggregating = false, listOfNotNull(patch.originatingFile))
 
         extensionProperties += extension.kinds.filterIsInstance<IrPropertyGetterExtension>().map { getter ->
             buildKotlinProperty(getter.name, getter.typeName) {
-                setReceiverType(mixin.instanceClassName)
+                setReceiverType(patch.mixin.instanceClassName)
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
@@ -640,7 +642,7 @@ class MixinGenerator(
         extensionFunctions += extension.kinds.filterIsInstance<IrFunctionCallExtension>().map { method ->
             buildKotlinFunction(method.name) {
                 setModifiers(IrModifier.INLINE)
-                setReceiverType(mixin.instanceClassName)
+                setReceiverType(patch.mixin.instanceClassName)
                 setParameters(method.parameters)
                 setReturnType(method.returnTypeName)
                 setBody {
@@ -669,12 +671,12 @@ class MixinGenerator(
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
     }
 
-    private fun generateMixinConfig(mixins: List<IrMixin>) {
+    private fun generateMixinConfig(patches: List<IrPatch>) {
         val contents = configJson.encodeToString(
             MixinConfig.of(
                 mixinPackage = options.mixinPackageName,
-                qualifiedNames = mixins.groupBy { it.side }.mapValues { (_, mixins) ->
-                    mixins.map { it.className.qualifiedName }
+                qualifiedNames = patches.groupBy { it.side }.mapValues { (_, patches) ->
+                    patches.map { it.mixin.className.qualifiedName }
                 },
             )
         )
