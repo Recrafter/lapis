@@ -59,6 +59,97 @@ low-level Mixins and expressive Kotlin.
 
 ## Quick Start
 
+### Schemas
+
+Schemas describe the target environment once. They support static members, custom bytecode mappings, and recursive nesting to target anonymous or local classes effortlessly.
+
+```kotlin
+@Schema("net.minecraft.client.gui.screens.advancements.AdvancementsScreen")
+object _AdvancementsScreen {
+    @Static object WINDOW_INSIDE_X : Lapis.Field<Int>
+    object tabs : Lapis.Field<Map<AdvancementHolder, AdvancementTab>>
+
+    @BytecodeName("repositionElements")
+    object updateUI : Lapis.Method<() -> Unit>
+
+    // Targeting an anonymous class (e.g., RandomState$1)
+    @AnonymousSchema(1, delegate = DensityFunction.Visitor::class)
+    object NoiseFlattener {
+        object newInstance : Lapis.Constructor<(RandomState) -> Unit>
+    }
+
+    // Targeting a local class inside a method
+    @LocalSchema(1, "NoiseWiringHelper", delegate = DensityFunction.Visitor::class)
+    object NoiseWiringHelper {
+        object visitNoise : Lapis.Method<(DensityFunction.NoiseHolder) -> DensityFunction.NoiseHolder>
+    }
+}
+```
+
+### Patches
+
+A Patch is a Kotlin class linked to a Schema. Lapis handles all the heavy lifting—bridges, wrappers, and type-safe delegates—keeping your logic clean.
+
+```kotlin
+@Patch(_AdvancementsScreen::class, Side.ClientOnly)
+abstract class AdvancementsScreenPatch(@Origin val screen: AdvancementsScreen) {
+
+    // Example: Inverting scroll direction when Shift is pressed
+    @Hook(_AdvancementsScreen.mouseScrolled::class, At.Call)
+    @AtCall(_AdvancementTab.scroll::class, ordinal = [0])
+    fun invertScroll(@Origin original: Lapis.Call<_AdvancementTab.scroll>) {
+        if (Minecraft.getInstance().hasShiftDown()) {
+            // Invoke ORIGINAL logic with modified, type-safe arguments
+            original(scrollX = original.scrollY, scrollY = 0.toDouble())
+        } else {
+            original()
+        }
+    }
+
+    // Example: Patching an anonymous class defined in the Schema
+    @Patch(_AdvancementsScreen.NoiseFlattener::class)
+    abstract class NoiseFlattenerPatch {
+        @Hook(_AdvancementsScreen.NoiseFlattener.newInstance::class, At.Tail)
+        fun onInit() {
+            // Your logic here
+        }
+    }
+}
+```
+
+### Generated Examples
+
+```java
+@Mixin(
+        targets = {"net.minecraft.client.gui.screens.advancements.AdvancementWidget"}
+)
+public class io_github_diskria_advancements_fullscreen_client_patch_AdvancementWidgetPatch_Mixin {
+    @Unique
+    private AdvancementWidgetPatch _lapis_patch;
+
+    @Unique
+    private AdvancementWidgetPatch _lapis_getOrInitPatch() {
+        if (_lapis_patch == null) {
+            _lapis_patch = new io_github_diskria_advancements_fullscreen_client_patch_AdvancementWidgetPatch_Impl((AdvancementWidget) (Object) this);
+        }
+        return _lapis_patch;
+    }
+
+    @ModifyVariable(
+            method = {"extractHover(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIFII)V"},
+            name = {"topSide"},
+            at = @At(value = "STORE", ordinal = 0, unsafe = true)
+    )
+    private boolean fixHoverOutOfScreen_ordinal0(boolean _lapis_value,
+            @Local(name = {"titleTop"}) int _local_titleTop,
+            @Local(name = {"titleBarBottom"}) int _local_titleBarBottom,
+            @Local(name = {"descriptionTextHeight"}) int _local_descriptionTextHeight,
+            @Local(name = {"descriptionHeight"}) int _local_descriptionHeight) {
+        return _lapis_getOrInitPatch().fixHoverOutOfScreen(_local_titleTop, _local_titleBarBottom, _local_descriptionTextHeight, _local_descriptionHeight);
+    }
+}
+```
+
 > [!NOTE]
 > A brief guide on connecting the KSP plugin will be added here shortly. The full documentation and comprehensive Wiki
 > will be available with the **1.0.0** release.
