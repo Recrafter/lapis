@@ -109,7 +109,7 @@ class FrontendValidator(
         } else {
             name
         }
-        val receiverType = schemaOriginClassDeclaration.type
+        val receiverType = schemaOriginClassDeclaration.starProjectedType
         if (superClassDeclaration.isBuiltin(SimpleBuiltin.Field)) {
             kspRequire(genericType is ParsedTypeDescriptorGenericType) { "99" }
             kspRequireNotNull(genericType.type) { "100" }

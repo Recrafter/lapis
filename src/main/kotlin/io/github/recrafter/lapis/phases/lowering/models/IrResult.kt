@@ -3,6 +3,7 @@ package io.github.recrafter.lapis.phases.lowering.models
 import com.google.devtools.ksp.symbol.KSFile
 import io.github.recrafter.lapis.annotations.Side
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 class IrResult(
     val schemas: List<IrSchema>,
@@ -15,7 +16,7 @@ class IrSchema(
     val makePublic: Boolean,
     val removeFinal: Boolean,
     val className: IrClassName,
-    val originClassName: IrClassName,
+    val originTypeName: IrTypeName,
     val descriptors: List<IrDescriptor>,
 )
 
@@ -32,7 +33,7 @@ class IrPatch(
 
 class IrMixin(
     val className: IrClassName,
-    val instanceClassName: IrClassName,
+    val instanceTypeName: IrTypeName,
     val isInterfaceInstance: Boolean,
     val targetBinaryName: String,
     val injections: List<IrInjection>,

@@ -33,6 +33,8 @@ import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.binaryName
@@ -129,7 +131,7 @@ class MixinGenerator(
             val constructorParameters = patch.impl.constructorParameters.map { parameter ->
                 when (parameter) {
                     is IrPatchImplConstructorInstanceParameter -> {
-                        IrParameter(instanceParameterName, patch.mixin.instanceClassName)
+                        IrParameter(instanceParameterName, patch.mixin.instanceTypeName)
                     }
                 }
             }
@@ -167,7 +169,7 @@ class MixinGenerator(
                         val constructorArgumentCodeBlocks = patch.impl.constructorParameters.map { parameter ->
                             when (parameter) {
                                 is IrPatchImplConstructorInstanceParameter -> {
-                                    val isDoubleCastRequired = patch.mixin.instanceClassName != KPAny.asIrClassName()
+                                    val isDoubleCastRequired = patch.mixin.instanceTypeName != KPAny.asIrClassName()
                                     val isObjectCastRequired = !patch.mixin.isInterfaceInstance
                                     buildJavaCodeBlock(
                                         buildString {
@@ -181,9 +183,9 @@ class MixinGenerator(
                                         }
                                     ) {
                                         if (isDoubleCastRequired) {
-                                            arg(patch.mixin.instanceClassName)
+                                            arg(patch.mixin.instanceTypeName)
                                             if (isObjectCastRequired) {
-                                                arg(Object::class.asIrClassName())
+                                                arg(Object::class.asIrTypeName())
                                             }
                                         }
                                     }
@@ -399,7 +401,7 @@ class MixinGenerator(
                     is IrInjectionOperationParameter -> {
                         buildJavaParameter(
                             originalParameterName,
-                            Operation::class.asIrClassName().parameterizedBy(parameter.returnTypeName.orVoid())
+                            Operation::class.asIrParameterizedTypeName(parameter.returnTypeName.orVoid())
                         )
                     }
 
@@ -408,9 +410,9 @@ class MixinGenerator(
                     is IrInjectionLocalParameter -> {
                         val typeName = parameter.varImplBuiltin?.let {
                             if (it == LocalVarImplBuiltin.ObjectLocalVar) {
-                                it.referenceClassName.parameterizedBy(parameter.typeName)
+                                it.referenceTypeName.parameterizedBy(parameter.typeName)
                             } else {
-                                it.referenceClassName
+                                it.referenceTypeName
                             }
                         } ?: parameter.typeName
                         when (parameter) {
@@ -451,8 +453,8 @@ class MixinGenerator(
                         buildJavaParameter(
                             callbackParameterName,
                             parameter.returnTypeName
-                                ?.let { CallbackInfoReturnable::class.asIrClassName().parameterizedBy(it) }
-                                ?: CallbackInfo::class.asIrClassName()
+                                ?.let { CallbackInfoReturnable::class.asIrParameterizedTypeName(it) }
+                                ?: CallbackInfo::class.asIrTypeName()
                         ) {
                             if (injection !is IrInjectInjection) {
                                 addAnnotation<Cancellable>()
@@ -620,7 +622,7 @@ class MixinGenerator(
 
         extensionProperties += extension.kinds.filterIsInstance<IrPropertyGetterExtension>().map { getter ->
             buildKotlinProperty(getter.name, getter.typeName) {
-                setReceiverType(patch.mixin.instanceClassName)
+                setReceiverType(patch.mixin.instanceTypeName)
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
@@ -648,7 +650,7 @@ class MixinGenerator(
         extensionFunctions += extension.kinds.filterIsInstance<IrFunctionCallExtension>().map { method ->
             buildKotlinFunction(method.name) {
                 setModifiers(IrModifier.INLINE)
-                setReceiverType(patch.mixin.instanceClassName)
+                setReceiverType(patch.mixin.instanceTypeName)
                 setParameters(method.parameters)
                 setReturnType(method.returnTypeName)
                 setBody {
@@ -702,7 +704,7 @@ class MixinGenerator(
         schemas.forEach { schema ->
             if (schema.makePublic) {
                 entries += ClassEntry(
-                    ownerClassName = schema.originClassName,
+                    ownerClassName = schema.originTypeName.rawClassName,
                     removeFinal = schema.removeFinal,
                 )
             }
@@ -710,7 +712,7 @@ class MixinGenerator(
                 entries += when (descriptor) {
                     is IrInvokableDescriptor -> {
                         MethodEntry(
-                            ownerClassName = schema.originClassName,
+                            ownerClassName = schema.originTypeName.rawClassName,
                             name = descriptor.binaryName,
                             parameterTypes = descriptor.parameters.map { it.typeName },
                             returnTypeName = when (descriptor) {
@@ -724,7 +726,7 @@ class MixinGenerator(
 
                     is IrFieldDescriptor -> {
                         FieldEntry(
-                            ownerClassName = schema.originClassName,
+                            ownerClassName = schema.originTypeName.rawClassName,
                             name = descriptor.bytecodeName,
                             typeName = descriptor.typeName,
                             removeFinal = descriptor.removeFinal,

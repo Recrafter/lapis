@@ -5,87 +5,91 @@ import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin.LocalVar
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.IrSetterParameter
-import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 import kotlin.reflect.KCallable
+import kotlin.reflect.KClass
 
 enum class LocalVarImplBuiltin(
-    val valueTypeName: IrTypeName? = null,
-    val referenceClassName: IrClassName,
+    private val valueKPClassName: KPClassName? = null,
+    private val referenceKClass: KClass<*>,
     private val getterCallable: KCallable<*>,
     private val setterCallable: KCallable<*>,
 ) : Builtin<KPClass> {
 
     ObjectLocalVar(
-        referenceClassName = LocalRef::class.asIrClassName(),
+        referenceKClass = LocalRef::class,
         getterCallable = LocalRef<*>::get,
         setterCallable = LocalRef<*>::set,
     ),
     BooleanLocalVar(
-        valueTypeName = KPBoolean.asIrClassName(),
-        referenceClassName = LocalBooleanRef::class.asIrClassName(),
+        valueKPClassName = KPBoolean,
+        referenceKClass = LocalBooleanRef::class,
         getterCallable = LocalBooleanRef::get,
         setterCallable = LocalBooleanRef::set,
     ),
     ByteLocalVar(
-        valueTypeName = KPByte.asIrClassName(),
-        referenceClassName = LocalByteRef::class.asIrClassName(),
+        valueKPClassName = KPByte,
+        referenceKClass = LocalByteRef::class,
         getterCallable = LocalByteRef::get,
         setterCallable = LocalByteRef::set,
     ),
     ShortLocalVar(
-        valueTypeName = KPShort.asIrClassName(),
-        referenceClassName = LocalShortRef::class.asIrClassName(),
+        valueKPClassName = KPShort,
+        referenceKClass = LocalShortRef::class,
         getterCallable = LocalShortRef::get,
         setterCallable = LocalShortRef::set,
     ),
     IntLocalVar(
-        valueTypeName = KPInt.asIrClassName(),
-        referenceClassName = LocalIntRef::class.asIrClassName(),
+        valueKPClassName = KPInt,
+        referenceKClass = LocalIntRef::class,
         getterCallable = LocalIntRef::get,
         setterCallable = LocalIntRef::set,
     ),
     LongLocalVar(
-        valueTypeName = KPLong.asIrClassName(),
-        referenceClassName = LocalLongRef::class.asIrClassName(),
+        valueKPClassName = KPLong,
+        referenceKClass = LocalLongRef::class,
         getterCallable = LocalLongRef::get,
         setterCallable = LocalLongRef::set,
     ),
     CharLocalVar(
-        valueTypeName = KPChar.asIrClassName(),
-        referenceClassName = LocalCharRef::class.asIrClassName(),
+        valueKPClassName = KPChar,
+        referenceKClass = LocalCharRef::class,
         getterCallable = LocalCharRef::get,
         setterCallable = LocalCharRef::set,
     ),
     FloatLocalVar(
-        valueTypeName = KPFloat.asIrClassName(),
-        referenceClassName = LocalFloatRef::class.asIrClassName(),
+        valueKPClassName = KPFloat,
+        referenceKClass = LocalFloatRef::class,
         getterCallable = LocalFloatRef::get,
         setterCallable = LocalFloatRef::set,
     ),
     DoubleLocalVar(
-        valueTypeName = KPDouble.asIrClassName(),
-        referenceClassName = LocalDoubleRef::class.asIrClassName(),
+        valueKPClassName = KPDouble,
+        referenceKClass = LocalDoubleRef::class,
         getterCallable = LocalDoubleRef::get,
         setterCallable = LocalDoubleRef::set,
     );
+
+    val referenceTypeName: IrTypeName = referenceKClass.asIrTypeName()
 
     override val isInternal: Boolean = true
 
     override fun generate(resolve: BuiltinResolver): KPClass =
         buildKotlinClass(name) {
             setModifiers(IrModifier.PUBLIC)
-            val genericTypeName = valueTypeName ?: run {
-                IrTypeVariableName.of("T").also { setVariableTypes(it) }
+            val (genericTypeName, referenceTypeName) = if (valueKPClassName != null) {
+                valueKPClassName.asIrClassName() to referenceTypeName
+            } else {
+                val typeVariableName = IrTypeVariableName.of("T")
+                setVariableTypes(typeVariableName)
+                typeVariableName to referenceKClass.asIrParameterizedTypeName(typeVariableName)
             }
-            val referenceParameter = IrParameter(
-                "reference",
-                valueTypeName?.let { referenceClassName } ?: referenceClassName.parameterizedBy(genericTypeName),
-                listOf(IrModifier.PRIVATE)
-            )
+            val referenceParameter = IrParameter("reference", referenceTypeName, listOf(IrModifier.PRIVATE))
             setConstructor(referenceParameter)
             addSuperInterface(resolve(LocalVar).parameterizedBy(genericTypeName))
             addProperty(buildKotlinProperty("value", genericTypeName) {
@@ -114,6 +118,6 @@ enum class LocalVarImplBuiltin(
 
     companion object {
         fun of(valueTypeName: IrTypeName): LocalVarImplBuiltin =
-            LocalVarImplBuiltin.entries.find { valueTypeName == it.valueTypeName } ?: ObjectLocalVar
+            LocalVarImplBuiltin.entries.find { valueTypeName == it.valueKPClassName } ?: ObjectLocalVar
     }
 }

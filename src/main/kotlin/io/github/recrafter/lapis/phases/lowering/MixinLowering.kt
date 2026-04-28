@@ -1,6 +1,6 @@
 package io.github.recrafter.lapis.phases.lowering
 
-import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.asTypeName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
@@ -34,7 +34,7 @@ class MixinLowering(
                     makePublic = schema.makePublic,
                     removeFinal = schema.removeFinal,
                     className = schema.className,
-                    originClassName = schema.originClassName,
+                    originTypeName = schema.originClassName,
                     descriptors = schema.descriptors.map { lowerDescriptor(it) },
                 )
             },
@@ -120,7 +120,7 @@ class MixinLowering(
                 options.mixinPackageName,
                 "Mixin".withQualifiedNamePrefix(patch.className)
             ),
-            instanceClassName = patch.schema.originClassName,
+            instanceTypeName = patch.schema.originClassName,
             isInterfaceInstance = patch.schema.originClassDeclaration.isInterface,
             targetBinaryName = patch.schema.originBinaryName,
             injections = patch.hooks.flatMap { lowerInjections(it) },
@@ -218,7 +218,7 @@ class MixinLowering(
                 }
 
                 hook is InstanceofHook -> {
-                    add(IrInjectionValueParameter(Object::class.asIrClassName()))
+                    add(IrInjectionValueParameter(Object::class.asIrTypeName()))
                     add(IrInjectionOperationParameter(KPBoolean.asIrClassName()))
                 }
             }
@@ -635,8 +635,13 @@ fun FunctionParameter.asIrParameter(): IrParameter =
 fun FunctionTypeParameter.asIrFunctionTypeParameter(): IrFunctionTypeParameter =
     IrFunctionTypeParameter(name, typeName)
 
-fun KClass<*>.asIrClassName(): IrClassName =
-    asClassName().asIrClassName()
+fun KClass<*>.asIrTypeName(): IrTypeName =
+    asTypeName().asIrTypeName()
+
+fun KClass<*>.asIrParameterizedTypeName(
+    vararg argumentTypeNames: IrTypeName = arrayOf(KPStar.asIrWildcardTypeName())
+): IrParameterizedTypeName =
+    asIrTypeName().parameterizedBy(*argumentTypeNames)
 
 fun KPTypeName.asIrTypeName(): IrTypeName =
     IrTypeName(this)

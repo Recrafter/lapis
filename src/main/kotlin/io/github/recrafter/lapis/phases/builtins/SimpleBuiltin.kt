@@ -4,6 +4,8 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 
@@ -19,7 +21,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
         override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
-                setVariableTypes(IrTypeVariableName.of("F", Function::class.asIrClassName().parameterizedByStar()))
+                setVariableTypes(IrTypeVariableName.of("F", Function::class.asIrParameterizedTypeName()))
             }
     },
     Method {
@@ -28,7 +30,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIrClassName().parameterizedByStar()
+                    Function::class.asIrParameterizedTypeName()
                 )
                 setVariableTypes(functionTypeVariableName)
                 addSuperInterface(resolve(Callable).parameterizedBy(functionTypeVariableName))
@@ -40,7 +42,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setModifiers(IrModifier.PUBLIC)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
-                    Function::class.asIrClassName().parameterizedByStar()
+                    Function::class.asIrParameterizedTypeName()
                 )
                 setVariableTypes(functionTypeVariableName)
                 addSuperInterface(resolve(Callable).parameterizedBy(functionTypeVariableName))
@@ -69,7 +71,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 )
                 val operationParameter = IrParameter(
                     "operation",
-                    Operation::class.asIrClassName().parameterizedBy(KPBoolean.asIrClassName()),
+                    Operation::class.asIrParameterizedTypeName(KPBoolean.asIrClassName()),
                     listOf(IrModifier.PRIVATE)
                 )
                 setConstructor(valueParameter, operationParameter)
@@ -97,7 +99,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             buildKotlinObject(name) {
                 setModifiers(IrModifier.PUBLIC)
                 setSuperClass(
-                    RuntimeException::class.asIrClassName(),
+                    RuntimeException::class.asIrTypeName(),
                     constructorArguments = listOf(
                         buildKotlinCodeBlock("null"),
                         buildKotlinCodeBlock("null"),
@@ -107,7 +109,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 )
                 addFunction(buildKotlinFunction(RuntimeException::fillInStackTrace.name) {
                     setModifiers(IrModifier.OVERRIDE)
-                    setReturnType(Throwable::class.asIrClassName())
+                    setReturnType(Throwable::class.asIrTypeName())
                     setBody { return_("this") }
                 })
             }

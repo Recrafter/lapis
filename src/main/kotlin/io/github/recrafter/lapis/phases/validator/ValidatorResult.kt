@@ -11,6 +11,7 @@ import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.annotations.Side
 import io.github.recrafter.lapis.annotations.ZeroCondition
+import io.github.recrafter.lapis.extensions.ks.starProjectedType
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
@@ -36,7 +37,7 @@ class Schema(
     val descriptors: List<Descriptor>,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
-    val originClassName: IrClassName = originClassDeclaration.asIrClassName()
+    val originClassName: IrTypeName = originClassDeclaration.starProjectedType.asIrTypeName()
     val containingFile: KSFile? = source.containingFile
 }
 

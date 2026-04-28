@@ -6,6 +6,7 @@ import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.IrLambdaTypeName
@@ -31,7 +32,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIrClassName().parameterizedBy(impl.fieldTypeName),
+                Operation::class.asIrParameterizedTypeName(impl.fieldTypeName),
                 listOf(IrModifier.PUBLIC)
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
@@ -103,7 +104,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
             )
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIrClassName().parameterizedBy(IrTypeName.VOID),
+                Operation::class.asIrParameterizedTypeName(IrTypeName.VOID),
                 listOf(IrModifier.PUBLIC)
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
@@ -374,7 +375,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIrClassName().parameterizedBy(impl.returnTypeName.orVoid()),
+                Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
                 listOf(IrModifier.PUBLIC)
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
@@ -466,7 +467,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIrClassName().parameterizedBy(impl.returnTypeName.orVoid())
+                Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid())
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(listOfNotNull(receiverParameter) + argumentParameters + operationParameter)
@@ -603,8 +604,8 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
             val callbackParameter = IrParameter(
                 "callback".withInternalPrefix(),
                 impl.returnTypeName
-                    ?.let { CallbackInfoReturnable::class.asIrClassName().parameterizedBy(it) }
-                    ?: CallbackInfo::class.asIrClassName(),
+                    ?.let { CallbackInfoReturnable::class.asIrParameterizedTypeName(it) }
+                    ?: CallbackInfo::class.asIrTypeName(),
                 listOf(IrModifier.PUBLIC)
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {

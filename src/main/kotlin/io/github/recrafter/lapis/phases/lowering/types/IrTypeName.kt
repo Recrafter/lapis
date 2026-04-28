@@ -1,5 +1,7 @@
 package io.github.recrafter.lapis.phases.lowering.types
 
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.lowering.*
@@ -63,6 +65,19 @@ open class IrTypeName(
         JPArrayTypeName.of(arrayComponentType)
     }
 
+    val rawClassName: IrClassName
+        get() = when (val kotlin = this.kotlin) {
+            is KPClassName -> kotlin.asIrClassName()
+            is KPParameterizedTypeName -> kotlin.rawType.asIrClassName()
+            else -> lapisError("Cannot get raw class")
+        }
+
+    fun parameterizedBy(vararg argumentTypeNames: IrTypeName): IrParameterizedTypeName =
+        rawClassName.kotlin.parameterizedBy(argumentTypeNames.map { it.kotlin }).asIrParameterizedTypeName()
+
+    fun parameterizedByStar(): IrParameterizedTypeName =
+        parameterizedBy(KPStar.asIrWildcardTypeName())
+
     fun box(): IrTypeName =
         if (boxed) this
         else IrTypeName(kotlin, true)
@@ -101,7 +116,7 @@ open class IrTypeName(
         kotlin.hashCode()
 
     companion object {
-        val VOID: IrTypeName = Void::class.asIrClassName()
+        val VOID: IrTypeName = Void::class.asIrTypeName()
     }
 }
 
