@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.phases.generator.accessor
 
+import io.github.recrafter.lapis.phases.lowering.jvmDescriptor
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-import io.github.recrafter.lapis.phases.lowering.types.jvmName
 
 class FieldEntry(
     override val ownerClassName: IrClassName,
@@ -18,7 +18,7 @@ class FieldEntry(
             append(" ")
             append(name)
             append(" ")
-            append(typeName.jvmName)
+            append(typeName.jvmDescriptor)
         }
         append("accessible $fieldPart")
         if (removeFinal) {

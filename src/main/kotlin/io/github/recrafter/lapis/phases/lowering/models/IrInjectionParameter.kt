@@ -5,7 +5,10 @@ import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 sealed interface IrInjectionParameter
 
-class IrInjectionReceiverParameter(val typeName: IrTypeName) : IrInjectionParameter
+class IrInjectionReceiverParameter(
+    val typeName: IrTypeName,
+    val isCoerce: Boolean,
+) : IrInjectionParameter
 
 class IrInjectionArgumentParameter(
     val name: String?,

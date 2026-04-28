@@ -1,16 +1,17 @@
-package io.github.recrafter.lapis.phases.lowering.types
+package io.github.recrafter.lapis.phases.lowering
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.phases.lowering.models.IrConstructorDescriptor
 import io.github.recrafter.lapis.phases.lowering.models.IrInvokableDescriptor
 import io.github.recrafter.lapis.phases.lowering.models.IrMethodDescriptor
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.validator.ConstructorDescriptor
 import io.github.recrafter.lapis.phases.validator.Descriptor
 import io.github.recrafter.lapis.phases.validator.FieldDescriptor
 import io.github.recrafter.lapis.phases.validator.MethodDescriptor
 
-class IrJvmType(private val type: JPTypeName) {
+class JvmDescriptor(private val type: JPTypeName) {
 
     fun getPrimitiveName(allowVoid: Boolean = true): String? =
         when (type) {
@@ -30,12 +31,12 @@ class IrJvmType(private val type: JPTypeName) {
         when (type) {
             is JPClassName -> type.objectName
             is JPParameterizedTypeName -> type.rawType().objectName
-            is JPArrayTypeName -> "[" + type.componentType().jvmName
+            is JPArrayTypeName -> "[" + type.componentType().jvmDescriptor
             else -> getPrimitiveName() ?: lapisError("Unsupported Java type")
         }
 
     private val JPClassName.objectName: String
-        get() = "L$internalName;"
+        get() = internalName.objectName
 
     companion object {
         fun buildSignature(parameterTypeNames: List<IrTypeName>, returnTypeName: IrTypeName?): String =
@@ -45,15 +46,15 @@ class IrJvmType(private val type: JPTypeName) {
                         prefix = "(",
                         separator = "",
                         postfix = ")",
-                    ) { it.jvmName }
+                    ) { it.jvmDescriptor }
                 )
-                append(returnTypeName?.jvmName ?: VOID_NAME)
+                append(returnTypeName?.jvmDescriptor ?: VOID_NAME)
             }
     }
 }
 
-val IrTypeName.jvmName: String
-    get() = java.jvmName
+val IrTypeName.jvmDescriptor: String
+    get() = java.jvmDescriptor
 
 fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
     when (this) {
@@ -62,7 +63,7 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
                 append(CONSTRUCTOR_NAME)
             }
             append(
-                IrJvmType.buildSignature(
+                JvmDescriptor.buildSignature(
                     parameters.map { it.typeName },
                     if (isTarget) returnTypeName else null
                 )
@@ -71,11 +72,11 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
 
         is MethodDescriptor -> buildString {
             if (isTarget) {
-                append(receiverTypeName.jvmName)
+                append(inaccessibleInternalName?.objectName ?: receiverTypeName.jvmDescriptor)
             }
             append(bytecodeName)
             append(
-                IrJvmType.buildSignature(
+                JvmDescriptor.buildSignature(
                     parameters.map { it.typeName },
                     returnTypeName
                 )
@@ -84,11 +85,11 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
 
         is FieldDescriptor -> buildString {
             if (isTarget) {
-                append(receiverTypeName.jvmName)
+                append(inaccessibleInternalName?.objectName ?: receiverTypeName.jvmDescriptor)
             }
             append(bytecodeName)
             append(":")
-            append(fieldTypeName.jvmName)
+            append(fieldTypeName.jvmDescriptor)
         }
     }
 
@@ -101,5 +102,8 @@ val IrInvokableDescriptor.binaryName: String
 private const val CONSTRUCTOR_NAME: String = "<init>"
 private const val VOID_NAME: String = "V"
 
-private val JPTypeName.jvmName: String
-    get() = IrJvmType(this).getName()
+private val JPTypeName.jvmDescriptor: String
+    get() = JvmDescriptor(this).getName()
+
+private val String.objectName: String
+    get() = "L$this;"

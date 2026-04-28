@@ -31,13 +31,9 @@ import io.github.recrafter.lapis.phases.generator.accessor.FieldEntry
 import io.github.recrafter.lapis.phases.generator.accessor.MethodEntry
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
-import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIrClassName
-import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
-import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.*
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
-import io.github.recrafter.lapis.phases.lowering.types.binaryName
 import io.github.recrafter.lapis.phases.lowering.types.orVoid
 import kotlinx.serialization.json.Json
 import org.objectweb.asm.Opcodes
@@ -392,7 +388,14 @@ class MixinGenerator(
             val callbackParameterName = "callback".withInternalPrefix()
             addParameters(injection.parameters.map { parameter ->
                 when (parameter) {
-                    is IrInjectionReceiverParameter -> buildJavaParameter(receiverParameterName, parameter.typeName)
+                    is IrInjectionReceiverParameter -> {
+                        buildJavaParameter(receiverParameterName, parameter.typeName) {
+                            if (parameter.isCoerce) {
+                                addAnnotation<Coerce>()
+                            }
+                        }
+                    }
+
                     is IrInjectionArgumentParameter -> {
                         val name = parameter.name ?: parameter.index.toString()
                         buildJavaParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName)

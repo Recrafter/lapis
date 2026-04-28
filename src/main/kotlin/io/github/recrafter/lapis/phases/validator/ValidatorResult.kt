@@ -46,6 +46,7 @@ sealed class Descriptor(
     val bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
+    val inaccessibleInternalName: String?,
     val parameters: List<FunctionTypeParameter>,
     val returnType: KSType?,
     val isStatic: Boolean,
@@ -62,6 +63,7 @@ sealed class InvokableDescriptor(
     bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
+    inaccessibleInternalName: String?,
     parameters: List<FunctionTypeParameter>,
     returnType: KSType?,
     isStatic: Boolean,
@@ -72,6 +74,7 @@ sealed class InvokableDescriptor(
     bytecodeName,
     classDeclaration,
     receiverType,
+    inaccessibleInternalName,
     parameters,
     returnType,
     isStatic,
@@ -86,7 +89,7 @@ class ConstructorDescriptor(
     parameters: List<FunctionTypeParameter>,
     makePublic: Boolean,
 ) : InvokableDescriptor(
-    name, "", classDeclaration, returnType, parameters, returnType, false, makePublic, false
+    name, "", classDeclaration, returnType, null, parameters, returnType, false, makePublic, false,
 )
 
 open class MethodDescriptor(
@@ -94,6 +97,7 @@ open class MethodDescriptor(
     bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
+    inaccessibleInternalName: String?,
     returnType: KSType?,
     parameters: List<FunctionTypeParameter>,
     isStatic: Boolean,
@@ -104,6 +108,7 @@ open class MethodDescriptor(
     bytecodeName,
     classDeclaration,
     receiverType,
+    inaccessibleInternalName,
     parameters,
     returnType,
     isStatic,
@@ -116,6 +121,7 @@ class FieldDescriptor(
     bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
+    inaccessibleInternalName: String?,
     val fieldType: KSType,
     val arrayComponentType: KSType?,
     isStatic: Boolean,
@@ -126,6 +132,7 @@ class FieldDescriptor(
     bytecodeName,
     classDeclaration,
     receiverType,
+    inaccessibleInternalName,
     emptyList(),
     fieldType,
     isStatic,

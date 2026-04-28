@@ -2,8 +2,8 @@ package io.github.recrafter.lapis.phases.generator.accessor
 
 import io.github.recrafter.lapis.extensions.jp.binaryName
 import io.github.recrafter.lapis.extensions.jp.internalName
+import io.github.recrafter.lapis.phases.lowering.JvmDescriptor
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
-import io.github.recrafter.lapis.phases.lowering.types.IrJvmType
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 class MethodEntry(
@@ -25,7 +25,7 @@ class MethodEntry(
         append(" ")
         append(name)
         append(" ")
-        append(IrJvmType.buildSignature(parameterTypes, returnTypeName))
+        append(JvmDescriptor.buildSignature(parameterTypes, returnTypeName))
     }
 
     override val atEntry: String = buildString {
@@ -37,7 +37,7 @@ class MethodEntry(
         append(ownerClassName.java.binaryName)
         append(" ")
         append(name)
-        append(IrJvmType.buildSignature(parameterTypes, returnTypeName))
+        append(JvmDescriptor.buildSignature(parameterTypes, returnTypeName))
     }
 
     override val sectionIndex: Int = if (isConstructor) 2 else 3

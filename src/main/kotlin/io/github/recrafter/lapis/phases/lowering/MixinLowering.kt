@@ -180,7 +180,12 @@ class MixinLowering(
 
                 hook is HookWithTarget -> {
                     if (hook !is BodyHook && !hook.targetDescriptor.isStatic) {
-                        add(IrInjectionReceiverParameter(hook.targetDescriptor.receiverTypeName))
+                        add(
+                            IrInjectionReceiverParameter(
+                                hook.targetDescriptor.receiverTypeName,
+                                isCoerce = hook.targetDescriptor.inaccessibleInternalName != null,
+                            )
+                        )
                     }
                     if (hook is FieldSetHook) {
                         add(IrInjectionArgumentParameter("value", 0, hook.typeName))

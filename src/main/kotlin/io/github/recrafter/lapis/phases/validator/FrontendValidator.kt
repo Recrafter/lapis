@@ -65,7 +65,7 @@ class FrontendValidator(
             val descriptorQualifiedName = parsedDescriptor.classDeclaration.qualifiedName?.asString()
                 ?: return@mapNotNull null
             val validatedDescriptor = runOrNullOnSkip {
-                validateDescriptor(parsedDescriptor, originClassDeclaration, isAccessible)
+                validateDescriptor(parsedDescriptor, originClassDeclaration, originInternalName, isAccessible)
             }
             if (validatedDescriptor != null) {
                 validDescriptors[descriptorQualifiedName] = validatedDescriptor
@@ -96,6 +96,7 @@ class FrontendValidator(
     private fun validateDescriptor(
         descriptor: ParsedDescriptor,
         schemaOriginClassDeclaration: KSClassDeclaration,
+        schemaOriginInternalName: String,
         isAccessibleSchema: Boolean,
     ): Descriptor = with(descriptor) {
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "89" }
@@ -118,6 +119,7 @@ class FrontendValidator(
                 name = name,
                 classDeclaration = classDeclaration,
                 receiverType = receiverType,
+                inaccessibleInternalName = if (isAccessibleSchema) null else schemaOriginInternalName,
                 bytecodeName = bytecodeName,
                 fieldType = genericType.type,
                 arrayComponentType = genericType.arrayComponentType,
@@ -141,6 +143,7 @@ class FrontendValidator(
                     name = name,
                     classDeclaration = classDeclaration,
                     receiverType = receiverType,
+                    inaccessibleInternalName = if (isAccessibleSchema) null else schemaOriginInternalName,
                     returnType = genericType.returnType,
                     bytecodeName = bytecodeName,
                     parameters = parameters,
