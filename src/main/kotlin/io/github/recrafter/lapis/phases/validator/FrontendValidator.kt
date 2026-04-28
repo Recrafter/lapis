@@ -4,6 +4,7 @@ import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.Variance
 import com.squareup.kotlinpoet.ksp.toClassName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
@@ -209,6 +210,7 @@ class FrontendValidator(
             hasOriginAnnotation -> {
                 val instanceClassDeclaration = type.toClassDeclaration()
                 kspRequire(instanceClassDeclaration == schema.originClassDeclaration) { "172" }
+                kspRequire(type.arguments.none { it.variance != Variance.STAR }) { "213" }
                 PatchConstructorOriginParameter
             }
 
