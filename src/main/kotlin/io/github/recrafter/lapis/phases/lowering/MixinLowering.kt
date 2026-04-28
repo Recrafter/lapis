@@ -56,7 +56,7 @@ class MixinLowering(
                         makePublic = descriptor.makePublic,
                         removeFinal = descriptor.removeFinal,
                         name = descriptor.name,
-                        targetName = descriptor.targetName,
+                        bytecodeName = descriptor.bytecodeName,
                         bodyWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         cancelWrapperImpl = findCancelDescriptorWrapperImpl(descriptor.className),
@@ -71,7 +71,7 @@ class MixinLowering(
                     makePublic = descriptor.makePublic,
                     removeFinal = descriptor.removeFinal,
                     name = descriptor.name,
-                    targetName = descriptor.targetName,
+                    bytecodeName = descriptor.bytecodeName,
                     fieldGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                     fieldSetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                     arrayGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
@@ -120,7 +120,7 @@ class MixinLowering(
                 "Mixin".withQualifiedNamePrefix(patch.className)
             ),
             instanceClassName = patch.schema.originClassName,
-            bytecodeTargetName = patch.schema.originBinaryName,
+            targetBinaryName = patch.schema.originBinaryName,
             injections = patch.hooks.flatMap { lowerInjections(it) },
         )
 

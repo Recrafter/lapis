@@ -2,8 +2,6 @@ package io.github.recrafter.lapis.phases.parser
 
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.impl.symbol.kotlin.KSClassDeclarationImpl
-import com.google.devtools.ksp.impl.symbol.kotlin.KSFunctionDeclarationImpl
-import com.google.devtools.ksp.impl.symbol.kotlin.KSPropertyDeclarationJavaImpl
 import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.processing.Resolver
@@ -14,19 +12,10 @@ import io.github.recrafter.lapis.annotations.Origin
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
-import ksp.com.intellij.psi.PsiElement
-import ksp.com.intellij.psi.util.PsiTreeUtil
-import ksp.org.jetbrains.kotlin.analysis.api.KaImplementationDetail
-import ksp.org.jetbrains.kotlin.analysis.api.KaSession
-import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaCallableMemberCall
-import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaErrorCallInfo
-import ksp.org.jetbrains.kotlin.analysis.api.resolution.KaSuccessCallInfo
-import ksp.org.jetbrains.kotlin.analysis.api.session.KaSessionProvider
 import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
-import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
-import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaJavaFieldSymbol
-import ksp.org.jetbrains.kotlin.analysis.api.types.KaClassType
-import ksp.org.jetbrains.kotlin.psi.*
+import ksp.org.jetbrains.kotlin.psi.KtClassOrObject
+import ksp.org.jetbrains.kotlin.psi.KtFunctionType
+import ksp.org.jetbrains.kotlin.psi.KtUserType
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 
@@ -107,7 +96,7 @@ class SymbolParser(
         val accessAnnotation = classDeclaration.findAnnotation<Access>()
         val bytecodeNameAnnotation = classDeclaration.findAnnotation<BytecodeName>()
         val superClassType = classDeclaration.getSuperTypeOrNull()
-        val ktSuperTypeListEntry = classDeclaration
+        val ktFunctionType = classDeclaration
             .castOrNull<KSClassDeclarationImpl>()
             ?.ktDeclarationSymbol
             ?.castOrNull<KaClassSymbol>()
@@ -115,6 +104,14 @@ class SymbolParser(
             ?.castOrNull<KtClassOrObject>()
             ?.superTypeListEntries
             ?.firstOrNull()
+            ?.typeReference
+            ?.typeElement
+            ?.castOrNull<KtUserType>()
+            ?.typeArguments
+            ?.firstOrNull()
+            ?.typeReference
+            ?.typeElement
+            ?.castOrNull<KtFunctionType>()
         return ParsedDescriptor(
             symbol = classDeclaration,
 
@@ -126,26 +123,14 @@ class SymbolParser(
             bytecodeName = bytecodeNameAnnotation?.getArgumentValue(BytecodeName::name),
             unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
 
-            genericType = parseDescriptorGenericType(
-                superClassType?.genericTypes?.firstOrNull(),
-                ktSuperTypeListEntry
-                    ?.typeReference
-                    ?.typeElement
-                    ?.castOrNull<KtUserType>()
-                    ?.typeArguments
-                    ?.firstOrNull()
-                    ?.typeReference
-                    ?.typeElement
-                    ?.castOrNull<KtFunctionType>()
-            ),
-            callableReference = parseDescriptorCallableReference(ktSuperTypeListEntry as? KtSuperTypeCallEntry),
+            genericType = parseDescriptorGenericType(superClassType?.genericTypes?.firstOrNull(), ktFunctionType),
             superClassDeclaration = superClassType?.toClassDeclaration(),
         )
     }
 
     private fun parseDescriptorGenericType(
         type: KSType?,
-        ktFunctionType: KtFunctionType?
+        ktFunctionType: KtFunctionType?,
     ): ParsedDescriptorGenericType =
         if (type?.isFunctionType == true && ktFunctionType != null) {
             val genericTypes = type.genericTypes
@@ -172,51 +157,6 @@ class SymbolParser(
                 arrayComponentType = type?.findArrayComponentType(types)
             )
         }
-
-    private fun parseDescriptorCallableReference(
-        ktSuperTypeCallEntry: KtSuperTypeCallEntry?
-    ): ParsedDescriptorCallableReference? =
-        ktSuperTypeCallEntry
-            ?.useAnalysis {
-                it.typeReference?.type?.castOrNull<KaClassType>()?.typeArguments?.firstOrNull()?.type
-                return@useAnalysis it
-            }
-            ?.getChildOfType<KtValueArgumentList>()
-            ?.arguments
-            ?.firstOrNull()
-            ?.getArgumentExpression()
-            ?.castOrNull<KtCallableReferenceExpression>()
-            ?.useAnalysis { callable ->
-                val callInfo = callable.resolveToCall()
-                if (callInfo is KaErrorCallInfo && callInfo.diagnostic.factoryName == "INVISIBLE_REFERENCE") {
-                    return@useAnalysis InvisibleCallableReference(callable.callableReference.text)
-                }
-                val symbol = callInfo
-                    ?.castOrNull<KaSuccessCallInfo>()
-                    ?.call
-                    ?.castOrNull<KaCallableMemberCall<*, *>>()
-                    ?.partiallyAppliedSymbol
-                    ?.signature
-                    ?.symbol
-                    ?: return@useAnalysis null
-                val receiverClassDeclaration = symbol
-                    .containingSymbol
-                    ?.castOrNull<KaClassSymbol>()
-                    ?.let { KSClassDeclarationImpl.getCached(it) }
-                when (symbol) {
-                    is KaFunctionSymbol -> ParsedMethodDescriptorCallableReference(
-                        receiverClassDeclaration = receiverClassDeclaration,
-                        name = KSFunctionDeclarationImpl.getCached(symbol).name,
-                    )
-
-                    is KaJavaFieldSymbol -> ParsedFieldDescriptorCallableReference(
-                        receiverClassDeclaration = receiverClassDeclaration,
-                        name = KSPropertyDeclarationJavaImpl.getCached(symbol).name,
-                    )
-
-                    else -> null
-                }
-            }
 
     private fun parsePatch(symbol: KSAnnotated): ParsedPatch {
         val patchAnnotation = symbol.findAnnotation<Patch>()
@@ -269,8 +209,7 @@ class SymbolParser(
             isPublic = propertyDeclaration.isPublic(),
             isAbstract = propertyDeclaration.isAbstract(),
             isExtension = propertyDeclaration.isExtension,
-            isMutable = propertyDeclaration.isMutable &&
-                propertyDeclaration.setter?.modifiers?.contains(Modifier.PUBLIC) == true,
+            isMutable = propertyDeclaration.isMutable && propertyDeclaration.setter?.isPublic == true,
         )
 
     private fun parsePatchFunction(functionDeclaration: KSFunctionDeclaration): ParsedPatchFunction {
@@ -503,12 +442,3 @@ class SymbolParser(
     ): Iterable<KSAnnotationArgumentValue>? =
         findArgumentValue(property, explicit)?.asArray()
 }
-
-inline fun <reified T : PsiElement> PsiElement.getChildOfType(): T? =
-    PsiTreeUtil.getChildOfType(this, T::class.java)
-
-@OptIn(KaImplementationDetail::class)
-inline fun <T : KtElement, R> T.useAnalysis(crossinline action: KaSession.(T) -> R): R =
-    KaSessionProvider.getInstance(project).analyze(this) {
-        action(this@useAnalysis)
-    }

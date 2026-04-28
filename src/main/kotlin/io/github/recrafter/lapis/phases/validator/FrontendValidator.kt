@@ -54,9 +54,7 @@ class FrontendValidator(
                 hasLocalSchemaAnnotation,
                 hasAnonymousSchemaAnnotation,
             ).singleOrNull { it }
-        ) {
-            "47"
-        }
+        ) { "47" }
         val isAccessible = hasSchemaAnnotation
         if (hasAccessAnnotation) {
             kspRequire(isAccessible) { "49" }
@@ -86,7 +84,6 @@ class FrontendValidator(
             descriptors = descriptors,
         )
         validSchemas[qualifiedName] = schema
-
         return buildList {
             add(schema)
             addAll(nestedSchemas.flatMap {
@@ -106,18 +103,21 @@ class FrontendValidator(
             kspRequire(isAccessibleSchema) { "91" }
             kspRequire(options.accessWidenerConfigName != null || options.accessTransformerConfigName != null) { "94" }
         }
+        val bytecodeName = if (bytecodeName != null) {
+            kspRequire(bytecodeName.isNotEmpty()) { "439" }
+            bytecodeName
+        } else {
+            name
+        }
         val receiverType = schemaOriginClassDeclaration.type
         if (superClassDeclaration.isBuiltin(SimpleBuiltin.Field)) {
             kspRequire(genericType is ParsedTypeDescriptorGenericType) { "99" }
             kspRequireNotNull(genericType.type) { "100" }
-            if (callableReference !is InvisibleCallableReference) {
-                kspRequire(callableReference is ParsedFieldDescriptorCallableReference) { "102" }
-            }
             return FieldDescriptor(
                 name = name,
                 classDeclaration = classDeclaration,
                 receiverType = receiverType,
-                targetName = kspRequireNotNull(callableReference.name) { "108" },
+                bytecodeName = bytecodeName,
                 fieldType = genericType.type,
                 arrayComponentType = genericType.arrayComponentType,
                 isStatic = hasStaticAnnotation,
@@ -126,6 +126,7 @@ class FrontendValidator(
             )
         }
         kspRequire(genericType is ParsedFunctionTypeDescriptorGenericType) { "116" }
+        kspRequire(genericType.receiverType == null) { "150" }
         val parameters = genericType.parameters.map { parameter ->
             kspRequire(!parameter.type.isFunctionType) { "118" }
             FunctionTypeParameter(
@@ -135,18 +136,12 @@ class FrontendValidator(
         }
         return when {
             superClassDeclaration.isBuiltin(SimpleBuiltin.Method) -> {
-                if (callableReference !is InvisibleCallableReference) {
-                    kspRequire(callableReference is ParsedMethodDescriptorCallableReference) { "127" }
-                }
-                if (!hasStaticAnnotation) {
-                    kspRequireNotNull(genericType.receiverType) { "130" }
-                }
                 MethodDescriptor(
                     name = name,
                     classDeclaration = classDeclaration,
                     receiverType = receiverType,
                     returnType = genericType.returnType,
-                    targetName = kspRequireNotNull(callableReference.name) { "137" },
+                    bytecodeName = bytecodeName,
                     parameters = parameters,
                     isStatic = hasStaticAnnotation,
                     makePublic = hasAccessAnnotation,
@@ -155,9 +150,7 @@ class FrontendValidator(
             }
 
             superClassDeclaration.isBuiltin(SimpleBuiltin.Constructor) -> {
-                kspRequire(callableReference == null) { "147" }
                 kspRequire(!unfinal) { "149" }
-                kspRequire(genericType.receiverType == null) { "150" }
                 kspRequire(genericType.returnType == null) { "150" }
                 kspRequire(!hasBytecodeNameAnnotation) { "151" }
                 ConstructorDescriptor(
@@ -620,13 +613,12 @@ class FrontendValidator(
                 if (explicitParamName != null) {
                     kspRequire(explicitParamName.trim().isNotEmpty()) { "566" }
                 }
-                val paramName = explicitParamName ?: name
-                val descriptorParameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == paramName }
-                kspRequireNotNull(descriptorParameterIndex) { "580" }
-                val descriptorParameter = hookDescriptor.parameters[descriptorParameterIndex]
+                val parameterName = explicitParamName ?: name
+                val parameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == parameterName }
+                kspRequireNotNull(parameterIndex) { "580" }
                 val (paramLocalType, isVar) = validateLocalType(type)
-                kspRequire(descriptorParameter.type == paramLocalType) { "582" }
-                HookParamLocalParameter(paramName, paramLocalType, descriptorParameterIndex, isVar)
+                kspRequire(hookDescriptor.parameters[parameterIndex].type == paramLocalType) { "582" }
+                HookParamLocalParameter(parameterName, paramLocalType, parameterIndex, isVar)
             }
 
             hasLocalAnnotation -> {
@@ -671,6 +663,7 @@ class FrontendValidator(
         logger.info(message(), symbol)
     }
 
+    @Suppress("unused")
     private inline fun SymbolSource.kspWarn(crossinline message: () -> String) {
         logger.warn(message(), symbol)
     }

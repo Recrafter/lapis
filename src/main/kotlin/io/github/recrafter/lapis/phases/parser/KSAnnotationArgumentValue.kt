@@ -12,28 +12,28 @@ class KSAnnotationArgumentValue(
     private val keepDefault: Boolean = false,
 ) {
     fun asBoolean(): Boolean? =
-        raw.castOrNull<Boolean>()?.filter { !it }
+        raw.castOrNull<Boolean>()?.filterDefault { !it }
 
     fun asInt(): Int? =
-        raw.castOrNull<Int>()?.filter { it == -1 }
+        raw.castOrNull<Int>()?.filterDefault { it == -1 }
 
     fun asLong(): Long? =
-        raw.castOrNull<Long>()?.filter { it == -1L }
+        raw.castOrNull<Long>()?.filterDefault { it == -1L }
 
     fun asFloat(): Float? =
-        raw.castOrNull<Float>()?.filter { it == -1f }
+        raw.castOrNull<Float>()?.filterDefault { it == -1f }
 
     fun asDouble(): Double? =
-        raw.castOrNull<Double>()?.filter { it == -1.0 }
+        raw.castOrNull<Double>()?.filterDefault { it == -1.0 }
 
     fun asString(): String? =
-        raw.castOrNull<String>()?.filter { it.isEmpty() }
+        raw.castOrNull<String>()?.filterDefault { it.isEmpty() }
 
     fun asKClass(types: KSTypes): KSType? =
-        raw.castOrNull<KSType>()?.filter { it.isNothing(types) }
+        raw.castOrNull<KSType>()?.filterDefault { it.isNothing(types) }
 
     inline fun <reified E : Enum<E>> asEnum(default: E? = null): E? {
-        val entryName = raw.castOrNull<KSClassDeclaration>()?.name?.filter { it == default?.name }
+        val entryName = raw.castOrNull<KSClassDeclaration>()?.name?.filterDefault { it == default?.name }
         return enumEntries<E>().find { it.name == entryName }
     }
 
@@ -43,9 +43,9 @@ class KSAnnotationArgumentValue(
     fun asArray(): Iterable<KSAnnotationArgumentValue>? =
         raw.castOrNull<Iterable<Any>>()
             ?.map { KSAnnotationArgumentValue(it, keepDefault) }
-            ?.filter { it.isEmpty() }
+            ?.filterDefault { it.isEmpty() }
 
-    fun <T> T.filter(isDefault: (T) -> Boolean): T? =
+    fun <T> T.filterDefault(isDefault: (T) -> Boolean): T? =
         if (keepDefault) this
         else takeUnless { isDefault(it) }
 }

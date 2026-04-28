@@ -40,7 +40,6 @@ class ParsedDescriptor(
     val unfinal: Boolean,
     val superClassDeclaration: KSClassDeclaration?,
     val genericType: ParsedDescriptorGenericType?,
-    val callableReference: ParsedDescriptorCallableReference?,
 ) : SymbolSource(symbol)
 
 sealed interface ParsedDescriptorGenericType
@@ -54,19 +53,6 @@ class ParsedTypeDescriptorGenericType(
     val type: KSType?,
     val arrayComponentType: KSType?,
 ) : ParsedDescriptorGenericType
-
-sealed class ParsedDescriptorCallableReference(val name: String?)
-class ParsedFieldDescriptorCallableReference(
-    val receiverClassDeclaration: KSClassDeclaration?,
-    name: String?,
-) : ParsedDescriptorCallableReference(name)
-
-class ParsedMethodDescriptorCallableReference(
-    val receiverClassDeclaration: KSClassDeclaration?,
-    name: String?,
-) : ParsedDescriptorCallableReference(name)
-
-class InvisibleCallableReference(name: String?) : ParsedDescriptorCallableReference(name)
 
 class ParsedPatch(
     override val symbol: KSAnnotated,

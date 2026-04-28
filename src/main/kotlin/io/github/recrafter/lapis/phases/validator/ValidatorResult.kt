@@ -42,7 +42,7 @@ class Schema(
 
 sealed class Descriptor(
     val name: String,
-    val targetName: String,
+    val bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     val parameters: List<FunctionTypeParameter>,
@@ -58,7 +58,7 @@ sealed class Descriptor(
 
 sealed class InvokableDescriptor(
     name: String,
-    targetName: String,
+    bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     parameters: List<FunctionTypeParameter>,
@@ -68,7 +68,7 @@ sealed class InvokableDescriptor(
     removeFinal: Boolean,
 ) : Descriptor(
     name,
-    targetName,
+    bytecodeName,
     classDeclaration,
     receiverType,
     parameters,
@@ -90,7 +90,7 @@ class ConstructorDescriptor(
 
 open class MethodDescriptor(
     name: String,
-    targetName: String,
+    bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     returnType: KSType?,
@@ -100,7 +100,7 @@ open class MethodDescriptor(
     removeFinal: Boolean,
 ) : InvokableDescriptor(
     name,
-    targetName,
+    bytecodeName,
     classDeclaration,
     receiverType,
     parameters,
@@ -112,7 +112,7 @@ open class MethodDescriptor(
 
 class FieldDescriptor(
     name: String,
-    targetName: String,
+    bytecodeName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     val fieldType: KSType,
@@ -122,7 +122,7 @@ class FieldDescriptor(
     removeFinal: Boolean,
 ) : Descriptor(
     name,
-    targetName,
+    bytecodeName,
     classDeclaration,
     receiverType,
     emptyList(),

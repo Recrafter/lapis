@@ -33,7 +33,7 @@ class IrPatch(
 class IrMixin(
     val className: IrClassName,
     val instanceClassName: IrClassName,
-    val bytecodeTargetName: String,
+    val targetBinaryName: String,
     val injections: List<IrInjection>,
 )
 

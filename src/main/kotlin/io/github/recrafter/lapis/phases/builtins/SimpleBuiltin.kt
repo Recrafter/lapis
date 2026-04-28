@@ -6,52 +6,31 @@ import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
-import kotlin.reflect.KProperty
 
 enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPClass> {
-    Descriptor {
-        override fun generate(resolve: BuiltinResolver): KPClass =
-            buildKotlinInterface(name) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
-            }
-    },
     Field {
         override fun generate(resolve: BuiltinResolver): KPClass =
-            buildKotlinClass(name) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
-                val fieldTypeVariableName = IrTypeVariableName.of("T")
-                setVariableTypes(fieldTypeVariableName)
-                setConstructor(
-                    IrParameter(
-                        "callable",
-                        KProperty::class.asIrClassName().parameterizedBy(fieldTypeVariableName)
-                    )
-                )
-                addSuperInterface(resolve(Descriptor))
+            buildKotlinInterface(name) {
+                setModifiers(IrModifier.PUBLIC)
+                setVariableTypes(IrTypeVariableName.of("T"))
             }
     },
     Callable {
         override fun generate(resolve: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
                 setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
-                val functionTypeVariableName = IrTypeVariableName.of(
-                    "F",
-                    Function::class.asIrClassName().parameterizedByStar()
-                )
-                setVariableTypes(functionTypeVariableName)
-                addSuperInterface(resolve(Descriptor))
+                setVariableTypes(IrTypeVariableName.of("F", Function::class.asIrClassName().parameterizedByStar()))
             }
     },
     Method {
         override fun generate(resolve: BuiltinResolver): KPClass =
-            buildKotlinClass(name) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
+            buildKotlinInterface(name) {
+                setModifiers(IrModifier.PUBLIC)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
                     Function::class.asIrClassName().parameterizedByStar()
                 )
                 setVariableTypes(functionTypeVariableName)
-                setConstructor(IrParameter("reference", functionTypeVariableName))
                 addSuperInterface(resolve(Callable).parameterizedBy(functionTypeVariableName))
             }
     },

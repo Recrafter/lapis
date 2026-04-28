@@ -151,7 +151,7 @@ class MixinGenerator(
     private fun buildMixinClass(patch: IrPatch): JPClass =
         buildJavaClass(patch.mixin.className.simpleName) {
             addAnnotation<Mixin> {
-                setArgumentValue(Mixin::targets, patch.mixin.bytecodeTargetName)
+                setArgumentValue(Mixin::targets, patch.mixin.targetBinaryName)
             }
             setModifiers(IrModifier.PUBLIC)
             val patchField = buildJavaField("patch".withInternalPrefix(), patch.className) {
@@ -719,7 +719,7 @@ class MixinGenerator(
                     is IrFieldDescriptor -> {
                         FieldEntry(
                             ownerClassName = schema.originClassName,
-                            name = descriptor.targetName,
+                            name = descriptor.bytecodeName,
                             typeName = descriptor.typeName,
                             removeFinal = descriptor.removeFinal,
                         )
