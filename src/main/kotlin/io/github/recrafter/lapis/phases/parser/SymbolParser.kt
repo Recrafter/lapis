@@ -40,19 +40,33 @@ class SymbolParser(
     fun parse(): ParserResult =
         prepare().run {
             ParserResult(
-                schemas = schemaClassDeclarations.map { parseSchema(it) },
-                patches = patchClassDeclarations.map { parsePatch(it) },
+                schemas = schemaClassDeclarations.map(::parseSchema),
+                patches = patchClassDeclarations.map(::parsePatch),
             )
         }
 
-    private fun parseSchema(symbol: KSClassDeclaration, parentBinaryName: String? = null): ParsedSchema {
+    private fun parseSchema(symbol: KSClassDeclaration, nameBuilder: ClassNameBuilder? = null): ParsedSchema {
         val schemaAnnotation = symbol.findAnnotation<Schema>()
-        val currentQualifiedName = schemaAnnotation?.getArgumentValue(Schema::value)?.replace('/', '.')
+        val innerSchemaAnnotation = symbol.findAnnotation<InnerSchema>()
         val localSchemaAnnotation = symbol.findAnnotation<LocalSchema>()
         val anonymousSchemaAnnotation = symbol.findAnnotation<AnonymousSchema>()
-        val (originBinaryName, originClassDeclaration) = when {
-            parentBinaryName == null -> {
-                currentQualifiedName to currentQualifiedName?.let { resolver.getClassDeclarationByName(it) }
+        val isResolvable = symbol.parentDeclarations(includeSelf = true).none {
+            it.hasAnnotation<LocalSchema>() || it.hasAnnotation<AnonymousSchema>()
+        }
+        val (currentBuilder, originClassDeclaration) = when {
+            nameBuilder == null -> {
+                val qualifiedName = schemaAnnotation?.getArgumentValue(Schema::qualifiedName)
+                val builder = qualifiedName?.let { ClassNameBuilder.of(it) }
+                builder to qualifiedName?.let(resolver::getClassDeclarationByName)
+            }
+
+            innerSchemaAnnotation != null -> {
+                val builder = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)?.let(nameBuilder::nested)
+                builder to if (isResolvable) {
+                    builder?.qualifiedName?.let(resolver::getClassDeclarationByName)
+                } else {
+                    innerSchemaAnnotation.getArgumentValue(InnerSchema::delegate)?.toClassDeclaration()
+                }
             }
 
             localSchemaAnnotation != null -> {
@@ -60,20 +74,17 @@ class SymbolParser(
                 val name = localSchemaAnnotation.getArgumentValue(LocalSchema::name)
                 val delegateClassDeclaration = localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)
                     ?.toClassDeclaration()
-                parentBinaryName + "$" + index + name to delegateClassDeclaration
+                nameBuilder.nested(index.toString() + name) to delegateClassDeclaration
             }
 
             anonymousSchemaAnnotation != null -> {
                 val index = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::index)
                 val delegateClassDeclaration = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)
                     ?.toClassDeclaration()
-                parentBinaryName + "$" + index to delegateClassDeclaration
+                nameBuilder.nested(index.toString()) to delegateClassDeclaration
             }
 
-            else -> {
-                val originQualifiedName = parentBinaryName + "." + currentQualifiedName
-                parentBinaryName + "$" + currentQualifiedName to resolver.getClassDeclarationByName(originQualifiedName)
-            }
+            else -> null to null
         }
         val accessAnnotation = symbol.findAnnotation<Access>()
         val (nestedSchemas, descriptors) = symbol.classDeclarations.partition { it.getSuperTypeOrNull() == null }
@@ -81,14 +92,16 @@ class SymbolParser(
             symbol = symbol,
             classDeclaration = symbol,
             originClassDeclaration = originClassDeclaration,
-            originBinaryName = originBinaryName,
+            originInternalName = currentBuilder?.internalName,
             hasSchemaAnnotation = schemaAnnotation != null,
+            hasInnerSchemaAnnotation = innerSchemaAnnotation != null,
             hasLocalSchemaAnnotation = localSchemaAnnotation != null,
             hasAnonymousSchemaAnnotation = anonymousSchemaAnnotation != null,
             hasAccessAnnotation = accessAnnotation != null,
+            isAccessible = isResolvable,
             unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
-            descriptors = descriptors.map { parseDescriptor(it) },
-            nestedSchemas = nestedSchemas.map { parseSchema(it, originBinaryName) },
+            descriptors = descriptors.map(::parseDescriptor),
+            nestedSchemas = nestedSchemas.map { parseSchema(it, currentBuilder) },
         )
     }
 
@@ -171,16 +184,16 @@ class SymbolParser(
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
             constructors = classDeclaration?.constructorDeclarations
-                ?.map { parsePatchConstructor(it) }
+                ?.map(::parsePatchConstructor)
                 .orEmpty().toList(),
             properties = classDeclaration?.bodyPropertyDeclarations
-                ?.map { parsePatchProperty(it) }
+                ?.map(::parsePatchProperty)
                 .orEmpty().toList(),
             functions = listOfNotNull(
                 classDeclaration,
                 classDeclaration?.findCompanionObjectClassDeclaration(),
             ).flatMap { classDeclaration ->
-                classDeclaration.functionDeclarations.map { parsePatchFunction(it) }
+                classDeclaration.functionDeclarations.map(::parsePatchFunction)
             },
         )
     }
@@ -189,7 +202,7 @@ class SymbolParser(
         ParsedPatchConstructor(
             symbol = constructorDeclaration,
 
-            parameters = constructorDeclaration.parameters.map { parsePatchConstructorParameter(it) },
+            parameters = constructorDeclaration.parameters.map(::parsePatchConstructorParameter),
         )
 
     private fun parsePatchConstructorParameter(parameter: KSValueParameter): ParsedPatchConstructorParameter =
@@ -237,7 +250,7 @@ class SymbolParser(
             symbol = functionDeclaration,
 
             name = functionDeclaration.name,
-            parameters = functionDeclaration.parameters.map { parsePatchFunctionParameter(it) },
+            parameters = functionDeclaration.parameters.map(::parsePatchFunctionParameter),
             returnType = functionDeclaration.getReturnTypeOrNull(),
             hasTypeParameters = functionDeclaration.typeParameters.isNotEmpty(),
 

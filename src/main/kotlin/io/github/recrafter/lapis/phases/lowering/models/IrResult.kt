@@ -35,7 +35,7 @@ class IrMixin(
     val className: IrClassName,
     val instanceTypeName: IrTypeName,
     val isInterfaceInstance: Boolean,
-    val targetBinaryName: String,
+    val targetInternalName: String,
     val injections: List<IrInjection>,
 )
 

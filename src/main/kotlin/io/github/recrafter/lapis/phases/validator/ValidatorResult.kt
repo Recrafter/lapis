@@ -27,7 +27,7 @@ class Schema(
     source: KSNode,
 
     classDeclaration: KSClassDeclaration,
-    val originBinaryName: String,
+    val originInternalName: String,
     val originClassDeclaration: KSClassDeclaration,
 
     val isAccessible: Boolean,
@@ -54,7 +54,7 @@ sealed class Descriptor(
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
     val receiverTypeName: IrTypeName = receiverType.asIrTypeName()
-    open val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
+    val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
 sealed class InvokableDescriptor(

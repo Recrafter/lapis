@@ -153,7 +153,7 @@ class MixinGenerator(
     private fun buildMixinClass(patch: IrPatch): JPClass =
         buildJavaClass(patch.mixin.className.simpleName) {
             addAnnotation<Mixin> {
-                setArgumentValue(Mixin::targets, patch.mixin.targetBinaryName)
+                setArgumentValue(Mixin::targets, patch.mixin.targetInternalName)
             }
             setModifiers(IrModifier.PUBLIC)
             val patchField = buildJavaField("patch".withInternalPrefix(), patch.className) {

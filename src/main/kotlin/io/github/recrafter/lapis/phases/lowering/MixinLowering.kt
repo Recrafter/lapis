@@ -122,7 +122,7 @@ class MixinLowering(
             ),
             instanceTypeName = patch.schema.originClassName,
             isInterfaceInstance = patch.schema.originClassDeclaration.isInterface,
-            targetBinaryName = patch.schema.originBinaryName,
+            targetInternalName = patch.schema.originInternalName,
             injections = patch.hooks.flatMap { lowerInjections(it) },
         )
 

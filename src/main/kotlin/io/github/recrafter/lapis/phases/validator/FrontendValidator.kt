@@ -47,16 +47,16 @@ class FrontendValidator(
     private fun validateSchema(parsedSchema: ParsedSchema): List<Schema> = with(parsedSchema) {
         kspRequire(classDeclaration?.isValid == true) { "45" }
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "48" }
-        kspRequireNotNull(originBinaryName) { "41" }
+        kspRequireNotNull(originInternalName) { "41" }
         kspRequire(originClassDeclaration?.isValid == true) { "46" }
         kspRequireNotNull(
             listOf(
                 hasSchemaAnnotation,
+                hasInnerSchemaAnnotation,
                 hasLocalSchemaAnnotation,
                 hasAnonymousSchemaAnnotation,
             ).singleOrNull { it }
         ) { "47" }
-        val isAccessible = hasSchemaAnnotation
         if (hasAccessAnnotation) {
             kspRequire(isAccessible) { "49" }
         }
@@ -77,7 +77,7 @@ class FrontendValidator(
         val schema = Schema(
             source = symbol,
             classDeclaration = classDeclaration,
-            originBinaryName = originBinaryName,
+            originInternalName = originInternalName,
             originClassDeclaration = originClassDeclaration,
             isAccessible = isAccessible,
             makePublic = hasAccessAnnotation,
