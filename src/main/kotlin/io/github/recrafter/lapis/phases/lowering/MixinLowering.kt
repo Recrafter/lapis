@@ -7,6 +7,7 @@ import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.ks.isInterface
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
@@ -120,6 +121,7 @@ class MixinLowering(
                 "Mixin".withQualifiedNamePrefix(patch.className)
             ),
             instanceClassName = patch.schema.originClassName,
+            isInterfaceInstance = patch.schema.originClassDeclaration.isInterface,
             targetBinaryName = patch.schema.originBinaryName,
             injections = patch.hooks.flatMap { lowerInjections(it) },
         )

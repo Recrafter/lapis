@@ -168,17 +168,23 @@ class MixinGenerator(
                             when (parameter) {
                                 is IrPatchImplConstructorInstanceParameter -> {
                                     val isDoubleCastRequired = patch.mixin.instanceClassName != KPAny.asIrClassName()
+                                    val isObjectCastRequired = !patch.mixin.isInterfaceInstance
                                     buildJavaCodeBlock(
                                         buildString {
                                             if (isDoubleCastRequired) {
-                                                append("(%T) (%T) ")
+                                                append("(%T) ")
+                                                if (isObjectCastRequired) {
+                                                    append("(%T) ")
+                                                }
                                             }
                                             append("this")
                                         }
                                     ) {
                                         if (isDoubleCastRequired) {
                                             arg(patch.mixin.instanceClassName)
-                                            arg(Object::class.asIrClassName())
+                                            if (isObjectCastRequired) {
+                                                arg(Object::class.asIrClassName())
+                                            }
                                         }
                                     }
                                 }

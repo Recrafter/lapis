@@ -33,6 +33,7 @@ class IrPatch(
 class IrMixin(
     val className: IrClassName,
     val instanceClassName: IrClassName,
+    val isInterfaceInstance: Boolean,
     val targetBinaryName: String,
     val injections: List<IrInjection>,
 )

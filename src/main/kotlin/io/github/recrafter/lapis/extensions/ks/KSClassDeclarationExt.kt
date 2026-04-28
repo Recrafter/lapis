@@ -12,6 +12,9 @@ val KSClassDeclaration.type: KSType
 val KSClassDeclaration.isClass: Boolean
     get() = classKind == ClassKind.CLASS
 
+val KSClassDeclaration.isInterface: Boolean
+    get() = classKind == ClassKind.INTERFACE
+
 val KSClassDeclaration.isInner: Boolean
     get() = modifiers.contains(Modifier.INNER)
 
