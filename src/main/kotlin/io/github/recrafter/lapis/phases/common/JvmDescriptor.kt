@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.phases.lowering
+package io.github.recrafter.lapis.phases.common
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
@@ -36,7 +36,7 @@ class JvmDescriptor(private val type: JPTypeName) {
         }
 
     private val JPClassName.objectName: String
-        get() = internalName.objectName
+        get() = JvmClassName.of(binaryName).descriptor
 
     companion object {
         fun buildSignature(parameterTypeNames: List<IrTypeName>, returnTypeName: IrTypeName?): String =
@@ -72,7 +72,7 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
 
         is MethodDescriptor -> buildString {
             if (isTarget) {
-                append(inaccessibleInternalName?.objectName ?: receiverTypeName.jvmDescriptor)
+                append(inaccessibleReceiverJvmClassName?.descriptor ?: receiverTypeName.jvmDescriptor)
             }
             append(mappingName)
             append(
@@ -85,7 +85,7 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
 
         is FieldDescriptor -> buildString {
             if (isTarget) {
-                append(inaccessibleInternalName?.objectName ?: receiverTypeName.jvmDescriptor)
+                append(inaccessibleReceiverJvmClassName?.descriptor ?: receiverTypeName.jvmDescriptor)
             }
             append(mappingName)
             append(":")
@@ -104,6 +104,3 @@ private const val VOID_NAME: String = "V"
 
 private val JPTypeName.jvmDescriptor: String
     get() = JvmDescriptor(this).getName()
-
-private val String.objectName: String
-    get() = "L$this;"

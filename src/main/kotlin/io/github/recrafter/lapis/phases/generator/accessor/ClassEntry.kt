@@ -1,11 +1,9 @@
 package io.github.recrafter.lapis.phases.generator.accessor
 
-import io.github.recrafter.lapis.extensions.jp.binaryName
-import io.github.recrafter.lapis.extensions.jp.internalName
-import io.github.recrafter.lapis.phases.lowering.types.IrClassName
+import io.github.recrafter.lapis.phases.common.JvmClassName
 
 class ClassEntry(
-    override val ownerClassName: IrClassName,
+    override val ownerJvmClassName: JvmClassName,
     val removeFinal: Boolean,
 ) : AccessorConfigEntry {
 
@@ -15,7 +13,7 @@ class ClassEntry(
             else "accessible"
         )
         append(" class ")
-        append(ownerClassName.java.internalName)
+        append(ownerJvmClassName.internalName)
     }
 
     override val atEntry: String = buildString {
@@ -24,7 +22,7 @@ class ClassEntry(
             else "public"
         )
         append(" ")
-        append(ownerClassName.java.binaryName)
+        append(ownerJvmClassName.binaryName)
     }
 
     override val sectionIndex: Int = 0

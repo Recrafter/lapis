@@ -12,6 +12,7 @@ import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.annotations.Side
 import io.github.recrafter.lapis.annotations.ZeroCondition
 import io.github.recrafter.lapis.extensions.ks.starProjectedType
+import io.github.recrafter.lapis.phases.common.JvmClassName
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
@@ -27,7 +28,7 @@ class Schema(
     source: KSNode,
 
     classDeclaration: KSClassDeclaration,
-    val originInternalName: String,
+    val originJvmClassName: JvmClassName,
     val originClassDeclaration: KSClassDeclaration,
 
     val isAccessible: Boolean,
@@ -37,7 +38,7 @@ class Schema(
     val descriptors: List<Descriptor>,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
-    val originClassName: IrTypeName = originClassDeclaration.starProjectedType.asIrTypeName()
+    val originTypeName: IrTypeName = originClassDeclaration.starProjectedType.asIrTypeName()
     val containingFile: KSFile? = source.containingFile
 }
 
@@ -46,7 +47,7 @@ sealed class Descriptor(
     val mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
-    val inaccessibleInternalName: String?,
+    val inaccessibleReceiverJvmClassName: JvmClassName?,
     val parameters: List<FunctionTypeParameter>,
     val returnType: KSType?,
     val isStatic: Boolean,
@@ -63,7 +64,7 @@ sealed class InvokableDescriptor(
     mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
-    inaccessibleInternalName: String?,
+    inaccessibleReceiverJvmClassName: JvmClassName?,
     parameters: List<FunctionTypeParameter>,
     returnType: KSType?,
     isStatic: Boolean,
@@ -74,7 +75,7 @@ sealed class InvokableDescriptor(
     mappingName,
     classDeclaration,
     receiverType,
-    inaccessibleInternalName,
+    inaccessibleReceiverJvmClassName,
     parameters,
     returnType,
     isStatic,
@@ -97,7 +98,7 @@ open class MethodDescriptor(
     mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
-    inaccessibleInternalName: String?,
+    inaccessibleReceiverJvmClassName: JvmClassName?,
     returnType: KSType?,
     parameters: List<FunctionTypeParameter>,
     isStatic: Boolean,
@@ -108,7 +109,7 @@ open class MethodDescriptor(
     mappingName,
     classDeclaration,
     receiverType,
-    inaccessibleInternalName,
+    inaccessibleReceiverJvmClassName,
     parameters,
     returnType,
     isStatic,
@@ -121,7 +122,7 @@ class FieldDescriptor(
     mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
-    inaccessibleInternalName: String?,
+    inaccessibleReceiverJvmClassName: JvmClassName?,
     val fieldType: KSType,
     val arrayComponentType: KSType?,
     isStatic: Boolean,
@@ -132,7 +133,7 @@ class FieldDescriptor(
     mappingName,
     classDeclaration,
     receiverType,
-    inaccessibleInternalName,
+    inaccessibleReceiverJvmClassName,
     emptyList(),
     fieldType,
     isStatic,

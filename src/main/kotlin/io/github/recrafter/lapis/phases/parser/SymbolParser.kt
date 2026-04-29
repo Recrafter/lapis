@@ -12,6 +12,7 @@ import io.github.recrafter.lapis.annotations.Origin
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
+import io.github.recrafter.lapis.phases.common.JvmClassName
 import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import ksp.org.jetbrains.kotlin.psi.KtClassOrObject
 import ksp.org.jetbrains.kotlin.psi.KtFunctionType
@@ -45,7 +46,7 @@ class SymbolParser(
             )
         }
 
-    private fun parseSchema(symbol: KSClassDeclaration, nameBuilder: ClassNameBuilder? = null): ParsedSchema {
+    private fun parseSchema(symbol: KSClassDeclaration, parentJvmClassName: JvmClassName? = null): ParsedSchema {
         val schemaAnnotation = symbol.findAnnotation<Schema>()
         val innerSchemaAnnotation = symbol.findAnnotation<InnerSchema>()
         val localSchemaAnnotation = symbol.findAnnotation<LocalSchema>()
@@ -53,34 +54,38 @@ class SymbolParser(
         val isResolvable = symbol.parentDeclarations(includeSelf = true).none {
             it.hasAnnotation<LocalSchema>() || it.hasAnnotation<AnonymousSchema>()
         }
-        val (currentBuilder, originClassDeclaration) = when {
-            nameBuilder == null -> {
+        val (currentJvmClassName, originClassDeclaration) = when {
+            parentJvmClassName == null -> {
                 val qualifiedName = schemaAnnotation?.getArgumentValue(Schema::qualifiedName)
-                val builder = qualifiedName?.let { ClassNameBuilder.of(it) }
-                builder to qualifiedName?.let(resolver::getClassDeclarationByName)
+                val rootClassName = qualifiedName?.let { JvmClassName.of(it) }
+                rootClassName to qualifiedName?.let(resolver::getClassDeclarationByName)
             }
 
             innerSchemaAnnotation != null -> {
-                val builder = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)?.let(nameBuilder::inner)
+                val innerClassName = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)
+                    ?.let(parentJvmClassName::inner)
                 val classDeclaration = if (isResolvable) {
-                    builder?.qualifiedName?.let(resolver::getClassDeclarationByName)
+                    innerClassName?.qualifiedName?.let(resolver::getClassDeclarationByName)
                 } else {
                     innerSchemaAnnotation.getArgumentValue(InnerSchema::delegate)?.toClassDeclaration()
                 }
-                builder to classDeclaration
+                innerClassName to classDeclaration
             }
 
             localSchemaAnnotation != null -> {
                 val index = localSchemaAnnotation.getArgumentValue(LocalSchema::index)
                 val name = localSchemaAnnotation.getArgumentValue(LocalSchema::name)
-                val builder = if (index != null && name != null) nameBuilder.local(index, name) else null
-                builder to localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)?.toClassDeclaration()
+                val localJvmClassName = if (index != null && name != null) {
+                    parentJvmClassName.local(index, name)
+                } else null
+                localJvmClassName to localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)?.toClassDeclaration()
             }
 
             anonymousSchemaAnnotation != null -> {
                 val index = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::index)
-                val builder = index?.let { nameBuilder.anonymous(it) }
-                builder to anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)?.toClassDeclaration()
+                val anonymousJvmClassName = index?.let { parentJvmClassName.anonymous(it) }
+                anonymousJvmClassName to anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)
+                    ?.toClassDeclaration()
             }
 
             else -> null to null
@@ -91,7 +96,7 @@ class SymbolParser(
             symbol = symbol,
             classDeclaration = symbol,
             originClassDeclaration = originClassDeclaration,
-            originInternalName = currentBuilder?.internalName,
+            originJvmClassName = currentJvmClassName,
             hasSchemaAnnotation = schemaAnnotation != null,
             hasInnerSchemaAnnotation = innerSchemaAnnotation != null,
             hasLocalSchemaAnnotation = localSchemaAnnotation != null,
@@ -100,7 +105,7 @@ class SymbolParser(
             isAccessible = isResolvable,
             unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
             descriptors = descriptors.map(::parseDescriptor),
-            nestedSchemas = nestedSchemas.map { parseSchema(it, currentBuilder) },
+            nestedSchemas = nestedSchemas.map { parseSchema(it, currentJvmClassName) },
         )
     }
 

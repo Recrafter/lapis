@@ -1,13 +1,11 @@
 package io.github.recrafter.lapis.phases.generator.accessor
 
-import io.github.recrafter.lapis.extensions.jp.binaryName
-import io.github.recrafter.lapis.extensions.jp.internalName
-import io.github.recrafter.lapis.phases.lowering.JvmDescriptor
-import io.github.recrafter.lapis.phases.lowering.types.IrClassName
+import io.github.recrafter.lapis.phases.common.JvmClassName
+import io.github.recrafter.lapis.phases.common.JvmDescriptor
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 class MethodEntry(
-    override val ownerClassName: IrClassName,
+    override val ownerJvmClassName: JvmClassName,
     val name: String,
     val parameterTypes: List<IrTypeName>,
     val returnTypeName: IrTypeName?,
@@ -21,7 +19,7 @@ class MethodEntry(
             else "accessible"
         )
         append(" method ")
-        append(ownerClassName.java.internalName)
+        append(ownerJvmClassName.internalName)
         append(" ")
         append(name)
         append(" ")
@@ -34,7 +32,7 @@ class MethodEntry(
             else "public"
         )
         append(" ")
-        append(ownerClassName.java.binaryName)
+        append(ownerJvmClassName.binaryName)
         append(" ")
         append(name)
         append(JvmDescriptor.buildSignature(parameterTypes, returnTypeName))

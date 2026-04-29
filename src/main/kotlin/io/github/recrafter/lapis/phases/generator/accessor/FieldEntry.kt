@@ -1,11 +1,11 @@
 package io.github.recrafter.lapis.phases.generator.accessor
 
-import io.github.recrafter.lapis.phases.lowering.jvmDescriptor
-import io.github.recrafter.lapis.phases.lowering.types.IrClassName
+import io.github.recrafter.lapis.phases.common.JvmClassName
+import io.github.recrafter.lapis.phases.common.jvmDescriptor
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 class FieldEntry(
-    override val ownerClassName: IrClassName,
+    override val ownerJvmClassName: JvmClassName,
     val name: String,
     val typeName: IrTypeName,
     val removeFinal: Boolean,
@@ -14,7 +14,7 @@ class FieldEntry(
     override val awEntry: String = buildString {
         val fieldPart = buildString {
             append("field ")
-            append(ownerClassName.internalName)
+            append(ownerJvmClassName.internalName)
             append(" ")
             append(name)
             append(" ")
@@ -33,7 +33,7 @@ class FieldEntry(
             else "public"
         )
         append(" ")
-        append(ownerClassName.binaryName)
+        append(ownerJvmClassName.binaryName)
         append(" ")
         append(name)
     }

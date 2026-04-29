@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.phases.lowering.models
 
 import com.google.devtools.ksp.symbol.KSFile
 import io.github.recrafter.lapis.annotations.Side
+import io.github.recrafter.lapis.phases.common.JvmClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
@@ -16,7 +17,7 @@ class IrSchema(
     val makePublic: Boolean,
     val removeFinal: Boolean,
     val className: IrClassName,
-    val originTypeName: IrTypeName,
+    val ownerJvmClassName: JvmClassName,
     val descriptors: List<IrDescriptor>,
 )
 

@@ -11,6 +11,7 @@ import io.github.recrafter.lapis.extensions.ks.isInterface
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
+import io.github.recrafter.lapis.phases.common.getMixinRef
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.*
 import io.github.recrafter.lapis.phases.validator.*
@@ -34,7 +35,7 @@ class MixinLowering(
                     makePublic = schema.makePublic,
                     removeFinal = schema.removeFinal,
                     className = schema.className,
-                    originTypeName = schema.originClassName,
+                    ownerJvmClassName = schema.originJvmClassName,
                     descriptors = schema.descriptors.map { lowerDescriptor(it) },
                 )
             },
@@ -120,9 +121,9 @@ class MixinLowering(
                 options.mixinPackageName,
                 "Mixin".withQualifiedNamePrefix(patch.className)
             ),
-            instanceTypeName = patch.schema.originClassName,
+            instanceTypeName = patch.schema.originTypeName,
             isInterfaceInstance = patch.schema.originClassDeclaration.isInterface,
-            targetInternalName = patch.schema.originInternalName,
+            targetInternalName = patch.schema.originJvmClassName.internalName,
             injections = patch.hooks.flatMap { lowerInjections(it) },
         )
 
@@ -183,7 +184,7 @@ class MixinLowering(
                         add(
                             IrInjectionReceiverParameter(
                                 hook.targetDescriptor.receiverTypeName,
-                                isCoerce = hook.targetDescriptor.inaccessibleInternalName != null,
+                                isCoerce = hook.targetDescriptor.inaccessibleReceiverJvmClassName != null,
                             )
                         )
                     }

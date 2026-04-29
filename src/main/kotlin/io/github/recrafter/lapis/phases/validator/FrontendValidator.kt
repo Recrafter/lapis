@@ -18,6 +18,7 @@ import io.github.recrafter.lapis.phases.builtins.Builtin
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin
+import io.github.recrafter.lapis.phases.common.JvmClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.parser.*
 import kotlin.contracts.ExperimentalContracts
@@ -47,7 +48,7 @@ class FrontendValidator(
     private fun validateSchema(parsedSchema: ParsedSchema): List<Schema> = with(parsedSchema) {
         kspRequire(classDeclaration?.isValid == true) { "45" }
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "48" }
-        kspRequireNotNull(originInternalName) { "41" }
+        kspRequireNotNull(originJvmClassName) { "41" }
         kspRequire(originClassDeclaration?.isValid == true) { "46" }
         kspRequireNotNull(
             listOf(
@@ -65,7 +66,7 @@ class FrontendValidator(
             val descriptorQualifiedName = parsedDescriptor.classDeclaration.qualifiedName?.asString()
                 ?: return@mapNotNull null
             val validatedDescriptor = runOrNullOnSkip {
-                validateDescriptor(parsedDescriptor, originClassDeclaration, originInternalName, isAccessible)
+                validateDescriptor(parsedDescriptor, originClassDeclaration, originJvmClassName, isAccessible)
             }
             if (validatedDescriptor != null) {
                 validDescriptors[descriptorQualifiedName] = validatedDescriptor
@@ -77,7 +78,7 @@ class FrontendValidator(
         val schema = Schema(
             source = symbol,
             classDeclaration = classDeclaration,
-            originInternalName = originInternalName,
+            originJvmClassName = originJvmClassName,
             originClassDeclaration = originClassDeclaration,
             isAccessible = isAccessible,
             makePublic = hasAccessAnnotation,
@@ -96,7 +97,7 @@ class FrontendValidator(
     private fun validateDescriptor(
         descriptor: ParsedDescriptor,
         schemaOriginClassDeclaration: KSClassDeclaration,
-        schemaOriginInternalName: String,
+        schemaOriginJvmClassName: JvmClassName,
         isAccessibleSchema: Boolean,
     ): Descriptor = with(descriptor) {
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "89" }
@@ -119,7 +120,7 @@ class FrontendValidator(
                 name = name,
                 classDeclaration = classDeclaration,
                 receiverType = receiverType,
-                inaccessibleInternalName = if (isAccessibleSchema) null else schemaOriginInternalName,
+                inaccessibleReceiverJvmClassName = if (isAccessibleSchema) null else schemaOriginJvmClassName,
                 mappingName = mappingName,
                 fieldType = genericType.type,
                 arrayComponentType = genericType.arrayComponentType,
@@ -143,7 +144,7 @@ class FrontendValidator(
                     name = name,
                     classDeclaration = classDeclaration,
                     receiverType = receiverType,
-                    inaccessibleInternalName = if (isAccessibleSchema) null else schemaOriginInternalName,
+                    inaccessibleReceiverJvmClassName = if (isAccessibleSchema) null else schemaOriginJvmClassName,
                     returnType = genericType.returnType,
                     mappingName = mappingName,
                     parameters = parameters,

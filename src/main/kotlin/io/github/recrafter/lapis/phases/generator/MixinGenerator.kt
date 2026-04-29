@@ -25,15 +25,19 @@ import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin
+import io.github.recrafter.lapis.phases.common.JvmClassName
+import io.github.recrafter.lapis.phases.common.binaryName
 import io.github.recrafter.lapis.phases.generator.accessor.AccessorConfigEntry
 import io.github.recrafter.lapis.phases.generator.accessor.ClassEntry
 import io.github.recrafter.lapis.phases.generator.accessor.FieldEntry
 import io.github.recrafter.lapis.phases.generator.accessor.MethodEntry
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
-import io.github.recrafter.lapis.phases.lowering.*
+import io.github.recrafter.lapis.phases.lowering.IrModifier
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
-import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.orVoid
 import kotlinx.serialization.json.Json
 import org.objectweb.asm.Opcodes
@@ -707,7 +711,7 @@ class MixinGenerator(
         schemas.forEach { schema ->
             if (schema.makePublic) {
                 entries += ClassEntry(
-                    ownerClassName = schema.originTypeName.rawClassName,
+                    ownerJvmClassName = schema.ownerJvmClassName,
                     removeFinal = schema.removeFinal,
                 )
             }
@@ -715,7 +719,7 @@ class MixinGenerator(
                 entries += when (descriptor) {
                     is IrInvokableDescriptor -> {
                         MethodEntry(
-                            ownerClassName = schema.originTypeName.rawClassName,
+                            ownerJvmClassName = schema.ownerJvmClassName,
                             name = descriptor.binaryName,
                             parameterTypes = descriptor.parameters.map { it.typeName },
                             returnTypeName = when (descriptor) {
@@ -729,7 +733,7 @@ class MixinGenerator(
 
                     is IrFieldDescriptor -> {
                         FieldEntry(
-                            ownerClassName = schema.originTypeName.rawClassName,
+                            ownerJvmClassName = schema.ownerJvmClassName,
                             name = descriptor.mappingName,
                             typeName = descriptor.typeName,
                             removeFinal = descriptor.removeFinal,
@@ -745,15 +749,15 @@ class MixinGenerator(
 
         fun formatConfig(header: String? = null, directive: (AccessorConfigEntry) -> String): String = buildString {
             header?.let { appendLine(it) }
-            var lastOwner: IrClassName? = null
+            var lastOwner: JvmClassName? = null
             sortedEntries.forEach { entry ->
                 appendLine()
-                if (lastOwner != entry.ownerClassName) {
+                if (lastOwner != entry.ownerJvmClassName) {
                     if (lastOwner != null) {
                         appendLine()
                     }
-                    appendLine("# ${entry.ownerClassName.nestedName}")
-                    lastOwner = entry.ownerClassName
+                    appendLine("# ${entry.ownerJvmClassName.nestedName}")
+                    lastOwner = entry.ownerJvmClassName
                 }
                 append(directive(entry))
             }
