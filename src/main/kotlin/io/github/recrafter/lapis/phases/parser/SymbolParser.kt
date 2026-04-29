@@ -61,27 +61,26 @@ class SymbolParser(
             }
 
             innerSchemaAnnotation != null -> {
-                val builder = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)?.let(nameBuilder::nested)
-                builder to if (isResolvable) {
+                val builder = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)?.let(nameBuilder::inner)
+                val classDeclaration = if (isResolvable) {
                     builder?.qualifiedName?.let(resolver::getClassDeclarationByName)
                 } else {
                     innerSchemaAnnotation.getArgumentValue(InnerSchema::delegate)?.toClassDeclaration()
                 }
+                builder to classDeclaration
             }
 
             localSchemaAnnotation != null -> {
                 val index = localSchemaAnnotation.getArgumentValue(LocalSchema::index)
                 val name = localSchemaAnnotation.getArgumentValue(LocalSchema::name)
-                val delegateClassDeclaration = localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)
-                    ?.toClassDeclaration()
-                nameBuilder.nested(index.toString() + name) to delegateClassDeclaration
+                val builder = if (index != null && name != null) nameBuilder.local(index, name) else null
+                builder to localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)?.toClassDeclaration()
             }
 
             anonymousSchemaAnnotation != null -> {
                 val index = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::index)
-                val delegateClassDeclaration = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)
-                    ?.toClassDeclaration()
-                nameBuilder.nested(index.toString()) to delegateClassDeclaration
+                val builder = index?.let { nameBuilder.anonymous(it) }
+                builder to anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)?.toClassDeclaration()
             }
 
             else -> null to null
@@ -107,7 +106,7 @@ class SymbolParser(
 
     private fun parseDescriptor(classDeclaration: KSClassDeclaration): ParsedDescriptor {
         val accessAnnotation = classDeclaration.findAnnotation<Access>()
-        val bytecodeNameAnnotation = classDeclaration.findAnnotation<BytecodeName>()
+        val mappingNameAnnotation = classDeclaration.findAnnotation<MappingName>()
         val superClassType = classDeclaration.getSuperTypeOrNull()
         val ktFunctionType = classDeclaration
             .castOrNull<KSClassDeclarationImpl>()
@@ -132,8 +131,8 @@ class SymbolParser(
             classDeclaration = classDeclaration,
             hasStaticAnnotation = classDeclaration.hasAnnotation<Static>(),
             hasAccessAnnotation = accessAnnotation != null,
-            hasBytecodeNameAnnotation = bytecodeNameAnnotation != null,
-            bytecodeName = bytecodeNameAnnotation?.getArgumentValue(BytecodeName::name),
+            hasMappingNameAnnotation = mappingNameAnnotation != null,
+            mappingName = mappingNameAnnotation?.getArgumentValue(MappingName::name),
             unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
 
             genericType = parseDescriptorGenericType(superClassType?.genericTypes?.firstOrNull(), ktFunctionType),

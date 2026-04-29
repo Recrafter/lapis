@@ -43,7 +43,7 @@ class Schema(
 
 sealed class Descriptor(
     val name: String,
-    val bytecodeName: String,
+    val mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     val inaccessibleInternalName: String?,
@@ -60,7 +60,7 @@ sealed class Descriptor(
 
 sealed class InvokableDescriptor(
     name: String,
-    bytecodeName: String,
+    mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     inaccessibleInternalName: String?,
@@ -71,7 +71,7 @@ sealed class InvokableDescriptor(
     removeFinal: Boolean,
 ) : Descriptor(
     name,
-    bytecodeName,
+    mappingName,
     classDeclaration,
     receiverType,
     inaccessibleInternalName,
@@ -79,7 +79,7 @@ sealed class InvokableDescriptor(
     returnType,
     isStatic,
     makePublic,
-    removeFinal
+    removeFinal,
 )
 
 class ConstructorDescriptor(
@@ -94,7 +94,7 @@ class ConstructorDescriptor(
 
 open class MethodDescriptor(
     name: String,
-    bytecodeName: String,
+    mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     inaccessibleInternalName: String?,
@@ -105,7 +105,7 @@ open class MethodDescriptor(
     removeFinal: Boolean,
 ) : InvokableDescriptor(
     name,
-    bytecodeName,
+    mappingName,
     classDeclaration,
     receiverType,
     inaccessibleInternalName,
@@ -113,12 +113,12 @@ open class MethodDescriptor(
     returnType,
     isStatic,
     makePublic,
-    removeFinal
+    removeFinal,
 )
 
 class FieldDescriptor(
     name: String,
-    bytecodeName: String,
+    mappingName: String,
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     inaccessibleInternalName: String?,
@@ -129,7 +129,7 @@ class FieldDescriptor(
     removeFinal: Boolean,
 ) : Descriptor(
     name,
-    bytecodeName,
+    mappingName,
     classDeclaration,
     receiverType,
     inaccessibleInternalName,
@@ -137,7 +137,7 @@ class FieldDescriptor(
     fieldType,
     isStatic,
     makePublic,
-    removeFinal
+    removeFinal,
 ) {
     val fieldTypeName: IrTypeName = fieldType.asIrTypeName()
 }

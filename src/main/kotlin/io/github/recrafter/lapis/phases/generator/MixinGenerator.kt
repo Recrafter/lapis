@@ -730,7 +730,7 @@ class MixinGenerator(
                     is IrFieldDescriptor -> {
                         FieldEntry(
                             ownerClassName = schema.originTypeName.rawClassName,
-                            name = descriptor.bytecodeName,
+                            name = descriptor.mappingName,
                             typeName = descriptor.typeName,
                             removeFinal = descriptor.removeFinal,
                         )

@@ -105,9 +105,9 @@ class FrontendValidator(
             kspRequire(isAccessibleSchema) { "91" }
             kspRequire(options.accessWidenerConfigName != null || options.accessTransformerConfigName != null) { "94" }
         }
-        val bytecodeName = if (bytecodeName != null) {
-            kspRequire(bytecodeName.isNotEmpty()) { "439" }
-            bytecodeName
+        val mappingName = if (mappingName != null) {
+            kspRequire(mappingName.isNotEmpty()) { "439" }
+            mappingName
         } else {
             name
         }
@@ -120,7 +120,7 @@ class FrontendValidator(
                 classDeclaration = classDeclaration,
                 receiverType = receiverType,
                 inaccessibleInternalName = if (isAccessibleSchema) null else schemaOriginInternalName,
-                bytecodeName = bytecodeName,
+                mappingName = mappingName,
                 fieldType = genericType.type,
                 arrayComponentType = genericType.arrayComponentType,
                 isStatic = hasStaticAnnotation,
@@ -145,7 +145,7 @@ class FrontendValidator(
                     receiverType = receiverType,
                     inaccessibleInternalName = if (isAccessibleSchema) null else schemaOriginInternalName,
                     returnType = genericType.returnType,
-                    bytecodeName = bytecodeName,
+                    mappingName = mappingName,
                     parameters = parameters,
                     isStatic = hasStaticAnnotation,
                     makePublic = hasAccessAnnotation,
@@ -156,7 +156,7 @@ class FrontendValidator(
             superClassDeclaration.isBuiltin(SimpleBuiltin.Constructor) -> {
                 kspRequire(!unfinal) { "149" }
                 kspRequire(genericType.returnType == null) { "150" }
-                kspRequire(!hasBytecodeNameAnnotation) { "151" }
+                kspRequire(!hasMappingNameAnnotation) { "151" }
                 ConstructorDescriptor(
                     name = name,
                     classDeclaration = classDeclaration,

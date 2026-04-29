@@ -69,7 +69,7 @@ object _AdvancementsScreen {
     @Static object WINDOW_INSIDE_X : Lapis.Field<Int>
     object tabs : Lapis.Field<Map<AdvancementHolder, AdvancementTab>>
 
-    @BytecodeName("repositionElements")
+    @MappingName("repositionElements")
     object updateUI : Lapis.Method<() -> Unit>
 
     // Targeting an anonymous class (e.g., RandomState$1)

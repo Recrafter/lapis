@@ -74,7 +74,7 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
             if (isTarget) {
                 append(inaccessibleInternalName?.objectName ?: receiverTypeName.jvmDescriptor)
             }
-            append(bytecodeName)
+            append(mappingName)
             append(
                 JvmDescriptor.buildSignature(
                     parameters.map { it.typeName },
@@ -87,7 +87,7 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
             if (isTarget) {
                 append(inaccessibleInternalName?.objectName ?: receiverTypeName.jvmDescriptor)
             }
-            append(bytecodeName)
+            append(mappingName)
             append(":")
             append(fieldTypeName.jvmDescriptor)
         }
@@ -96,7 +96,7 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
 val IrInvokableDescriptor.binaryName: String
     get() = when (this) {
         is IrConstructorDescriptor -> CONSTRUCTOR_NAME
-        is IrMethodDescriptor -> bytecodeName
+        is IrMethodDescriptor -> mappingName
     }
 
 private const val CONSTRUCTOR_NAME: String = "<init>"
