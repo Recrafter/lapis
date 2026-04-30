@@ -190,17 +190,17 @@ class FrontendValidator(
         val constructorParameters = constructor.parameters.mapNotNull {
             runOrNullOnSkip { validatePatchConstructorParameter(it, schema) }
         }
-        val sharedProperties = properties.filter { it.isShared }.mapNotNull {
-            runOrNullOnSkip { validatePatchSharedProperty(it, schema) }
+        val bridgeSourceProperties = properties.filter { it.hasExtensionAnnotation }.mapNotNull {
+            runOrNullOnSkip { validatePatchExtensionProperty(it, schema) }
         }
-        val sharedFunctions = parsedRegularFunctions.filter { it.isShared }.mapNotNull {
-            runOrNullOnSkip { validatePatchSharedFunction(it, schema) }
+        val bridgeSourceFunctions = parsedRegularFunctions.filter { it.hasExtensionAnnotation }.mapNotNull {
+            runOrNullOnSkip { validatePatchExtensionFunction(it, schema) }
         }
         val hooks = parsedHookFunctions.mapNotNull {
             runOrNullOnSkip { validatePatchHook(it, isObject) }
         }
         val hasStaticHooksOnly = constructorParameters.isEmpty()
-            && sharedProperties.isEmpty() && sharedFunctions.isEmpty()
+            && bridgeSourceProperties.isEmpty() && bridgeSourceFunctions.isEmpty()
             && hooks.all { it.descriptor.isStatic }
         if (!hasStaticHooksOnly) {
             kspRequire(isOpen || isAbstract) { "206" }
@@ -219,8 +219,7 @@ class FrontendValidator(
             schema = schema,
 
             constructorParameters = constructorParameters,
-            sharedProperties = sharedProperties,
-            sharedFunctions = sharedFunctions,
+            bridgeSources = bridgeSourceProperties + bridgeSourceFunctions,
             hooks = hooks,
         )
     }
@@ -241,25 +240,35 @@ class FrontendValidator(
         }
     }
 
-    private fun validatePatchSharedProperty(
+    private fun validatePatchExtensionProperty(
         property: ParsedPatchProperty,
         schema: Schema,
-    ): PatchSharedProperty = with(property) {
+    ): PatchExtensionProperty = with(property) {
         kspRequire(schema.isAccessible) { "248" }
-        PatchSharedProperty(
+        kspRequire(property.isPublic) { "261" }
+        kspRequire(!property.isAbstract) { "262" }
+        kspRequire(!property.isExtension) { "263" }
+        kspRequireNotNull(getterJvmName) { "251" }
+        PatchExtensionProperty(
             name = name,
+            getterJvmName = getterJvmName,
+            setterJvmName = setterJvmName,
             type = type,
             isMutable = isMutable,
         )
     }
 
-    private fun validatePatchSharedFunction(
+    private fun validatePatchExtensionFunction(
         function: ParsedPatchFunction,
         schema: Schema,
-    ): PatchSharedFunction = with(function) {
+    ): PatchExtensionFunction = with(function) {
         kspRequire(schema.isAccessible) { "260" }
-        PatchSharedFunction(
+        kspRequire(function.isPublic) { "261" }
+        kspRequire(!function.isAbstract) { "262" }
+        kspRequire(!function.isExtension) { "263" }
+        PatchExtensionFunction(
             name = name,
+            jvmName = jvmName,
             parameters = function.parameters.map {
                 FunctionParameter(
                     name = kspRequireNotNull(it.name) { "265" },
@@ -294,7 +303,7 @@ class FrontendValidator(
                     is ConstructorDescriptor -> {
                         kspRequire(hasAtConstructorHeadAnnotation) { "295" }
                         ConstructorHeadHook(
-                            name = name,
+                            jvmName = jvmName,
                             descriptor = hookDescriptor,
                             phase = kspRequireNotNull(atConstructorHeadPhase) { "299" },
                             parameters = parameters(),
@@ -303,7 +312,7 @@ class FrontendValidator(
 
                     is MethodDescriptor -> {
                         MethodHeadHook(
-                            name = name,
+                            jvmName = jvmName,
                             descriptor = hookDescriptor,
                             parameters = parameters(),
                         )
@@ -315,7 +324,7 @@ class FrontendValidator(
                 kspRequire(hookDescriptor is MethodDescriptor) { "315" }
                 kspRequire(returnType == hookDescriptor.returnType) { "316" }
                 BodyHook(
-                    name = name,
+                    jvmName = jvmName,
                     targetDescriptor = hookDescriptor,
                     returnType = returnType,
                     parameters = parameters(),
@@ -325,7 +334,7 @@ class FrontendValidator(
             At.Tail -> {
                 kspRequire(returnType == null) { "326" }
                 TailHook(
-                    name = name,
+                    jvmName = jvmName,
                     descriptor = hookDescriptor,
                     parameters = parameters(),
                 )
@@ -337,7 +346,7 @@ class FrontendValidator(
                 kspRequireNotNull(atLocalType) { "337" }
                 kspRequire(returnType == atLocalType) { "338" }
                 LocalHook(
-                    name = name,
+                    jvmName = jvmName,
                     descriptor = hookDescriptor,
                     type = atLocalType,
                     ordinals = ordinals(atLocalOpOrdinals),
@@ -352,7 +361,7 @@ class FrontendValidator(
                 kspRequire(atInstanceofTypeClassDeclaration?.isValid == true) { "352" }
                 kspRequire(returnType?.toClassName()?.asIrTypeName() == KPBoolean.asIrTypeName()) { "353" }
                 InstanceofHook(
-                    name = name,
+                    jvmName = jvmName,
                     descriptor = hookDescriptor,
                     classDeclaration = atInstanceofTypeClassDeclaration,
                     returnType = returnType,
@@ -365,7 +374,7 @@ class FrontendValidator(
                 kspRequire(hasAtReturnAnnotation) { "365" }
                 kspRequire(returnType == hookDescriptor.returnType) { "366" }
                 ReturnHook(
-                    name = name,
+                    jvmName = jvmName,
                     descriptor = hookDescriptor,
                     type = returnType,
                     ordinals = ordinals(atReturnOrdinals),
@@ -384,7 +393,7 @@ class FrontendValidator(
                     kspRequire(returnType == type) { "384" }
                 }
                 LiteralHook(
-                    name = name,
+                    jvmName = jvmName,
                     descriptor = hookDescriptor,
                     type = type,
                     literal = literal,
@@ -402,7 +411,7 @@ class FrontendValidator(
                     Op.Get -> {
                         kspRequire(returnType?.makeNotNullable() == targetDescriptor.fieldType) { "403" }
                         FieldGetHook(
-                            name = name,
+                            jvmName = jvmName,
                             descriptor = hookDescriptor,
                             type = targetDescriptor.fieldType,
                             ordinals = ordinals(atFieldOrdinals),
@@ -414,7 +423,7 @@ class FrontendValidator(
                     Op.Set -> {
                         kspRequire(returnType == null) { "415" }
                         FieldSetHook(
-                            name = name,
+                            jvmName = jvmName,
                             descriptor = hookDescriptor,
                             type = targetDescriptor.fieldType,
                             ordinals = ordinals(atFieldOrdinals),
@@ -436,7 +445,7 @@ class FrontendValidator(
                     Op.Set -> kspRequire(returnType == null) { "436" }
                 }
                 ArrayHook(
-                    name = name,
+                    jvmName = jvmName,
                     descriptor = hookDescriptor,
                     op = atArrayOp,
                     type = targetDescriptor.fieldType,
@@ -453,7 +462,7 @@ class FrontendValidator(
                 kspRequire(targetDescriptor is MethodDescriptor) { "453" }
                 kspRequire(returnType?.makeNotNullable() == targetDescriptor.returnType) { "454" }
                 CallHook(
-                    name = name,
+                    jvmName = jvmName,
                     descriptor = hookDescriptor,
                     returnType = returnType,
                     targetDescriptor = targetDescriptor,

@@ -154,8 +154,7 @@ class Patch(
     val schema: Schema,
 
     val constructorParameters: List<PatchConstructorParameter>,
-    val sharedProperties: List<PatchSharedProperty>,
-    val sharedFunctions: List<PatchSharedFunction>,
+    val bridgeSources: List<PatchBridgeSource>,
 
     val hooks: List<PatchHook>,
 ) {
@@ -166,24 +165,43 @@ class Patch(
 sealed interface PatchConstructorParameter
 object PatchConstructorOriginParameter : PatchConstructorParameter
 
-class PatchSharedProperty(
+sealed interface PatchBridgeSource
+sealed class PatchBridgeSourceProperty(
     val name: String,
+    val getterJvmName: String,
+    val setterJvmName: String?,
     type: KSType,
     val isMutable: Boolean,
-) {
+) : PatchBridgeSource {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
-class PatchSharedFunction(
+class PatchExtensionProperty(
+    name: String,
+    getterJvmName: String,
+    setterJvmName: String?,
+    type: KSType,
+    isMutable: Boolean,
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable)
+
+sealed class PatchBridgeSourceFunction(
     val name: String,
+    val jvmName: String,
     val parameters: List<FunctionParameter>,
     returnType: KSType?,
-) {
+) : PatchBridgeSource {
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
+class PatchExtensionFunction(
+    name: String,
+    jvmName: String,
+    parameters: List<FunctionParameter>,
+    returnType: KSType?,
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType)
+
 sealed class PatchHook(
-    val name: String,
+    val jvmName: String,
     val descriptor: Descriptor,
     returnType: KSType?,
     val parameters: List<HookParameter>,
@@ -199,78 +217,78 @@ sealed interface HookWithTarget {
 }
 
 class MethodHeadHook(
-    name: String,
+    jvmName: String,
     descriptor: MethodDescriptor,
     parameters: List<HookParameter>,
-) : PatchHook(name, descriptor, null, parameters, emptyList()) {
+) : PatchHook(jvmName, descriptor, null, parameters, emptyList()) {
     override val isInjectBased: Boolean = true
 }
 
 class ConstructorHeadHook(
-    name: String,
+    jvmName: String,
     descriptor: ConstructorDescriptor,
     parameters: List<HookParameter>,
     val phase: ConstructorHeadPhase,
-) : PatchHook(name, descriptor, null, parameters, emptyList()) {
+) : PatchHook(jvmName, descriptor, null, parameters, emptyList()) {
     override val isInjectBased: Boolean = true
 }
 
 class BodyHook(
-    name: String,
+    jvmName: String,
     override val targetDescriptor: MethodDescriptor,
     returnType: KSType?,
     parameters: List<HookParameter>,
-) : PatchHook(name, targetDescriptor, returnType, parameters, emptyList()), HookWithTarget
+) : PatchHook(jvmName, targetDescriptor, returnType, parameters, emptyList()), HookWithTarget
 
 class TailHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     parameters: List<HookParameter>,
-) : PatchHook(name, descriptor, null, parameters, emptyList()) {
+) : PatchHook(jvmName, descriptor, null, parameters, emptyList()) {
     override val isInjectBased: Boolean = true
 }
 
 class LocalHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     type: KSType,
     parameters: List<HookParameter>,
     ordinals: List<Int>,
     val local: DomainLocal,
     val op: Op,
-) : PatchHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, descriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class InstanceofHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     classDeclaration: KSClassDeclaration,
     returnType: KSType,
     parameters: List<HookParameter>,
     ordinals: List<Int>,
-) : PatchHook(name, descriptor, returnType, parameters, ordinals) {
+) : PatchHook(jvmName, descriptor, returnType, parameters, ordinals) {
     val className: IrClassName = classDeclaration.asIrClassName()
 }
 
 class ReturnHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     type: KSType?,
     parameters: List<HookParameter>,
     ordinals: List<Int>,
-) : PatchHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, descriptor, type, parameters, ordinals) {
     override val isInjectBased: Boolean = type == null
 }
 
 class LiteralHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     parameters: List<HookParameter>,
     type: KSType,
     val literal: Literal,
     ordinals: List<Int>,
-) : PatchHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, descriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
@@ -309,29 +327,29 @@ object NullLiteral : Literal {
 }
 
 class FieldGetHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     type: KSType,
     override val targetDescriptor: FieldDescriptor,
     ordinals: List<Int>,
     parameters: List<HookParameter>,
-) : PatchHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
+) : PatchHook(jvmName, descriptor, type, parameters, ordinals), HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class FieldSetHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     type: KSType,
     override val targetDescriptor: FieldDescriptor,
     ordinals: List<Int>,
     parameters: List<HookParameter>,
-) : PatchHook(name, descriptor, type, parameters, ordinals), HookWithTarget {
+) : PatchHook(jvmName, descriptor, type, parameters, ordinals), HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class ArrayHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     type: KSType,
     val componentType: KSType,
@@ -339,19 +357,19 @@ class ArrayHook(
     ordinals: List<Int>,
     parameters: List<HookParameter>,
     val op: Op,
-) : PatchHook(name, descriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, descriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
     val componentTypeName: IrTypeName = componentType.asIrTypeName()
 }
 
 class CallHook(
-    name: String,
+    jvmName: String,
     descriptor: InvokableDescriptor,
     returnType: KSType?,
     parameters: List<HookParameter>,
     override val targetDescriptor: InvokableDescriptor,
     ordinals: List<Int>,
-) : PatchHook(name, descriptor, returnType, parameters, ordinals), HookWithTarget
+) : PatchHook(jvmName, descriptor, returnType, parameters, ordinals), HookWithTarget
 
 sealed interface DomainLocal
 class NamedLocal(val name: String) : DomainLocal

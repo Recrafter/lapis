@@ -16,7 +16,6 @@ import io.github.recrafter.lapis.Options
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.InternalPrefix.*
-import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
@@ -61,8 +60,12 @@ class MixinGenerator(
         val patchOriginatingFiles = patches.mapNotNull { it.originatingFile }
 
         generateDescriptorWrappers(schemas.flatMap { it.descriptors }, schemaOriginatingFiles + patchOriginatingFiles)
-        patches.forEach { generateMixin(it, listOfNotNull(it.originatingFile)) }
-
+        patches.forEach { patch ->
+            val originatingFiles = listOfNotNull(patch.originatingFile)
+            patch.impl?.let { generatePatchImpl(patch, it, originatingFiles) }
+            patch.mixin.bridge?.let { generateMixinBridge(patch, it, originatingFiles) }
+            generateMixin(patch, originatingFiles)
+        }
         generateExtensions(schemaOriginatingFiles + patchOriginatingFiles)
 
         generateMixinConfig(patches)
@@ -116,8 +119,6 @@ class MixinGenerator(
         buildJavaFile(patch.mixin.className) {
             buildMixinClass(patch)
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
-        patch.impl?.let { generatePatchImpl(patch, it, originatingFiles) }
-        patch.extension?.let { generateMixinExtension(patch, it, originatingFiles) }
     }
 
     private fun generatePatchImpl(patch: IrPatch, impl: IrPatchImpl, originatingFiles: List<KSFile>) {
@@ -134,7 +135,7 @@ class MixinGenerator(
             val constructorParameters = impl.constructorParameters.map { parameter ->
                 when (parameter) {
                     is IrPatchImplConstructorInstanceParameter -> {
-                        IrParameter(instanceParameterName, patch.mixin.instanceTypeName)
+                        IrParameter(instanceParameterName, patch.mixin.targetInstanceTypeName)
                     }
                 }
             }
@@ -158,33 +159,37 @@ class MixinGenerator(
             }
             setModifiers(IrModifier.PUBLIC)
             val patchImplReference = patch.impl?.let { generatePatchInitializer(this, it, patch.mixin) }
-            patch.extension?.let { extension ->
+            patch.mixin.bridge?.let { bridge ->
                 if (patchImplReference == null) {
                     lapisError("Patch impl reference cannot be null")
                 }
-                addSuperInterface(extension.className)
-                addMethods(extension.kinds.map { method ->
-                    buildJavaMethod(method.methodName) {
-                        setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
-                        setParameters(method.parameters)
-                        setReturnType(method.returnTypeName)
-                        setBody {
-                            code_(
-                                format = "${patchImplReference.format}.%L(%L)",
-                                isReturn = method.returnTypeName != null
-                            ) {
-                                when (patchImplReference) {
-                                    is PatchFieldReference -> arg(patchImplReference.field)
-                                    is PatchMethodReference -> arg(patchImplReference.method)
-                                }
-                                arg(
-                                    when (method) {
-                                        is IrPropertyGetterExtension -> "get" + method.name.capitalize()
-                                        is IrPropertySetterExtension -> "set" + method.name.capitalize()
-                                        is IrFunctionCallExtension -> method.name
+                addSuperInterface(bridge.className)
+                addMethods(bridge.functions.flatMap { function ->
+                    val accessors = when (function) {
+                        is IrPropertyBridgeFunction -> listOfNotNull(function.getter, function.setter)
+                        is IrFunctionBridgeFunction -> listOf(function)
+                    }
+                    accessors.map { accessor ->
+                        buildJavaMethod(accessor.name) {
+                            setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
+                            setParameters(accessor.parameters)
+                            setReturnType(accessor.returnTypeName)
+                            setBody {
+                                when (function.impl) {
+                                    is IrBridgeExtensionFunctionImpl -> {
+                                        code_(
+                                            format = "${patchImplReference.format}.%L(%L)",
+                                            isReturn = accessor.returnTypeName != null
+                                        ) {
+                                            when (patchImplReference) {
+                                                is PatchImplFieldReference -> arg(patchImplReference.field)
+                                                is PatchImplMethodReference -> arg(patchImplReference.method)
+                                            }
+                                            arg(accessor.sourceJvmName)
+                                            arg(accessor.parameters.joinToString { it.name })
+                                        }
                                     }
-                                )
-                                arg(method.parameters.joinToString { it.name })
+                                }
                             }
                         }
                     }
@@ -203,8 +208,8 @@ class MixinGenerator(
         val constructorArgumentCodeBlocks = impl.constructorParameters.map { parameter ->
             when (parameter) {
                 is IrPatchImplConstructorInstanceParameter -> {
-                    val isDoubleCastRequired = mixin.instanceTypeName != KPAny.asIrClassName()
-                    val isObjectCastRequired = !mixin.isInterfaceInstance
+                    val isDoubleCastRequired = mixin.targetInstanceTypeName != KPAny.asIrClassName()
+                    val isObjectCastRequired = !mixin.isInterfaceTarget
                     buildJavaCodeBlock(
                         buildString {
                             if (isDoubleCastRequired) {
@@ -217,7 +222,7 @@ class MixinGenerator(
                         }
                     ) {
                         if (isDoubleCastRequired) {
-                            arg(mixin.instanceTypeName)
+                            arg(mixin.targetInstanceTypeName)
                             if (isObjectCastRequired) {
                                 arg(Object::class)
                             }
@@ -237,9 +242,8 @@ class MixinGenerator(
             constructorArgumentCodeBlocks.forEach(::arg)
         }
         val isEagerStrategy = impl.initStrategy == InitStrategy.Eager
-        val isVolatileStrategy = impl.initStrategy == InitStrategy.Volatile
         val isSynchronizedStrategy = impl.initStrategy == InitStrategy.Synchronized
-        val isThreadSafeStrategy = isVolatileStrategy || isSynchronizedStrategy
+        val isThreadSafeStrategy = impl.initStrategy == InitStrategy.Volatile || isSynchronizedStrategy
         val patchField = buildJavaField("patch".withInternalPrefix(), impl.className) {
             addAnnotation<Unique>()
             setModifiers(
@@ -254,7 +258,7 @@ class MixinGenerator(
             }
         }.also(destination::addField)
         if (isEagerStrategy) {
-            return PatchFieldReference(patchField)
+            return PatchImplFieldReference(patchField)
         }
         val synchronizedLockField = if (isSynchronizedStrategy) {
             buildJavaField("patchLock".withInternalPrefix(), Object::class.asIrTypeName()) {
@@ -310,18 +314,18 @@ class MixinGenerator(
                 }
             }
         }.also(destination::addMethod)
-        return PatchMethodReference(getOrInitPatchMethod)
+        return PatchImplMethodReference(getOrInitPatchMethod)
     }
 
     sealed interface PatchImplReference {
         val format: String
     }
 
-    class PatchFieldReference(val field: JPField) : PatchImplReference {
+    class PatchImplFieldReference(val field: JPField) : PatchImplReference {
         override val format: String = "%N"
     }
 
-    class PatchMethodReference(val method: JPMethod) : PatchImplReference {
+    class PatchImplMethodReference(val method: JPMethod) : PatchImplReference {
         override val format: String = "%N()"
     }
 
@@ -331,7 +335,7 @@ class MixinGenerator(
         patchImplReference: PatchImplReference?,
     ): JPMethod =
         buildJavaMethod(buildString {
-            append(injection.name)
+            append(injection.jvmName)
             injection.ordinal?.let { append("_ordinal${it}") }
         }) {
             val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelArgument }
@@ -532,9 +536,7 @@ class MixinGenerator(
                                 buildJavaParameter(parameter.name.withInternalPrefix(SHARE), typeName) {
                                     addAnnotation<Share> {
                                         setArgumentValue(Share::value, parameter.key)
-                                        if (parameter.isExported) {
-                                            setArgumentValue(Share::namespace, options.modId)
-                                        }
+                                        parameter.namespace?.let { setArgumentValue(Share::namespace, it) }
                                     }
                                 }
                             }
@@ -673,12 +675,12 @@ class MixinGenerator(
                             arg(patch.className)
                         } else {
                             when (patchImplReference) {
-                                is PatchFieldReference -> arg(patchImplReference.field)
-                                is PatchMethodReference -> arg(patchImplReference.method)
+                                is PatchImplFieldReference -> arg(patchImplReference.field)
+                                is PatchImplMethodReference -> arg(patchImplReference.method)
                                 else -> lapisError("Patch impl reference cannot be null")
                             }
                         }
-                        arg(injection.name)
+                        arg(injection.jvmName)
                         hookArgumentCodeBlocks.forEach(::arg)
                     }
                 }
@@ -696,40 +698,51 @@ class MixinGenerator(
             }
         }
 
-    private fun generateMixinExtension(patch: IrPatch, extension: IrExtension, originatingFiles: List<KSFile>) {
-        buildKotlinFile(extension.className) {
-            addType(buildKotlinInterface(extension.className.simpleName) {
+    private fun generateMixinBridge(
+        patch: IrPatch,
+        bridge: IrBridge,
+        originatingFiles: List<KSFile>,
+    ) {
+        buildKotlinFile(bridge.className) {
+            addType(buildKotlinInterface(bridge.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
-                addFunctions(extension.kinds.map { method ->
-                    buildKotlinFunction(method.methodName) {
-                        setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
-                        setParameters(method.parameters)
-                        setReturnType(method.returnTypeName)
+                addFunctions(bridge.functions.flatMap { function ->
+                    val accessors = when (function) {
+                        is IrPropertyBridgeFunction -> listOfNotNull(function.getter, function.setter)
+                        is IrFunctionBridgeFunction -> listOf(function)
+                    }
+                    accessors.map { accessor ->
+                        buildKotlinFunction(accessor.name) {
+                            setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
+                            setParameters(accessor.parameters)
+                            setReturnType(accessor.returnTypeName)
+                        }
                     }
                 })
             })
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
 
-        extensionProperties += extension.kinds.filterIsInstance<IrPropertyGetterExtension>().map { getter ->
-            buildKotlinProperty(getter.name, getter.typeName) {
-                setReceiverType(patch.mixin.instanceTypeName)
+        val bridgeExtensionFunctions = bridge.functions.filter { it.impl is IrBridgeExtensionFunctionImpl }
+        extensionProperties += bridgeExtensionFunctions.filterIsInstance<IrPropertyBridgeFunction>().map { function ->
+            buildKotlinProperty(function.sourceName, function.typeName) {
+                setReceiverType(patch.mixin.targetInstanceTypeName)
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
                         return_("(this as %T).%L()") {
-                            arg(extension.className)
-                            arg(getter.methodName)
+                            arg(bridge.className)
+                            arg(function.getter.name)
                         }
                     }
                 }
-                extension.kinds.find { it is IrPropertySetterExtension && it.name == getter.name }?.let { setter ->
+                function.setter?.let { setter ->
                     setSetter {
                         setModifiers(IrModifier.INLINE)
                         setParameters(setter.parameters)
                         setBody {
                             code_("(this as %T).%L(%L)") {
-                                arg(extension.className)
-                                arg(setter.methodName)
+                                arg(bridge.className)
+                                arg(setter.name)
                                 arg(setter.parameters.joinToString { it.name })
                             }
                         }
@@ -737,17 +750,17 @@ class MixinGenerator(
                 }
             }
         }
-        extensionFunctions += extension.kinds.filterIsInstance<IrFunctionCallExtension>().map { method ->
-            buildKotlinFunction(method.name) {
+        extensionFunctions += bridgeExtensionFunctions.filterIsInstance<IrFunctionBridgeFunction>().map { function ->
+            buildKotlinFunction(function.sourceName) {
                 setModifiers(IrModifier.INLINE)
-                setReceiverType(patch.mixin.instanceTypeName)
-                setParameters(method.parameters)
-                setReturnType(method.returnTypeName)
+                setReceiverType(patch.mixin.targetInstanceTypeName)
+                setParameters(function.parameters)
+                setReturnType(function.returnTypeName)
                 setBody {
                     return_("(this as %T).%L(%L)") {
-                        arg(extension.className)
-                        arg(method.methodName)
-                        arg(method.parameters.joinToString { it.name })
+                        arg(bridge.className)
+                        arg(function.name)
+                        arg(function.parameters.joinToString { it.name })
                     }
                 }
             }
@@ -872,13 +885,6 @@ class MixinGenerator(
             )
         }
     }
-
-    private val IrExtensionKind.methodName: String
-        get() = when (this) {
-            is IrPropertyGetterExtension -> "get" + name.capitalize()
-            is IrPropertySetterExtension -> "set" + name.capitalize()
-            is IrFunctionCallExtension -> name
-        }.withInternalPrefix(options.modId)
 }
 
 private val configJson: Json = Json { prettyPrint = true }

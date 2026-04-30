@@ -31,15 +31,15 @@ class IrPatch(
     val constructorArguments: List<IrPatchConstructorArgument>,
     val impl: IrPatchImpl?,
     val mixin: IrMixin,
-    val extension: IrExtension?,
 )
 
 class IrMixin(
     val className: IrClassName,
-    val instanceTypeName: IrTypeName,
-    val isInterfaceInstance: Boolean,
+    val targetInstanceTypeName: IrTypeName,
+    val isInterfaceTarget: Boolean,
     val targetInternalName: String,
     val injections: List<IrInjection>,
+    val bridge: IrBridge?,
 )
 
 sealed interface IrPatchConstructorArgument

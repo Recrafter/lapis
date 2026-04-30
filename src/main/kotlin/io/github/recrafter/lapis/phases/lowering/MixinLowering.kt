@@ -5,9 +5,12 @@ import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
+import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ks.isInterface
+import io.github.recrafter.lapis.extensions.prefixed
+import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
@@ -94,7 +97,6 @@ class MixinLowering(
             constructorArguments = constructorArguments,
             impl = lowerPatchImpl(patch, constructorArguments),
             mixin = lowerMixin(patch),
-            extension = lowerExtension(patch),
         )
     }
 
@@ -124,48 +126,63 @@ class MixinLowering(
                 options.mixinPackageName,
                 "Mixin".withQualifiedNamePrefix(patch.className)
             ),
-            instanceTypeName = patch.schema.originTypeName,
-            isInterfaceInstance = patch.schema.originClassDeclaration.isInterface,
+            targetInstanceTypeName = patch.schema.originTypeName,
+            isInterfaceTarget = patch.schema.originClassDeclaration.isInterface,
             targetInternalName = patch.schema.originJvmClassName.internalName,
             injections = patch.hooks.flatMap(::lowerInjections),
+            bridge = lowerBridge(patch),
         )
 
-    private fun lowerExtension(patch: Patch): IrExtension? {
-        if (patch.sharedProperties.isEmpty() && patch.sharedFunctions.isEmpty()) {
-            return null
-        }
-        return IrExtension(
+    private fun lowerBridge(patch: Patch): IrBridge? =
+        if (patch.bridgeSources.isEmpty()) null
+        else IrBridge(
             className = IrClassName.of(
                 options.generatedPackageName,
-                "Extension".withQualifiedNamePrefix(patch.className)
+                "Bridge".withQualifiedNamePrefix(patch.className)
             ),
-            kinds = buildList {
-                patch.sharedProperties.forEach { property ->
-                    add(
-                        IrPropertyGetterExtension(
-                            name = property.name,
-                            typeName = property.typeName,
-                        )
-                    )
-                    if (property.isMutable) {
-                        add(
-                            IrPropertySetterExtension(
-                                name = property.name,
-                                typeName = property.typeName,
-                            )
-                        )
-                    }
-                }
-                addAll(patch.sharedFunctions.map { function ->
-                    IrFunctionCallExtension(
-                        name = function.name,
-                        parameters = function.parameters.map { it.asIrParameter() },
-                        returnTypeName = function.returnTypeName,
-                    )
-                })
-            },
+            functions = patch.bridgeSources.map(::lowerBridgeFunction),
         )
-    }
+
+    private fun lowerBridgeFunction(source: PatchBridgeSource): IrBridgeFunction =
+        when (source) {
+            is PatchBridgeSourceProperty -> {
+                val (setterName, setterSourceJvmName) = if (source.isMutable) {
+                    source.name.capitalize().prefixed("set").withInternalPrefix(options.modId) to source.setterJvmName
+                } else null to null
+                IrPropertyBridgeFunction(
+                    sourceName = source.name,
+                    typeName = source.typeName,
+                    impl = lowerPropertyBridgeFunctionImpl(source),
+                    getterName = source.name.capitalize().prefixed("get").withInternalPrefix(options.modId),
+                    getterSourceJvmName = source.getterJvmName,
+                    setterName = setterName,
+                    setterSourceJvmName = setterSourceJvmName,
+                )
+            }
+
+            is PatchBridgeSourceFunction -> IrFunctionBridgeFunction(
+                sourceName = source.name,
+                name = source.name.withInternalPrefix(options.modId),
+                sourceJvmName = source.jvmName,
+                parameters = source.parameters.map { it.asIrParameter() },
+                returnTypeName = source.returnTypeName,
+                impl = lowerFunctionBridgeFunctionImpl(source),
+            )
+        }
+
+    private fun lowerPropertyBridgeFunctionImpl(
+        property: PatchBridgeSourceProperty
+    ): IrPropertyBridgeExtensionFunctionImpl =
+        when (property) {
+            is PatchExtensionProperty -> IrPropertyBridgeExtensionFunctionImpl
+        }
+
+    private fun lowerFunctionBridgeFunctionImpl(
+        function: PatchBridgeSourceFunction
+    ): IrFunctionBridgeFunctionImpl =
+        when (function) {
+            is PatchExtensionFunction -> IrFunctionBridgeExtensionFunctionImpl
+        }
 
     private fun lowerInjections(hook: PatchHook): List<IrInjection> {
         val parameters = buildList {
@@ -256,7 +273,7 @@ class MixinLowering(
         return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
             when (hook) {
                 is MethodHeadHook -> IrMethodHeadInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -264,7 +281,7 @@ class MixinLowering(
                 )
 
                 is ConstructorHeadHook -> IrConstructorHeadInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -279,7 +296,7 @@ class MixinLowering(
                 )
 
                 is BodyHook -> IrWrapMethodInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.targetDescriptor.getMixinRef(),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     returnTypeName = hook.returnTypeName,
@@ -289,7 +306,7 @@ class MixinLowering(
                 )
 
                 is TailHook -> IrReturnInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -299,7 +316,7 @@ class MixinLowering(
                 )
 
                 is LocalHook -> IrModifyVariableInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
@@ -311,7 +328,7 @@ class MixinLowering(
                 )
 
                 is InstanceofHook -> IrInstanceofInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     className = hook.className,
                     parameters = parameters,
@@ -323,7 +340,7 @@ class MixinLowering(
                 is ReturnHook -> {
                     if (hook.isInjectBased) {
                         IrReturnInjection(
-                            name = hook.name,
+                            jvmName = hook.jvmName,
                             methodMixinRef = hook.descriptor.getMixinRef(),
                             parameters = parameters,
                             hookArguments = hookArguments,
@@ -333,7 +350,7 @@ class MixinLowering(
                         )
                     } else {
                         IrModifyReturnValueInjection(
-                            name = hook.name,
+                            jvmName = hook.jvmName,
                             methodMixinRef = hook.descriptor.getMixinRef(),
                             returnTypeName = hook.returnTypeName,
                             parameters = parameters,
@@ -367,7 +384,7 @@ class MixinLowering(
                         NullLiteral -> listOf("nullValue" to "true")
                     }
                     IrModifyExpressionValueInjection(
-                        name = hook.name,
+                        jvmName = hook.jvmName,
                         methodMixinRef = hook.descriptor.getMixinRef(),
                         parameters = parameters,
                         hookArguments = hookArguments,
@@ -379,7 +396,7 @@ class MixinLowering(
                 }
 
                 is FieldGetHook -> IrFieldGetInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -391,7 +408,7 @@ class MixinLowering(
                 )
 
                 is FieldSetHook -> IrFieldSetInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -402,7 +419,7 @@ class MixinLowering(
                 )
 
                 is ArrayHook -> IrArrayInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -415,7 +432,7 @@ class MixinLowering(
                 )
 
                 is CallHook -> IrWrapOperationInjection(
-                    name = hook.name,
+                    jvmName = hook.jvmName,
                     methodMixinRef = hook.descriptor.getMixinRef(),
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
@@ -473,7 +490,7 @@ class MixinLowering(
                 typeName = parameter.typeName,
                 varImplBuiltin = LocalVarImplBuiltin.of(parameter.typeName),
                 key = parameter.key,
-                isExported = parameter.isExported,
+                namespace = if (parameter.isExported) options.modId else null,
             )
 
             else -> null

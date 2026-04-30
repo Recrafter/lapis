@@ -94,28 +94,36 @@ class ParsedPatchProperty(
     symbol: KSNode,
 
     val name: String,
+    val getterJvmName: String?,
+    val setterJvmName: String?,
     val type: KSType,
-    isPublic: Boolean,
-    isAbstract: Boolean,
-    isExtension: Boolean,
+
+    val isPublic: Boolean,
+    val isOpen: Boolean,
+    val isAbstract: Boolean,
+    val isExtension: Boolean,
     val isMutable: Boolean,
-) : SymbolSource(symbol) {
-    val isShared: Boolean = isPublic && !isAbstract && !isExtension
-}
+
+    val hasExtensionAnnotation: Boolean,
+) : SymbolSource(symbol)
 
 class ParsedPatchFunction(
     symbol: KSNode,
 
     val name: String,
+    val jvmName: String,
     val parameters: List<ParsedPatchFunctionParameter>,
     val returnType: KSType?,
     val hasTypeParameters: Boolean,
 
-    isPublic: Boolean,
-    isAbstract: Boolean,
-    isExtension: Boolean,
+    val isPublic: Boolean,
+    val isOpen: Boolean,
+    val isAbstract: Boolean,
+    val isExtension: Boolean,
 
     val isInCompanionObject: Boolean,
+
+    val hasExtensionAnnotation: Boolean,
 
     val hasHookAnnotation: Boolean,
     val hookDescriptorClassDeclaration: KSClassDeclaration?,
@@ -165,8 +173,6 @@ class ParsedPatchFunction(
     val atCallDescriptorClassDeclaration: KSClassDeclaration?,
     val atCallOrdinals: List<Int>,
 ) : SymbolSource(symbol) {
-
-    val isShared: Boolean = isPublic && !isAbstract && !isExtension && !isInCompanionObject
 
     fun hasOrdinals(): Boolean {
         val allOrdinals = atLocalOpOrdinals + atInstanceofOrdinals + atReturnOrdinals + atLiteralOrdinals +

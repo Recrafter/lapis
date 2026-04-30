@@ -44,5 +44,5 @@ class IrInjectionShareParameter(
     typeName: IrTypeName,
     varImplBuiltin: LocalVarImplBuiltin,
     val key: String,
-    val isExported: Boolean,
+    val namespace: String?,
 ) : IrInjectionLocalParameter(typeName, varImplBuiltin)

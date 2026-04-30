@@ -11,6 +11,9 @@ fun String.capitalize(): String =
 fun String.quoted(): String =
     "'$this'"
 
+fun String.prefixed(prefix: String): String =
+    prefix + this
+
 fun String.withInternalPrefix(prefix: String): String =
     "_${prefix}_$this"
 

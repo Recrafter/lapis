@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.phases.parser
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.impl.symbol.kotlin.KSClassDeclarationImpl
-import com.google.devtools.ksp.isAbstract
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
@@ -10,6 +10,7 @@ import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.annotations.Origin
 import io.github.recrafter.lapis.extensions.common.castOrNull
+import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
 import io.github.recrafter.lapis.phases.common.JvmClassName
@@ -224,18 +225,26 @@ class SymbolParser(
             hasOriginAnnotation = parameter.hasAnnotation<Origin>()
         )
 
+    @OptIn(KspExperimental::class)
     private fun parsePatchProperty(propertyDeclaration: KSPropertyDeclaration): ParsedPatchProperty =
         ParsedPatchProperty(
             symbol = propertyDeclaration,
 
             name = propertyDeclaration.name,
+            getterJvmName = propertyDeclaration.getter?.let(resolver::getJvmName),
+            setterJvmName = propertyDeclaration.setter?.let(resolver::getJvmName),
             type = propertyDeclaration.type.resolve(),
+
             isPublic = propertyDeclaration.isPublic(),
-            isAbstract = propertyDeclaration.isAbstract(),
+            isOpen = propertyDeclaration.isExplicitlyOpen,
+            isAbstract = propertyDeclaration.isExplicitlyAbstract,
             isExtension = propertyDeclaration.isExtension,
             isMutable = propertyDeclaration.isMutable && propertyDeclaration.setter?.isPublic == true,
+
+            hasExtensionAnnotation = propertyDeclaration.hasAnnotation<Extension>()
         )
 
+    @OptIn(KspExperimental::class)
     private fun parsePatchFunction(functionDeclaration: KSFunctionDeclaration): ParsedPatchFunction {
         val hookAnnotation = functionDeclaration.findAnnotation<Hook>()
 
@@ -261,17 +270,21 @@ class SymbolParser(
             symbol = functionDeclaration,
 
             name = functionDeclaration.name,
+            jvmName = resolver.getJvmName(functionDeclaration) ?: lapisError("Function jvm name cannot be null"),
             parameters = functionDeclaration.parameters.map(::parsePatchFunctionParameter),
             returnType = functionDeclaration.getReturnTypeOrNull(),
             hasTypeParameters = functionDeclaration.typeParameters.isNotEmpty(),
 
             isPublic = functionDeclaration.isPublic(),
+            isOpen = functionDeclaration.isExplicitlyOpen,
             isAbstract = functionDeclaration.isAbstract,
             isExtension = functionDeclaration.isExtension,
 
             isInCompanionObject = functionDeclaration.parentDeclaration.let {
                 it is KSClassDeclaration && it.isCompanionObject
             },
+
+            hasExtensionAnnotation = functionDeclaration.hasAnnotation<Extension>(),
 
             hasHookAnnotation = hookAnnotation != null,
             hookDescriptorClassDeclaration = hookAnnotation?.getArgumentValue(Hook::desc)?.toClassDeclaration(),
