@@ -9,11 +9,14 @@ val KSClassDeclaration.starProjectedType: KSType
 val KSClassDeclaration.type: KSType
     get() = asType(emptyList())
 
+val KSClassDeclaration.isInterface: Boolean
+    get() = classKind == ClassKind.INTERFACE
+
 val KSClassDeclaration.isClass: Boolean
     get() = classKind == ClassKind.CLASS
 
-val KSClassDeclaration.isInterface: Boolean
-    get() = classKind == ClassKind.INTERFACE
+val KSClassDeclaration.isObject: Boolean
+    get() = classKind == ClassKind.OBJECT
 
 val KSClassDeclaration.isInner: Boolean
     get() = modifiers.contains(Modifier.INNER)

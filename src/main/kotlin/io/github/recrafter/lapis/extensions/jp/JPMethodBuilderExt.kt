@@ -24,10 +24,10 @@ fun JPMethodBuilder.addParameter(parameter: IrParameter): JPParameter =
     JPParameter
         .builder(parameter.typeName.java, parameter.name)
         .build()
-        .also { addParameter(it) }
+        .also(::addParameter)
 
 fun JPMethodBuilder.setParameters(parameters: List<IrParameter>): List<JPParameter> =
-    parameters.map { addParameter(it) }
+    parameters.map(::addParameter)
 
 fun JPMethodBuilder.setModifiers(vararg modifiers: IrModifier) {
     modifiers.forEach {
@@ -37,6 +37,7 @@ fun JPMethodBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
             IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
             IrModifier.OVERRIDE -> addAnnotation<Override>()
+            IrModifier.FINAL -> addModifiers(JPModifier.FINAL)
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Java methods")
         }
     }

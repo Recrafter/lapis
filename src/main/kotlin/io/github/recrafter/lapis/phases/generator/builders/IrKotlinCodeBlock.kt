@@ -25,6 +25,10 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
     @JvmInline
     value class Arguments(private val arguments: MutableList<Any> = mutableListOf()) {
 
+        fun arg(boolean: Boolean) {
+            arguments += boolean
+        }
+
         fun arg(string: String) {
             arguments += string
         }
@@ -61,3 +65,9 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
             arguments
     }
 }
+
+fun Boolean.toKotlinCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%L") { arg(this@toKotlinCodeBlock) }
+fun String.toKotlinCodeBlock(asValue: Boolean = false): KPCodeBlock =
+    buildKotlinCodeBlock(if (asValue) "%S" else "%L") { arg(this@toKotlinCodeBlock) }
+
+fun KPParameter.toCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%N") { arg(this@toCodeBlock) }

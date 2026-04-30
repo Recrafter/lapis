@@ -17,7 +17,7 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
     vararg strings: String,
 ) {
     setArrayArgumentValue<A>(property, strings, "%S", false) {
-        strings.forEach { arg(it) }
+        strings.forEach(::arg)
     }
 }
 
@@ -27,7 +27,7 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
     vararg strings: String,
 ) {
     setArrayArgumentValue<A>(property, strings, "%S", true) {
-        strings.forEach { arg(it) }
+        strings.forEach(::arg)
     }
 }
 

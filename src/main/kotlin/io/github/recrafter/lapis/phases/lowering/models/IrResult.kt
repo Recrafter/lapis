@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
 import com.google.devtools.ksp.symbol.KSFile
+import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Side
 import io.github.recrafter.lapis.phases.common.JvmClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
@@ -27,7 +28,7 @@ class IrPatch(
     val side: Side,
     val className: IrClassName,
     val constructorArguments: List<IrPatchConstructorArgument>,
-    val impl: IrPatchImpl,
+    val impl: IrPatchImpl?,
     val mixin: IrMixin,
     val extension: IrExtension?,
 )
@@ -46,6 +47,7 @@ object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
 class IrPatchImpl(
     val className: IrClassName,
     val constructorParameters: List<IrPatchImplConstructorParameter>,
+    val initStrategy: InitStrategy,
 )
 
 sealed interface IrPatchImplConstructorParameter

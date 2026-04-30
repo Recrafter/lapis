@@ -62,6 +62,7 @@ class ParsedPatch(
 
     val name: String?,
     val side: Side?,
+    val initStrategy: InitStrategy?,
     val classDeclaration: KSClassDeclaration?,
     val schemaClassDeclaration: KSClassDeclaration?,
 

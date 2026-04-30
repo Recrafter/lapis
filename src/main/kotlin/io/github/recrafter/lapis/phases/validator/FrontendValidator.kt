@@ -174,35 +174,47 @@ class FrontendValidator(
     private fun validatePatch(patch: ParsedPatch): Patch = with(patch) {
         kspRequireNotNull(name) { "164" }
         kspRequireNotNull(side) { "167" }
-        kspRequire(classDeclaration?.run { isAbstract() && !isInner && isClass } == true) { "168" }
+        kspRequireNotNull(initStrategy) { "167" }
+        kspRequire(classDeclaration?.isValid == true) { "162" }
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "169" }
         kspRequire(schemaClassDeclaration?.isValid == true) { "165" }
         val schema = validSchemas[schemaClassDeclaration.qualifiedName?.asString()]
         kspRequireNotNull(schema) { "172" }
         val constructor = kspRequireNotNull(patch.constructors.singleOrNull()) { "111" }
         val (parsedHookFunctions, parsedRegularFunctions) = functions.partition { it.hasHookAnnotation }
+        val constructorParameters = constructor.parameters.mapNotNull {
+            runOrNullOnSkip { validatePatchConstructorParameter(it, schema) }
+        }
+        val sharedProperties = properties.filter { it.isShared }.mapNotNull {
+            runOrNullOnSkip { validatePatchSharedProperty(it, schema) }
+        }
+        val sharedFunctions = parsedRegularFunctions.filter { it.isShared }.mapNotNull {
+            runOrNullOnSkip { validatePatchSharedFunction(it, schema) }
+        }
+        val hooks = parsedHookFunctions.mapNotNull {
+            runOrNullOnSkip { validatePatchHook(it) }
+        }
+        val isObject = constructorParameters.isEmpty() && sharedProperties.isEmpty() && sharedFunctions.isEmpty()
+            && hooks.all { it.descriptor.isStatic }
+        if (!isObject) {
+            kspRequire(classDeclaration.run { isAbstract() && !isInner && isClass }) { "168" }
+        }
         return Patch(
             source = symbol,
 
             name = name,
             side = side,
+            implInitStrategy = initStrategy,
+            isObject = isObject,
 
             classDeclaration = classDeclaration,
 
             schema = schema,
 
-            constructorParameters = constructor.parameters.mapNotNull {
-                runOrNullOnSkip { validatePatchConstructorParameter(it, schema) }
-            },
-            sharedProperties = properties.filter { it.isShared }.mapNotNull {
-                runOrNullOnSkip { validatePatchSharedProperty(it, schema) }
-            },
-            sharedFunctions = parsedRegularFunctions.filter { it.isShared }.mapNotNull {
-                runOrNullOnSkip { validatePatchSharedFunction(it, schema) }
-            },
-            hooks = parsedHookFunctions.mapNotNull {
-                runOrNullOnSkip { validatePatchHook(it) }
-            },
+            constructorParameters = constructorParameters,
+            sharedProperties = sharedProperties,
+            sharedFunctions = sharedFunctions,
+            hooks = hooks,
         )
     }
 
@@ -452,10 +464,10 @@ class FrontendValidator(
                     kspRequire(it != 0) { "417" }
                     IntLiteral(it)
                 },
-                atLiteralExplicitFloat?.let { FloatLiteral(it) },
-                atLiteralExplicitLong?.let { LongLiteral(it) },
-                atLiteralExplicitDouble?.let { DoubleLiteral(it) },
-                atLiteralExplicitString?.let { StringLiteral(it) },
+                atLiteralExplicitFloat?.let(::FloatLiteral),
+                atLiteralExplicitLong?.let(::LongLiteral),
+                atLiteralExplicitDouble?.let(::DoubleLiteral),
+                atLiteralExplicitString?.let(::StringLiteral),
                 atLiteralExplicitClassType?.let {
                     kspRequireNotNull(atLiteralExplicitClassDeclaration?.isValid) { "425" }
                     ClassLiteral(atLiteralExplicitClassDeclaration)

@@ -9,4 +9,6 @@ enum class IrModifier {
     INLINE,
     OPERATOR,
     SEALED,
+    VOLATILE,
+    FINAL,
 }

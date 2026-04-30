@@ -46,11 +46,11 @@ fun KPFunctionBuilder.addParameter(parameter: IrParameter) {
     KPParameter
         .builder(parameter.name, parameter.typeName.kotlin)
         .build()
-        .also { addParameter(it) }
+        .also(::addParameter)
 }
 
 fun KPFunctionBuilder.setParameters(parameters: List<IrParameter>) {
-    parameters.forEach { addParameter(it) }
+    parameters.forEach(::addParameter)
 }
 
 @OptIn(ExperimentalKotlinPoetApi::class)
@@ -67,6 +67,7 @@ fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
             IrModifier.INLINE -> addModifiers(KPModifier.INLINE)
             IrModifier.OPERATOR -> addModifiers(KPModifier.OPERATOR)
+            IrModifier.FINAL -> addModifiers(KPModifier.FINAL)
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin functions")
         }
     }

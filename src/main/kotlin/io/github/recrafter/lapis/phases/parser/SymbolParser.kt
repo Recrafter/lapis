@@ -57,19 +57,19 @@ class SymbolParser(
         val (currentJvmClassName, originClassDeclaration) = when {
             parentJvmClassName == null -> {
                 val qualifiedName = schemaAnnotation?.getArgumentValue(Schema::qualifiedName)
-                val rootClassName = qualifiedName?.let { JvmClassName.of(it) }
-                rootClassName to qualifiedName?.let(resolver::getClassDeclarationByName)
+                val rootJvmClassName = qualifiedName?.let { JvmClassName.of(it) }
+                rootJvmClassName to qualifiedName?.let(resolver::getClassDeclarationByName)
             }
 
             innerSchemaAnnotation != null -> {
-                val innerClassName = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)
+                val innerJvmClassName = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)
                     ?.let(parentJvmClassName::inner)
                 val classDeclaration = if (isResolvable) {
-                    innerClassName?.qualifiedName?.let(resolver::getClassDeclarationByName)
+                    innerJvmClassName?.qualifiedName?.let(resolver::getClassDeclarationByName)
                 } else {
                     innerSchemaAnnotation.getArgumentValue(InnerSchema::delegate)?.toClassDeclaration()
                 }
-                innerClassName to classDeclaration
+                innerJvmClassName to classDeclaration
             }
 
             localSchemaAnnotation != null -> {
@@ -183,6 +183,7 @@ class SymbolParser(
 
             name = classDeclaration?.name,
             side = patchAnnotation?.getArgumentValue(Patch::side),
+            initStrategy = patchAnnotation?.getArgumentValue(Patch::initStrategy),
             classDeclaration = classDeclaration,
 
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
@@ -369,15 +370,15 @@ class SymbolParser(
         )
     }
 
-    fun KSClassDeclaration.getSuperTypeOrNull(): KSType? =
+    private fun KSClassDeclaration.getSuperTypeOrNull(): KSType? =
         superTypes.map { it.resolve() }.find { !it.isAny(types) }
 
-    fun KSFunctionDeclaration.getReturnTypeOrNull(): KSType? =
+    private fun KSFunctionDeclaration.getReturnTypeOrNull(): KSType? =
         returnType?.resolve()?.takeIf { !it.isUnit(types) }
 
     private inline fun <reified A : Annotation> KSAnnotation.findArgumentValue(
         property: KProperty1<A, *>,
-        explicit: Boolean,
+        explicit: Boolean = false,
     ): KSAnnotationArgumentValue? =
         (if (explicit) explicitArguments else arguments)
             .find { it.name?.asString() == property.name }

@@ -8,40 +8,40 @@ import io.github.recrafter.lapis.extensions.ks.name
 import kotlin.enums.enumEntries
 
 class KSAnnotationArgumentValue(
-    val raw: Any,
+    val rawValue: Any,
     private val keepDefault: Boolean = false,
 ) {
     fun asBoolean(): Boolean? =
-        raw.castOrNull<Boolean>()?.filterDefault { !it }
+        rawValue.castOrNull<Boolean>()?.filterDefault { !it }
 
     fun asInt(): Int? =
-        raw.castOrNull<Int>()?.filterDefault { it == -1 }
+        rawValue.castOrNull<Int>()?.filterDefault { it == -1 }
 
     fun asLong(): Long? =
-        raw.castOrNull<Long>()?.filterDefault { it == -1L }
+        rawValue.castOrNull<Long>()?.filterDefault { it == -1L }
 
     fun asFloat(): Float? =
-        raw.castOrNull<Float>()?.filterDefault { it == -1f }
+        rawValue.castOrNull<Float>()?.filterDefault { it == -1f }
 
     fun asDouble(): Double? =
-        raw.castOrNull<Double>()?.filterDefault { it == -1.0 }
+        rawValue.castOrNull<Double>()?.filterDefault { it == -1.0 }
 
     fun asString(): String? =
-        raw.castOrNull<String>()?.filterDefault { it.isEmpty() }
+        rawValue.castOrNull<String>()?.filterDefault { it.isEmpty() }
 
     fun asKClass(types: KSTypes): KSType? =
-        raw.castOrNull<KSType>()?.filterDefault { it.isNothing(types) }
+        rawValue.castOrNull<KSType>()?.filterDefault { it.isNothing(types) }
 
     inline fun <reified E : Enum<E>> asEnum(default: E? = null): E? {
-        val entryName = raw.castOrNull<KSClassDeclaration>()?.name?.filterDefault { it == default?.name }
+        val entryName = rawValue.castOrNull<KSClassDeclaration>()?.name?.filterDefault { it == default?.name }
         return enumEntries<E>().find { it.name == entryName }
     }
 
     fun asAnnotation(): KSAnnotation? =
-        raw.castOrNull<KSAnnotation>()
+        rawValue.castOrNull<KSAnnotation>()
 
     fun asArray(): Iterable<KSAnnotationArgumentValue>? =
-        raw.castOrNull<Iterable<Any>>()
+        rawValue.castOrNull<Iterable<Any>>()
             ?.map { KSAnnotationArgumentValue(it, keepDefault) }
             ?.filterDefault { it.isEmpty() }
 

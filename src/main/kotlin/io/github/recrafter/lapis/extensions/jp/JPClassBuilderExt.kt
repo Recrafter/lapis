@@ -21,6 +21,7 @@ fun JPClassBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.PRIVATE -> addModifiers(JPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
             IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
+            IrModifier.FINAL -> addModifiers(JPModifier.FINAL)
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Java classes")
         }
     }

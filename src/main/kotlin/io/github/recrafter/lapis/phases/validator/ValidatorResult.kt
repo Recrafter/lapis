@@ -7,10 +7,7 @@ import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
-import io.github.recrafter.lapis.annotations.Op
-import io.github.recrafter.lapis.annotations.Side
-import io.github.recrafter.lapis.annotations.ZeroCondition
+import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.extensions.ks.starProjectedType
 import io.github.recrafter.lapis.phases.common.JvmClassName
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
@@ -148,6 +145,8 @@ class Patch(
 
     val name: String,
     val side: Side,
+    val implInitStrategy: InitStrategy,
+    val isObject: Boolean,
 
     classDeclaration: KSClassDeclaration,
 

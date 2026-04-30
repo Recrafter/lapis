@@ -48,6 +48,7 @@ fun KPClassBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
             IrModifier.SEALED -> addModifiers(KPModifier.SEALED)
+            IrModifier.FINAL -> addModifiers(KPModifier.FINAL)
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin classes")
         }
     }

@@ -16,7 +16,13 @@ fun JPFieldBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.PRIVATE -> addModifiers(JPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
             IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
+            IrModifier.VOLATILE -> addModifiers(JPModifier.VOLATILE)
+            IrModifier.FINAL -> addModifiers(JPModifier.FINAL)
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Java fields")
         }
     }
+}
+
+fun JPFieldBuilder.setModifiers(modifiers: List<IrModifier>) {
+    setModifiers(*modifiers.toTypedArray())
 }

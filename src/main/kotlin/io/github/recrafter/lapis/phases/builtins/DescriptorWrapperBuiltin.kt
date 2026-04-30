@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.InternalPrefix.ARGUMENT
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
+import io.github.recrafter.lapis.phases.generator.builders.toCodeBlock
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
@@ -52,7 +53,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                     }
                 }
             }
-            getReceiverFunction?.let { destination.addFunction(it) }
+            getReceiverFunction?.let(destination::addFunction)
 
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
@@ -64,7 +65,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         })
                     }
                 }
-                receiverParameter?.let { addParameter(it) }
+                receiverParameter?.let(::addParameter)
                 setReturnType(impl.fieldTypeName)
                 setBody {
                     return_(buildString {
@@ -77,7 +78,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         arg(impl.className)
                         arg(operationParameter)
                         arg(Operation<*>::call)
-                        receiverParameter?.let { arg(it) }
+                        receiverParameter?.let(::arg)
                     }
                 }
             })
@@ -138,7 +139,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                     }
                 }
             }
-            getReceiverFunction?.let { destination.addFunction(it) }
+            getReceiverFunction?.let(destination::addFunction)
 
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
@@ -156,7 +157,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                             arg(getReceiverFunction)
                         })
                     }
-                }?.also { addParameter(it) }
+                }?.also(::addParameter)
                 setBody {
                     code_(buildString {
                         append("(this as %T).%N.%L(")
@@ -168,7 +169,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         arg(impl.className)
                         arg(operationParameter)
                         arg(Operation<*>::call)
-                        receiverParameter?.let { arg(it) }
+                        receiverParameter?.let(::arg)
                         arg(valueParameter)
                     }
                 }
@@ -428,7 +429,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         arg(impl.className)
                         arg(operationParameter)
                         arg(Operation<*>::call)
-                        operationArguments.forEach { arg(it) }
+                        operationArguments.forEach(::arg)
                     }
                 }
             })
@@ -499,7 +500,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         }
                     }
                 }
-            }?.also { destination.addFunction(it) }
+            }?.also(destination::addFunction)
             val namedArgumentParameters = namedParameters.map { parameter ->
                 buildKotlinParameter(parameter) {
                     defaultValue(buildKotlinCodeBlock("this.%N") {
@@ -534,8 +535,8 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         arg(impl.className)
                         arg(operationParameter)
                         arg(Operation<*>::call)
-                        getReceiverFunction?.let { arg(it) }
-                        operationArguments.forEach { arg(it) }
+                        getReceiverFunction?.let(::arg)
+                        operationArguments.forEach(::arg)
                     }
                 }
             })
@@ -563,7 +564,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         arg(operationParameter)
                         arg(Operation<*>::call)
                         arg(receiverParameter)
-                        operationArguments.forEach { arg(it) }
+                        operationArguments.forEach(::arg)
                     }
                 }
             })
@@ -581,7 +582,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                 addParameter(blockParameter)
                 setReturnType(impl.returnTypeName)
                 setBody {
-                    with_(buildKotlinCodeBlock("%N") { arg(receiverParameter) }) {
+                    with_(receiverParameter.toCodeBlock()) {
                         code_(
                             format = "%N(this@%L)",
                             isReturn = impl.returnTypeName != null
@@ -618,7 +619,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                 setReturnType(KPNothing.asIrClassName())
                 val returnValueParameter = impl.returnTypeName
                     ?.let { IrParameter("returnValue", it) }
-                    ?.also { addParameter(it) }
+                    ?.also(::addParameter)
                 setBody {
                     code_("(this as %T)") {
                         arg(impl.className)
@@ -633,7 +634,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                             if (returnValueParameter != null) CallbackInfoReturnable<*>::setReturnValue
                             else CallbackInfo::cancel
                         )
-                        returnValueParameter?.let { arg(it) }
+                        returnValueParameter?.let(::arg)
                     }
                     throw_("%T") {
                         arg(resolve(SimpleBuiltin.CancelSignal))

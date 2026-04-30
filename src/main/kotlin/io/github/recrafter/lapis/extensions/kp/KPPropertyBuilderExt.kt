@@ -34,6 +34,7 @@ fun KPPropertyBuilder.setModifiers(vararg modifiers: IrModifier) {
             IrModifier.PRIVATE -> addModifiers(KPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
+            IrModifier.FINAL -> addModifiers(KPModifier.FINAL)
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin properties")
         }
     }

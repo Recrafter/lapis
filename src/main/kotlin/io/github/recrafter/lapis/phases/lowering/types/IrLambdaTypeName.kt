@@ -28,7 +28,7 @@ class IrLambdaTypeName(override val kotlin: KPLambdaTypeName) : IrTypeName(kotli
             IrLambdaTypeName(
                 KPLambdaTypeName.get(
                     receiver = receiverTypeName?.kotlin,
-                    parameters = parameters.map { buildKotlinParameter(it) },
+                    parameters = parameters.map(::buildKotlinParameter),
                     returnType = returnTypeName?.kotlin.orUnit(),
                     contextParameters = contextParameters.map { it.kotlin }
                 )

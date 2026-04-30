@@ -26,7 +26,7 @@ class MixinLowering(
     private val patches: MutableList<IrPatch> = mutableListOf()
 
     fun lower(validatorResult: ValidatorResult): IrResult {
-        patches += validatorResult.patches.map { lowerPatch(it) }
+        patches += validatorResult.patches.map(::lowerPatch)
         return IrResult(
             schemas = validatorResult.schemas.map { schema ->
                 IrSchema(
@@ -36,7 +36,7 @@ class MixinLowering(
                     removeFinal = schema.removeFinal,
                     className = schema.className,
                     ownerJvmClassName = schema.originJvmClassName,
-                    descriptors = schema.descriptors.map { lowerDescriptor(it) },
+                    descriptors = schema.descriptors.map(::lowerDescriptor),
                 )
             },
             patches = patches,
@@ -84,7 +84,7 @@ class MixinLowering(
         }
 
     private fun lowerPatch(patch: Patch): IrPatch {
-        val constructorArguments = patch.constructorParameters.map { lowerPatchConstructorArgument(it) }
+        val constructorArguments = patch.constructorParameters.map(::lowerPatchConstructorArgument)
         return IrPatch(
             originatingFile = patch.containingFile,
 
@@ -102,8 +102,9 @@ class MixinLowering(
             is PatchConstructorOriginParameter -> IrPatchConstructorOriginArgument
         }
 
-    private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl =
-        IrPatchImpl(
+    private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl? =
+        if (patch.isObject) null
+        else IrPatchImpl(
             className = IrClassName.of(
                 options.generatedPackageName,
                 "Impl".withQualifiedNamePrefix(patch.className)
@@ -113,6 +114,7 @@ class MixinLowering(
                     add(IrPatchImplConstructorInstanceParameter)
                 }
             },
+            initStrategy = patch.implInitStrategy,
         )
 
     private fun lowerMixin(patch: Patch): IrMixin =
@@ -124,7 +126,7 @@ class MixinLowering(
             instanceTypeName = patch.schema.originTypeName,
             isInterfaceInstance = patch.schema.originClassDeclaration.isInterface,
             targetInternalName = patch.schema.originJvmClassName.internalName,
-            injections = patch.hooks.flatMap { lowerInjections(it) },
+            injections = patch.hooks.flatMap(::lowerInjections),
         )
 
     private fun lowerExtension(patch: Patch): IrExtension? {
@@ -249,7 +251,7 @@ class MixinLowering(
                 )
             )
         }
-        val hookArguments = hook.parameters.map { lowerHookArgument(it) }
+        val hookArguments = hook.parameters.map(::lowerHookArgument)
         return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
             when (hook) {
                 is MethodHeadHook -> IrMethodHeadInjection(

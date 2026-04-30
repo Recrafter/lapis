@@ -8,6 +8,10 @@ import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 @JvmInline
 value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
 
+    fun IrJavaMethodBody.code_(codeBlock: JPCodeBlock) {
+        builder.addStatement(codeBlock)
+    }
+
     fun IrJavaMethodBody.code_(
         format: String,
         isReturn: Boolean = false,
@@ -16,7 +20,7 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
         if (isReturn) {
             return_(format, arguments)
         } else {
-            builder.addStatement(buildJavaCodeBlock(format, arguments))
+            code_(buildJavaCodeBlock(format, arguments))
         }
     }
 
@@ -24,7 +28,7 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
         format: String? = null,
         arguments: Builder<IrJavaCodeBlock.Arguments> = {}
     ) {
-        builder.addStatement(
+        code_(
             buildJavaCodeBlock(
                 buildString {
                     append("return")
@@ -33,6 +37,10 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
                 arguments
             )
         )
+    }
+
+    fun IrJavaMethodBody.return_(codeBlock: JPCodeBlock) {
+        code_(buildJavaCodeBlock("return %L") { arg(codeBlock) })
     }
 
     fun IrJavaMethodBody.if_(condition: JPCodeBlock, body: Builder<IrJavaCodeBlock>) {
@@ -52,11 +60,17 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
             arg(catchingClassName)
             arg(if (catch_ == null) "ignored" else "e")
         })
-        catch_?.let { buildJavaCodeBlock(it) }
+        catch_?.let(::buildJavaCodeBlock)
         finally_?.let {
             builder.nextControlFlow(buildJavaCodeBlock("finally"))
             buildJavaCodeBlock(it)
         }
+        builder.endControlFlow()
+    }
+
+    fun IrJavaMethodBody.synchronized_(lock: JPCodeBlock, body: Builder<IrJavaCodeBlock>) {
+        builder.beginControlFlow(buildJavaCodeBlock("synchronized (%L)") { arg(lock) })
+        buildJavaCodeBlock(body)
         builder.endControlFlow()
     }
 
