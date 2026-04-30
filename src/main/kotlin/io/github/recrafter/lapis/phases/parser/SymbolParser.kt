@@ -183,6 +183,12 @@ class SymbolParser(
 
             name = classDeclaration?.name,
             side = patchAnnotation?.getArgumentValue(Patch::side),
+            isClass = classDeclaration?.isClass == true,
+            isObject = classDeclaration?.isObject == true,
+            isOpen = classDeclaration?.isExplicitlyOpen == true,
+            isAbstract = classDeclaration?.isExplicitlyAbstract == true,
+            isSealed = classDeclaration?.isSealed == true,
+            isTopLevel = classDeclaration?.parentDeclaration == null,
             initStrategy = patchAnnotation?.getArgumentValue(Patch::initStrategy),
             classDeclaration = classDeclaration,
 
@@ -263,7 +269,7 @@ class SymbolParser(
             isAbstract = functionDeclaration.isAbstract,
             isExtension = functionDeclaration.isExtension,
 
-            fromCompanionObject = functionDeclaration.parentDeclaration.let {
+            isInCompanionObject = functionDeclaration.parentDeclaration.let {
                 it is KSClassDeclaration && it.isCompanionObject
             },
 

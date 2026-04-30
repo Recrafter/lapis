@@ -62,6 +62,12 @@ class ParsedPatch(
 
     val name: String?,
     val side: Side?,
+    val isClass: Boolean,
+    val isObject: Boolean,
+    val isOpen: Boolean,
+    val isAbstract: Boolean,
+    val isSealed: Boolean,
+    val isTopLevel: Boolean,
     val initStrategy: InitStrategy?,
     val classDeclaration: KSClassDeclaration?,
     val schemaClassDeclaration: KSClassDeclaration?,
@@ -109,7 +115,7 @@ class ParsedPatchFunction(
     isAbstract: Boolean,
     isExtension: Boolean,
 
-    val fromCompanionObject: Boolean,
+    val isInCompanionObject: Boolean,
 
     val hasHookAnnotation: Boolean,
     val hookDescriptorClassDeclaration: KSClassDeclaration?,
@@ -160,7 +166,7 @@ class ParsedPatchFunction(
     val atCallOrdinals: List<Int>,
 ) : SymbolSource(symbol) {
 
-    val isShared: Boolean = isPublic && !isAbstract && !isExtension && !fromCompanionObject
+    val isShared: Boolean = isPublic && !isAbstract && !isExtension && !isInCompanionObject
 
     fun hasOrdinals(): Boolean {
         val allOrdinals = atLocalOpOrdinals + atInstanceofOrdinals + atReturnOrdinals + atLiteralOrdinals +

@@ -89,6 +89,7 @@ class MixinLowering(
             originatingFile = patch.containingFile,
 
             side = patch.side,
+            isObject = patch.isObject,
             className = patch.className,
             constructorArguments = constructorArguments,
             impl = lowerPatchImpl(patch, constructorArguments),
@@ -103,7 +104,7 @@ class MixinLowering(
         }
 
     private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl? =
-        if (patch.isObject) null
+        if (patch.hasStaticHooksOnly) null
         else IrPatchImpl(
             className = IrClassName.of(
                 options.generatedPackageName,
@@ -114,7 +115,7 @@ class MixinLowering(
                     add(IrPatchImplConstructorInstanceParameter)
                 }
             },
-            initStrategy = patch.implInitStrategy,
+            initStrategy = patch.initStrategy,
         )
 
     private fun lowerMixin(patch: Patch): IrMixin =

@@ -145,8 +145,9 @@ class Patch(
 
     val name: String,
     val side: Side,
-    val implInitStrategy: InitStrategy,
+    val initStrategy: InitStrategy,
     val isObject: Boolean,
+    val hasStaticHooksOnly: Boolean,
 
     classDeclaration: KSClassDeclaration,
 

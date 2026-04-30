@@ -26,6 +26,7 @@ class IrPatch(
     val originatingFile: KSFile?,
 
     val side: Side,
+    val isObject: Boolean,
     val className: IrClassName,
     val constructorArguments: List<IrPatchConstructorArgument>,
     val impl: IrPatchImpl?,

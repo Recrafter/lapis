@@ -18,8 +18,14 @@ val KSClassDeclaration.isClass: Boolean
 val KSClassDeclaration.isObject: Boolean
     get() = classKind == ClassKind.OBJECT
 
-val KSClassDeclaration.isInner: Boolean
-    get() = modifiers.contains(Modifier.INNER)
+val KSClassDeclaration.isExplicitlyOpen: Boolean
+    get() = modifiers.contains(Modifier.OPEN)
+
+val KSClassDeclaration.isExplicitlyAbstract: Boolean
+    get() = modifiers.contains(Modifier.ABSTRACT)
+
+val KSClassDeclaration.isSealed: Boolean
+    get() = modifiers.contains(Modifier.SEALED)
 
 val KSClassDeclaration.isValid: Boolean
     get() = validate()

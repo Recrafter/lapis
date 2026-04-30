@@ -655,7 +655,11 @@ class MixinGenerator(
                     code_(
                         format = buildString {
                             if (injection.isStatic) {
-                                append("%T.Companion")
+                                append("%T.")
+                                append(
+                                    if (patch.isObject) "INSTANCE"
+                                    else "Companion"
+                                )
                             } else {
                                 append(patchImplReference?.format ?: lapisError("Patch impl reference cannot be null"))
                             }
