@@ -190,23 +190,17 @@ class SymbolParser(
             isAbstract = classDeclaration?.isExplicitlyAbstract == true,
             isSealed = classDeclaration?.isSealed == true,
             isTopLevel = classDeclaration?.parentDeclaration == null,
+            isPublic = classDeclaration?.isPublic() == true,
             initStrategy = patchAnnotation?.getArgumentValue(Patch::initStrategy),
             classDeclaration = classDeclaration,
 
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
-            constructors = classDeclaration?.constructorDeclarations
-                ?.map(::parsePatchConstructor)
-                .orEmpty().toList(),
-            properties = classDeclaration?.bodyPropertyDeclarations
-                ?.map(::parsePatchProperty)
-                .orEmpty().toList(),
-            functions = listOfNotNull(
-                classDeclaration,
-                classDeclaration?.findCompanionObjectClassDeclaration(),
-            ).flatMap { classDeclaration ->
-                classDeclaration.functionDeclarations.map(::parsePatchFunction)
-            },
+            companionObjects = classDeclaration?.companionObjectClassDeclarations
+                ?.map(::parsePatchCompanionObject).orEmpty().toList(),
+            constructors = classDeclaration?.constructorDeclarations?.map(::parsePatchConstructor).orEmpty().toList(),
+            properties = classDeclaration?.bodyPropertyDeclarations?.map(::parsePatchProperty).orEmpty().toList(),
+            functions = classDeclaration?.functionDeclarations?.map(::parsePatchFunction).orEmpty().toList(),
         )
     }
 
@@ -214,6 +208,7 @@ class SymbolParser(
         ParsedPatchConstructor(
             symbol = constructorDeclaration,
 
+            isPublic = constructorDeclaration.isPublic(),
             parameters = constructorDeclaration.parameters.map(::parsePatchConstructorParameter),
         )
 
@@ -223,6 +218,14 @@ class SymbolParser(
 
             type = parameter.type.resolve(),
             hasOriginAnnotation = parameter.hasAnnotation<Origin>()
+        )
+
+    private fun parsePatchCompanionObject(classDeclaration: KSClassDeclaration): ParsedPatchCompanionObject =
+        ParsedPatchCompanionObject(
+            symbol = classDeclaration,
+            isPublic = classDeclaration.isPublic(),
+            properties = classDeclaration.bodyPropertyDeclarations.map(::parsePatchProperty).toList(),
+            functions = classDeclaration.functionDeclarations.map(::parsePatchFunction).toList(),
         )
 
     @OptIn(KspExperimental::class)
@@ -279,10 +282,6 @@ class SymbolParser(
             isOpen = functionDeclaration.isExplicitlyOpen,
             isAbstract = functionDeclaration.isAbstract,
             isExtension = functionDeclaration.isExtension,
-
-            isInCompanionObject = functionDeclaration.parentDeclaration.let {
-                it is KSClassDeclaration && it.isCompanionObject
-            },
 
             hasExtensionAnnotation = functionDeclaration.hasAnnotation<Extension>(),
 

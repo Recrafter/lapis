@@ -601,7 +601,7 @@ class MixinGenerator(
                         }
                     }
 
-                    is IrHookOriginInstanceofArgument -> {
+                    is IrHookOriginInstanceofWrapperImplArgument -> {
                         buildJavaCodeBlock("new %T(%L, %L)") {
                             arg(builtins[SimpleBuiltin.Instanceof])
                             arg(valueParameterName)

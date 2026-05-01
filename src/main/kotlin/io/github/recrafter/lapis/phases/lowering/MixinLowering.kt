@@ -244,7 +244,7 @@ class MixinLowering(
                     add(IrInjectionOperationParameter(KPBoolean.asIrClassName()))
                 }
             }
-            if (!hook.isInjectBased && hook.parameters.any { it is HookCancelDescriptorParameter }) {
+            if (!hook.isInjectBased && hook.parameters.any { it is HookCancelDescriptorWrapperParameter }) {
                 add(IrInjectionCallbackParameter(hook.descriptor.returnTypeName))
             }
             addAll(
@@ -514,7 +514,7 @@ class MixinLowering(
         when (parameter) {
             is HookOriginValueParameter -> IrHookOriginValueArgument
 
-            is HookOriginBodyDescriptorParameter -> {
+            is HookOriginBodyDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
                 IrHookOriginBodyDescriptorWrapperImplArgument(
                     IrBodyDescriptorWrapperImpl(
@@ -530,7 +530,7 @@ class MixinLowering(
                 )
             }
 
-            is HookOriginFieldGetDescriptorParameter -> {
+            is HookOriginFieldGetDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
                 IrHookOriginFieldGetDescriptorWrapperImplArgument(
                     IrFieldGetDescriptorWrapperImpl(
@@ -546,7 +546,7 @@ class MixinLowering(
                 )
             }
 
-            is HookOriginFieldSetDescriptorParameter -> {
+            is HookOriginFieldSetDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
                 IrHookOriginFieldSetDescriptorWrapperImplArgument(
                     IrFieldSetDescriptorWrapperImpl(
@@ -562,7 +562,7 @@ class MixinLowering(
                 )
             }
 
-            is HookOriginArrayGetDescriptorParameter -> {
+            is HookOriginArrayGetDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
                 IrHookOriginArrayGetDescriptorWrapperImplArgument(
                     IrArrayGetDescriptorWrapperImpl(
@@ -578,7 +578,7 @@ class MixinLowering(
                 )
             }
 
-            is HookOriginArraySetDescriptorParameter -> {
+            is HookOriginArraySetDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
                 IrHookOriginArraySetDescriptorWrapperImplArgument(
                     IrArraySetDescriptorWrapperImpl(
@@ -594,7 +594,7 @@ class MixinLowering(
                 )
             }
 
-            is HookOriginCallDescriptorParameter -> {
+            is HookOriginCallDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
                 IrHookOriginCallDescriptorWrapperImplArgument(
                     IrCallDescriptorWrapperImpl(
@@ -611,7 +611,7 @@ class MixinLowering(
                 )
             }
 
-            is HookCancelDescriptorParameter -> {
+            is HookCancelDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
                 IrHookCancelDescriptorWrapperImplArgument(
                     IrCancelDescriptorWrapperImpl(
@@ -627,7 +627,7 @@ class MixinLowering(
                 )
             }
 
-            is HookOriginInstanceofParameter -> IrHookOriginInstanceofArgument
+            is HookOriginInstanceofWrapperParameter -> IrHookOriginInstanceofWrapperImplArgument
 
             is HookOrdinalParameter -> IrHookOrdinalArgument
             is HookLocalParameter -> IrHookLocalArgument(

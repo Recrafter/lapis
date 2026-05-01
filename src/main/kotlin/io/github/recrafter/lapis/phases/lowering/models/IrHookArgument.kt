@@ -35,7 +35,7 @@ class IrHookOriginCallDescriptorWrapperImplArgument(
     override val wrapperImpl: IrCallDescriptorWrapperImpl
 ) : IrHookOriginDescriptorWrapperImplArgument<IrCallDescriptorWrapperImpl>(wrapperImpl)
 
-object IrHookOriginInstanceofArgument : IrHookOriginArgument
+object IrHookOriginInstanceofWrapperImplArgument : IrHookOriginArgument
 class IrHookCancelDescriptorWrapperImplArgument(val wrapperImpl: IrCancelDescriptorWrapperImpl) : IrHookArgument
 object IrHookOrdinalArgument : IrHookArgument
 

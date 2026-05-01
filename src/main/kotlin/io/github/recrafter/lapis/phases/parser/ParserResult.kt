@@ -68,10 +68,12 @@ class ParsedPatch(
     val isAbstract: Boolean,
     val isSealed: Boolean,
     val isTopLevel: Boolean,
+    val isPublic: Boolean,
     val initStrategy: InitStrategy?,
     val classDeclaration: KSClassDeclaration?,
     val schemaClassDeclaration: KSClassDeclaration?,
 
+    val companionObjects: List<ParsedPatchCompanionObject>,
     val constructors: List<ParsedPatchConstructor>,
     val properties: List<ParsedPatchProperty>,
     val functions: List<ParsedPatchFunction>,
@@ -80,6 +82,7 @@ class ParsedPatch(
 class ParsedPatchConstructor(
     symbol: KSNode,
 
+    val isPublic: Boolean,
     val parameters: List<ParsedPatchConstructorParameter>,
 ) : SymbolSource(symbol)
 
@@ -88,6 +91,14 @@ class ParsedPatchConstructorParameter(
 
     val type: KSType,
     val hasOriginAnnotation: Boolean,
+) : SymbolSource(symbol)
+
+class ParsedPatchCompanionObject(
+    symbol: KSNode,
+
+    val isPublic: Boolean,
+    val properties: List<ParsedPatchProperty>,
+    val functions: List<ParsedPatchFunction>,
 ) : SymbolSource(symbol)
 
 class ParsedPatchProperty(
@@ -120,8 +131,6 @@ class ParsedPatchFunction(
     val isOpen: Boolean,
     val isAbstract: Boolean,
     val isExtension: Boolean,
-
-    val isInCompanionObject: Boolean,
 
     val hasExtensionAnnotation: Boolean,
 
