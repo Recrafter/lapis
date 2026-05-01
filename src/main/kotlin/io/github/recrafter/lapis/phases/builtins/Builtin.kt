@@ -9,7 +9,7 @@ sealed interface Builtin<T> {
     val name: String
     val isInternal: Boolean
 
-    fun generate(resolve: BuiltinResolver): T
+    fun generate(resolveBuiltin: BuiltinResolver): T
 
     companion object {
         val entries: List<Builtin<*>> by lazy {

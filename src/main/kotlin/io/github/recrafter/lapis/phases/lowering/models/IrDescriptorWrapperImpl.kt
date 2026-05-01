@@ -17,7 +17,7 @@ sealed interface IrInvokableDescriptorWrapperImpl {
     val parameters: List<IrFunctionTypeParameter>
 }
 
-class IrDescriptorBodyWrapperImpl(
+class IrBodyDescriptorWrapperImpl(
     className: IrClassName,
     descriptorClassName: IrClassName,
     wrapperBuiltinClassName: IrClassName,
@@ -26,7 +26,7 @@ class IrDescriptorBodyWrapperImpl(
 ) : IrDescriptorWrapperImpl(className, descriptorClassName, wrapperBuiltinClassName, null),
     IrInvokableDescriptorWrapperImpl
 
-class IrDescriptorFieldGetWrapperImpl(
+class IrFieldGetDescriptorWrapperImpl(
     className: IrClassName,
     descriptorClassName: IrClassName,
     wrapperBuiltinClassName: IrClassName,
@@ -34,7 +34,7 @@ class IrDescriptorFieldGetWrapperImpl(
     val fieldTypeName: IrTypeName,
 ) : IrDescriptorWrapperImpl(className, descriptorClassName, wrapperBuiltinClassName, receiverTypeName)
 
-class IrDescriptorFieldSetWrapperImpl(
+class IrFieldSetDescriptorWrapperImpl(
     className: IrClassName,
     descriptorClassName: IrClassName,
     wrapperBuiltinClassName: IrClassName,
@@ -42,7 +42,7 @@ class IrDescriptorFieldSetWrapperImpl(
     val fieldTypeName: IrTypeName,
 ) : IrDescriptorWrapperImpl(className, descriptorClassName, wrapperBuiltinClassName, receiverTypeName)
 
-class IrDescriptorArrayGetWrapperImpl(
+class IrArrayGetDescriptorWrapperImpl(
     className: IrClassName,
     descriptorClassName: IrClassName,
     wrapperBuiltinClassName: IrClassName,
@@ -50,7 +50,7 @@ class IrDescriptorArrayGetWrapperImpl(
     val arrayComponentTypeName: IrTypeName,
 ) : IrDescriptorWrapperImpl(className, descriptorClassName, wrapperBuiltinClassName, null)
 
-class IrDescriptorArraySetWrapperImpl(
+class IrArraySetDescriptorWrapperImpl(
     className: IrClassName,
     descriptorClassName: IrClassName,
     wrapperBuiltinClassName: IrClassName,
@@ -58,7 +58,7 @@ class IrDescriptorArraySetWrapperImpl(
     val arrayComponentTypeName: IrTypeName,
 ) : IrDescriptorWrapperImpl(className, descriptorClassName, wrapperBuiltinClassName, null)
 
-class IrDescriptorCallWrapperImpl(
+class IrCallDescriptorWrapperImpl(
     className: IrClassName,
     descriptorClassName: IrClassName,
     wrapperBuiltinClassName: IrClassName,
@@ -68,7 +68,7 @@ class IrDescriptorCallWrapperImpl(
 ) : IrDescriptorWrapperImpl(className, descriptorClassName, wrapperBuiltinClassName, receiverTypeName),
     IrInvokableDescriptorWrapperImpl
 
-class IrDescriptorCancelWrapperImpl(
+class IrCancelDescriptorWrapperImpl(
     className: IrClassName,
     descriptorClassName: IrClassName,
     wrapperBuiltinClassName: IrClassName,

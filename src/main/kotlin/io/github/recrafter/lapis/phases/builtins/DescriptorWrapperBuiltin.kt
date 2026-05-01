@@ -22,11 +22,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
     val builtin: SimpleBuiltin,
 ) : Builtin<KPClass> {
 
-    data object FieldGet : DescriptorWrapperBuiltin<IrDescriptorFieldGetWrapperImpl>("FieldGet", SimpleBuiltin.Field) {
+    data object FieldGet : DescriptorWrapperBuiltin<IrFieldGetDescriptorWrapperImpl>("FieldGet", SimpleBuiltin.Field) {
         override fun generateImpl(
             destination: KPFileBuilder,
-            impl: IrDescriptorFieldGetWrapperImpl,
-            resolve: BuiltinResolver
+            impl: IrFieldGetDescriptorWrapperImpl,
+            resolveBuiltin: BuiltinResolver
         ) {
             val receiverParameter = impl.receiverTypeName?.let {
                 IrParameter("receiver".withInternalPrefix(), it, listOf(IrModifier.PUBLIC))
@@ -85,11 +85,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
         }
     }
 
-    data object FieldSet : DescriptorWrapperBuiltin<IrDescriptorFieldSetWrapperImpl>("FieldSet", SimpleBuiltin.Field) {
+    data object FieldSet : DescriptorWrapperBuiltin<IrFieldSetDescriptorWrapperImpl>("FieldSet", SimpleBuiltin.Field) {
         override fun generateImpl(
             destination: KPFileBuilder,
-            impl: IrDescriptorFieldSetWrapperImpl,
-            resolve: BuiltinResolver
+            impl: IrFieldSetDescriptorWrapperImpl,
+            resolveBuiltin: BuiltinResolver
         ) {
             val receiverParameter = impl.receiverTypeName?.let {
                 IrParameter(
@@ -177,11 +177,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
         }
     }
 
-    data object ArrayGet : DescriptorWrapperBuiltin<IrDescriptorArrayGetWrapperImpl>("ArrayGet", SimpleBuiltin.Field) {
+    data object ArrayGet : DescriptorWrapperBuiltin<IrArrayGetDescriptorWrapperImpl>("ArrayGet", SimpleBuiltin.Field) {
         override fun generateImpl(
             destination: KPFileBuilder,
-            impl: IrDescriptorArrayGetWrapperImpl,
-            resolve: BuiltinResolver
+            impl: IrArrayGetDescriptorWrapperImpl,
+            resolveBuiltin: BuiltinResolver
         ) {
             val arrayParameter = IrParameter(
                 "array".withInternalPrefix(),
@@ -254,11 +254,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
         }
     }
 
-    data object ArraySet : DescriptorWrapperBuiltin<IrDescriptorArraySetWrapperImpl>("ArraySet", SimpleBuiltin.Field) {
+    data object ArraySet : DescriptorWrapperBuiltin<IrArraySetDescriptorWrapperImpl>("ArraySet", SimpleBuiltin.Field) {
         override fun generateImpl(
             destination: KPFileBuilder,
-            impl: IrDescriptorArraySetWrapperImpl,
-            resolve: BuiltinResolver
+            impl: IrArraySetDescriptorWrapperImpl,
+            resolveBuiltin: BuiltinResolver
         ) {
             val arrayParameter = IrParameter(
                 "array".withInternalPrefix(),
@@ -357,11 +357,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
         }
     }
 
-    data object Body : DescriptorWrapperBuiltin<IrDescriptorBodyWrapperImpl>("Body", SimpleBuiltin.Method) {
+    data object Body : DescriptorWrapperBuiltin<IrBodyDescriptorWrapperImpl>("Body", SimpleBuiltin.Method) {
         override fun generateImpl(
             destination: KPFileBuilder,
-            impl: IrDescriptorBodyWrapperImpl,
-            resolve: BuiltinResolver
+            impl: IrBodyDescriptorWrapperImpl,
+            resolveBuiltin: BuiltinResolver
         ) {
             val namedParameters = impl.parameters.mapNotNull { parameter ->
                 parameter.name?.let { IrParameter(parameter.name, parameter.typeName) }
@@ -436,11 +436,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
         }
     }
 
-    data object Call : DescriptorWrapperBuiltin<IrDescriptorCallWrapperImpl>("Call", SimpleBuiltin.Callable) {
+    data object Call : DescriptorWrapperBuiltin<IrCallDescriptorWrapperImpl>("Call", SimpleBuiltin.Callable) {
         override fun generateImpl(
             destination: KPFileBuilder,
-            impl: IrDescriptorCallWrapperImpl,
-            resolve: BuiltinResolver
+            impl: IrCallDescriptorWrapperImpl,
+            resolveBuiltin: BuiltinResolver
         ) {
             val receiverParameter = impl.receiverTypeName?.let {
                 IrParameter(
@@ -596,11 +596,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
         }
     }
 
-    data object Cancel : DescriptorWrapperBuiltin<IrDescriptorCancelWrapperImpl>("Cancel", SimpleBuiltin.Method) {
+    data object Cancel : DescriptorWrapperBuiltin<IrCancelDescriptorWrapperImpl>("Cancel", SimpleBuiltin.Method) {
         override fun generateImpl(
             destination: KPFileBuilder,
-            impl: IrDescriptorCancelWrapperImpl,
-            resolve: BuiltinResolver
+            impl: IrCancelDescriptorWrapperImpl,
+            resolveBuiltin: BuiltinResolver
         ) {
             val callbackParameter = IrParameter(
                 "callback".withInternalPrefix(),
@@ -637,7 +637,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                         returnValueParameter?.let(::arg)
                     }
                     throw_("%T") {
-                        arg(resolve(SimpleBuiltin.CancelSignal))
+                        arg(resolveBuiltin(SimpleBuiltin.CancelSignal))
                     }
                 }
             })
@@ -646,13 +646,13 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
 
     override val isInternal: Boolean = false
 
-    abstract fun generateImpl(destination: KPFileBuilder, impl: T, resolve: BuiltinResolver)
-
-    override fun generate(resolve: BuiltinResolver): KPClass =
+    override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
         buildKotlinInterface(name) {
             setModifiers(IrModifier.PUBLIC)
-            setVariableTypes(IrTypeVariableName.of("D", resolve(builtin).parameterizedByStar()))
+            setVariableTypes(IrTypeVariableName.of("D", resolveBuiltin(builtin).parameterizedByStar()))
         }
+
+    abstract fun generateImpl(destination: KPFileBuilder, impl: T, resolveBuiltin: BuiltinResolver)
 
     companion object {
         val entries: List<DescriptorWrapperBuiltin<*>> =

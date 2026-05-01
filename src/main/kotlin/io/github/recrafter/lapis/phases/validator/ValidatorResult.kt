@@ -208,7 +208,6 @@ sealed class PatchHook(
     val ordinals: List<Int>,
 ) {
     open val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
-
     open val isInjectBased: Boolean = false
 }
 
@@ -380,40 +379,40 @@ sealed interface HookParameter
 sealed interface HookOriginParameter : HookParameter
 object HookOriginValueParameter : HookOriginParameter
 
-sealed class HookOriginDescriptorWrapperParameter(open val descriptor: Descriptor) : HookOriginParameter
+sealed class HookOriginDescriptorParameter(open val descriptor: Descriptor) : HookOriginParameter
 
-class HookOriginDescriptorBodyWrapperParameter(
+class HookOriginBodyDescriptorParameter(
     override val descriptor: InvokableDescriptor
-) : HookOriginDescriptorWrapperParameter(descriptor)
+) : HookOriginDescriptorParameter(descriptor)
 
-class HookOriginDescriptorFieldGetWrapperParameter(
+class HookOriginFieldGetDescriptorParameter(
     override val descriptor: FieldDescriptor
-) : HookOriginDescriptorWrapperParameter(descriptor)
+) : HookOriginDescriptorParameter(descriptor)
 
-class HookOriginDescriptorFieldSetWrapperParameter(
+class HookOriginFieldSetDescriptorParameter(
     override val descriptor: FieldDescriptor
-) : HookOriginDescriptorWrapperParameter(descriptor)
+) : HookOriginDescriptorParameter(descriptor)
 
-class HookOriginDescriptorArrayGetWrapperParameter(
+class HookOriginArrayGetDescriptorParameter(
     override val descriptor: FieldDescriptor,
-    arrayComponentType: KSType
-) : HookOriginDescriptorWrapperParameter(descriptor) {
+    arrayComponentType: KSType,
+) : HookOriginDescriptorParameter(descriptor) {
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
 object HookOriginInstanceofParameter : HookOriginParameter
 
-class HookOriginDescriptorArraySetWrapperParameter(
+class HookOriginArraySetDescriptorParameter(
     override val descriptor: FieldDescriptor,
-    arrayComponentType: KSType
-) : HookOriginDescriptorWrapperParameter(descriptor) {
+    arrayComponentType: KSType,
+) : HookOriginDescriptorParameter(descriptor) {
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
-class HookOriginDescriptorCallWrapperParameter(override val descriptor: InvokableDescriptor) :
-    HookOriginDescriptorWrapperParameter(descriptor)
+class HookOriginCallDescriptorParameter(override val descriptor: InvokableDescriptor) :
+    HookOriginDescriptorParameter(descriptor)
 
-class HookCancelParameter(val descriptor: InvokableDescriptor) : HookParameter
+class HookCancelDescriptorParameter(val descriptor: InvokableDescriptor) : HookParameter
 object HookOrdinalParameter : HookParameter
 
 sealed class HookLocalParameter(
@@ -428,7 +427,7 @@ class HookParamLocalParameter(
     name: String,
     type: KSType,
     val index: Int,
-    isVar: Boolean
+    isVar: Boolean,
 ) : HookLocalParameter(name, type, isVar)
 
 class HookBodyLocalParameter(

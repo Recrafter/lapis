@@ -165,18 +165,14 @@ class MixinGenerator(
                 }
                 addSuperInterface(bridge.className)
                 addMethods(bridge.functions.flatMap { function ->
-                    val accessors = when (function) {
-                        is IrPropertyBridgeFunction -> listOfNotNull(function.getter, function.setter)
-                        is IrFunctionBridgeFunction -> listOf(function)
-                    }
-                    accessors.map { accessor ->
+                    function.accessors.map { accessor ->
                         buildJavaMethod(accessor.name) {
                             setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                             setParameters(accessor.parameters)
                             setReturnType(accessor.returnTypeName)
                             setBody {
                                 when (function.impl) {
-                                    is IrBridgeExtensionFunctionImpl -> {
+                                    is IrBridgeFunctionExtensionImpl -> {
                                         code_(
                                             format = "${patchImplReference.format}.%L(%L)",
                                             isReturn = accessor.returnTypeName != null
@@ -338,7 +334,7 @@ class MixinGenerator(
             append(injection.jvmName)
             injection.ordinal?.let { append("_ordinal${it}") }
         }) {
-            val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelArgument }
+            val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelDescriptorWrapperImplArgument }
             when (injection) {
                 is IrWrapMethodInjection -> addAnnotation<WrapMethod> {
                     setArgumentValue(WrapMethod::method, injection.methodMixinRef)
@@ -613,7 +609,7 @@ class MixinGenerator(
                         }
                     }
 
-                    is IrHookCancelArgument -> {
+                    is IrHookCancelDescriptorWrapperImplArgument -> {
                         buildJavaCodeBlock("new %T(%L)") {
                             arg(argument.wrapperImpl.className)
                             arg(callbackParameterName)
@@ -707,11 +703,7 @@ class MixinGenerator(
             addType(buildKotlinInterface(bridge.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
                 addFunctions(bridge.functions.flatMap { function ->
-                    val accessors = when (function) {
-                        is IrPropertyBridgeFunction -> listOfNotNull(function.getter, function.setter)
-                        is IrFunctionBridgeFunction -> listOf(function)
-                    }
-                    accessors.map { accessor ->
+                    function.accessors.map { accessor ->
                         buildKotlinFunction(accessor.name) {
                             setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
                             setParameters(accessor.parameters)
@@ -722,8 +714,8 @@ class MixinGenerator(
             })
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
 
-        val bridgeExtensionFunctions = bridge.functions.filter { it.impl is IrBridgeExtensionFunctionImpl }
-        extensionProperties += bridgeExtensionFunctions.filterIsInstance<IrPropertyBridgeFunction>().map { function ->
+        val bridgeExtensions = bridge.functions.filter { it.impl is IrBridgeFunctionExtensionImpl }
+        extensionProperties += bridgeExtensions.filterIsInstance<IrBridgeFunctionProperty>().map { function ->
             buildKotlinProperty(function.sourceName, function.typeName) {
                 setReceiverType(patch.mixin.targetInstanceTypeName)
                 setGetter {
@@ -750,7 +742,7 @@ class MixinGenerator(
                 }
             }
         }
-        extensionFunctions += bridgeExtensionFunctions.filterIsInstance<IrFunctionBridgeFunction>().map { function ->
+        extensionFunctions += bridgeExtensions.filterIsInstance<IrBridgeFunctionFunction>().map { function ->
             buildKotlinFunction(function.sourceName) {
                 setModifiers(IrModifier.INLINE)
                 setReceiverType(patch.mixin.targetInstanceTypeName)

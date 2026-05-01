@@ -10,8 +10,8 @@ enum class TypeAliasBuiltin : Builtin<KPTypeAlias> {
 
     override val isInternal: Boolean = false
 
-    protected abstract fun getActualTypeName(resolve: BuiltinResolver): IrTypeName
+    protected abstract fun getActualTypeName(resolveBuiltin: BuiltinResolver): IrTypeName
 
-    override fun generate(resolve: BuiltinResolver): KPTypeAlias =
-        buildKotlinTypeAlias(name, getActualTypeName(resolve))
+    override fun generate(resolveBuiltin: BuiltinResolver): KPTypeAlias =
+        buildKotlinTypeAlias(name, getActualTypeName(resolveBuiltin))
 }

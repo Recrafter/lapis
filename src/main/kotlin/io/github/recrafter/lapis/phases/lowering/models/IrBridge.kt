@@ -11,65 +11,68 @@ class IrBridge(
 sealed class IrBridgeFunction(
     val sourceName: String,
     open val impl: IrBridgeFunctionImpl,
-)
-
-class IrPropertyBridgeFunction(
-    sourceName: String,
-    val typeName: IrTypeName,
-    override val impl: IrPropertyBridgeFunctionImpl,
-    val getterName: String,
-    val getterSourceJvmName: String,
-    setterName: String?,
-    setterSourceJvmName: String?,
-) : IrBridgeFunction(sourceName, impl) {
-    val getter: IrPropertyBridgeFunctionGetter by lazy {
-        IrPropertyBridgeFunctionGetter(getterName, getterSourceJvmName, typeName)
-    }
-    val setter: IrPropertyBridgeFunctionSetter? by lazy {
-        if (setterName != null && setterSourceJvmName != null) {
-            IrPropertyBridgeFunctionSetter(setterName, setterSourceJvmName, typeName)
-        } else null
-    }
+) {
+    abstract val accessors: List<IrBridgeFunctionAccessor>
 }
 
-sealed interface IrPropertyBridgeFunctionAccessor {
+sealed interface IrBridgeFunctionAccessor {
     val name: String
     val sourceJvmName: String
     val parameters: List<IrParameter>
     val returnTypeName: IrTypeName?
 }
 
-class IrPropertyBridgeFunctionGetter(
+class IrBridgeFunctionPropertyGetter(
     override val name: String,
     override val sourceJvmName: String,
     typeName: IrTypeName,
-) : IrPropertyBridgeFunctionAccessor {
+) : IrBridgeFunctionAccessor {
     override val parameters: List<IrParameter> = emptyList()
     override val returnTypeName: IrTypeName = typeName
 }
 
-class IrPropertyBridgeFunctionSetter(
+class IrBridgeFunctionPropertySetter(
     override val name: String,
     override val sourceJvmName: String,
     typeName: IrTypeName,
-) : IrPropertyBridgeFunctionAccessor {
+) : IrBridgeFunctionAccessor {
     override val parameters: List<IrParameter> = listOf(IrSetterParameter(typeName))
     override val returnTypeName: IrTypeName? = null
 }
 
-class IrFunctionBridgeFunction(
+class IrBridgeFunctionProperty(
+    sourceName: String,
+    val typeName: IrTypeName,
+    override val impl: IrBridgeFunctionPropertyImpl,
+    val getterName: String,
+    val getterSourceJvmName: String,
+    setterName: String?,
+    setterSourceJvmName: String?,
+) : IrBridgeFunction(sourceName, impl) {
+    val getter: IrBridgeFunctionPropertyGetter =
+        IrBridgeFunctionPropertyGetter(getterName, getterSourceJvmName, typeName)
+    val setter: IrBridgeFunctionPropertySetter? = if (setterName != null && setterSourceJvmName != null) {
+        IrBridgeFunctionPropertySetter(setterName, setterSourceJvmName, typeName)
+    } else null
+
+    override val accessors: List<IrBridgeFunctionAccessor> = listOfNotNull(getter, setter)
+}
+
+class IrBridgeFunctionFunction(
     sourceName: String,
     override val name: String,
     override val sourceJvmName: String,
     override val parameters: List<IrParameter>,
     override val returnTypeName: IrTypeName?,
-    override val impl: IrFunctionBridgeFunctionImpl,
-) : IrBridgeFunction(sourceName, impl), IrPropertyBridgeFunctionAccessor
+    override val impl: IrBridgeFunctionFunctionImpl,
+) : IrBridgeFunction(sourceName, impl), IrBridgeFunctionAccessor {
+    override val accessors: List<IrBridgeFunctionAccessor> = listOf(this)
+}
 
 sealed interface IrBridgeFunctionImpl
-sealed interface IrPropertyBridgeFunctionImpl : IrBridgeFunctionImpl
-sealed interface IrFunctionBridgeFunctionImpl : IrBridgeFunctionImpl
+sealed interface IrBridgeFunctionPropertyImpl : IrBridgeFunctionImpl
+sealed interface IrBridgeFunctionFunctionImpl : IrBridgeFunctionImpl
 
-sealed interface IrBridgeExtensionFunctionImpl
-object IrPropertyBridgeExtensionFunctionImpl : IrPropertyBridgeFunctionImpl, IrBridgeExtensionFunctionImpl
-object IrFunctionBridgeExtensionFunctionImpl : IrFunctionBridgeFunctionImpl, IrBridgeExtensionFunctionImpl
+sealed interface IrBridgeFunctionExtensionImpl
+object IrBridgeFunctionPropertyExtensionImpl : IrBridgeFunctionPropertyImpl, IrBridgeFunctionExtensionImpl
+object IrBridgeFunctionFunctionExtensionImpl : IrBridgeFunctionFunctionImpl, IrBridgeFunctionExtensionImpl

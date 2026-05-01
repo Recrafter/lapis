@@ -553,7 +553,7 @@ class FrontendValidator(
                     val originDescriptor = validateDescriptorReference(originGenericTypeClassDeclaration)
                     kspRequire(originDescriptor is InvokableDescriptor) { "545" }
                     kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Body)) { "546" }
-                    HookOriginDescriptorBodyWrapperParameter(originDescriptor)
+                    HookOriginBodyDescriptorParameter(originDescriptor)
                 }
 
                 At.Local -> {
@@ -586,12 +586,12 @@ class FrontendValidator(
                     when (function.atFieldOp) {
                         Op.Get -> {
                             kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.FieldGet)) { "579" }
-                            HookOriginDescriptorFieldGetWrapperParameter(originDescriptor)
+                            HookOriginFieldGetDescriptorParameter(originDescriptor)
                         }
 
                         Op.Set -> {
                             kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.FieldSet)) { "584" }
-                            HookOriginDescriptorFieldSetWrapperParameter(originDescriptor)
+                            HookOriginFieldSetDescriptorParameter(originDescriptor)
                         }
                     }
                 }
@@ -604,7 +604,7 @@ class FrontendValidator(
                     when (function.atArrayOp) {
                         Op.Get -> {
                             kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.ArrayGet)) { "597" }
-                            HookOriginDescriptorArrayGetWrapperParameter(
+                            HookOriginArrayGetDescriptorParameter(
                                 originDescriptor,
                                 originDescriptor.arrayComponentType
                             )
@@ -612,7 +612,7 @@ class FrontendValidator(
 
                         Op.Set -> {
                             kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.ArraySet)) { "605" }
-                            HookOriginDescriptorArraySetWrapperParameter(
+                            HookOriginArraySetDescriptorParameter(
                                 originDescriptor,
                                 originDescriptor.arrayComponentType
                             )
@@ -624,7 +624,7 @@ class FrontendValidator(
                     val originDescriptor = validateDescriptorReference(originGenericTypeClassDeclaration)
                     kspRequire(originDescriptor is InvokableDescriptor) { "616" }
                     kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Call)) { "617" }
-                    HookOriginDescriptorCallWrapperParameter(originDescriptor)
+                    HookOriginCallDescriptorParameter(originDescriptor)
                 }
             }
 
@@ -634,7 +634,7 @@ class FrontendValidator(
                 val cancelDescriptor = validateDescriptorReference(cancelGenericTypeClassDeclaration)
                 kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Cancel)) { "626" }
                 kspRequire(cancelDescriptor == hookDescriptor) { "627" }
-                HookCancelParameter(hookDescriptor)
+                HookCancelDescriptorParameter(hookDescriptor)
             }
 
             hasOrdinalAnnotation -> {
