@@ -53,13 +53,13 @@ class FrontendValidator(
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "53" }
         kspRequireNotNull(originJvmClassName) { "54" }
         kspRequire(originClassDeclaration?.isValid == true) { "55" }
-        val hasAnySchemaAnnotation = listOf(
+        val hasSingleSchemaAnnotation = listOf(
             hasSchemaAnnotation,
             hasInnerSchemaAnnotation,
             hasLocalSchemaAnnotation,
             hasAnonymousSchemaAnnotation,
-        ).any { it }
-        kspRequire(hasAnySchemaAnnotation) { "62" }
+        ).count { it } == 1
+        kspRequire(hasSingleSchemaAnnotation) { "62" }
         val accessRequest = validateAccessRequest(hasAccessAnnotation, isAccessible, accessor, isAccessUnfinal)?.also {
             kspRequire(accessor == Accessor.Tweaker) { "64" }
         }
