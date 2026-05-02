@@ -14,7 +14,7 @@ import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.common.binaryName
-import io.github.recrafter.lapis.phases.common.getMixinRef
+import io.github.recrafter.lapis.phases.common.getMixinReference
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.*
 import io.github.recrafter.lapis.phases.validator.*
@@ -307,7 +307,7 @@ class MixinLowering(
             when (hook) {
                 is MethodHeadHook -> IrMethodHeadInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     parameters = parameters,
                     hookArguments = hookArguments,
                     isStatic = hook.descriptor.isStatic,
@@ -315,7 +315,7 @@ class MixinLowering(
 
                 is ConstructorHeadHook -> IrConstructorHeadInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     parameters = parameters,
                     hookArguments = hookArguments,
                     atArgs = listOf(
@@ -330,7 +330,7 @@ class MixinLowering(
 
                 is BodyHook -> IrWrapMethodInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.targetDescriptor.getMixinRef(),
+                    methodMixinReference = hook.targetDescriptor.getMixinReference(),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
@@ -340,7 +340,7 @@ class MixinLowering(
 
                 is TailHook -> IrReturnInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     parameters = parameters,
                     hookArguments = hookArguments,
                     ordinal = null,
@@ -350,7 +350,7 @@ class MixinLowering(
 
                 is LocalHook -> IrModifyVariableInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -362,7 +362,7 @@ class MixinLowering(
 
                 is InstanceofHook -> IrInstanceofInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     className = hook.className,
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -374,7 +374,7 @@ class MixinLowering(
                     if (hook.isInjectBased) {
                         IrReturnInjection(
                             jvmName = hook.jvmName,
-                            methodMixinReference = hook.descriptor.getMixinRef(),
+                            methodMixinReference = hook.descriptor.getMixinReference(),
                             parameters = parameters,
                             hookArguments = hookArguments,
                             ordinal = ordinal,
@@ -384,7 +384,7 @@ class MixinLowering(
                     } else {
                         IrModifyReturnValueInjection(
                             jvmName = hook.jvmName,
-                            methodMixinReference = hook.descriptor.getMixinRef(),
+                            methodMixinReference = hook.descriptor.getMixinReference(),
                             returnTypeName = hook.returnTypeName,
                             parameters = parameters,
                             hookArguments = hookArguments,
@@ -418,7 +418,7 @@ class MixinLowering(
                     }
                     IrModifyExpressionValueInjection(
                         jvmName = hook.jvmName,
-                        methodMixinReference = hook.descriptor.getMixinRef(),
+                        methodMixinReference = hook.descriptor.getMixinReference(),
                         parameters = parameters,
                         hookArguments = hookArguments,
                         constantTypeName = hook.typeName,
@@ -430,10 +430,10 @@ class MixinLowering(
 
                 is FieldGetHook -> IrFieldGetInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     fieldTypeName = hook.typeName,
                     ordinal = ordinal,
@@ -442,10 +442,10 @@ class MixinLowering(
 
                 is FieldSetHook -> IrFieldSetInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     ordinal = ordinal,
                     isStatic = hook.descriptor.isStatic,
@@ -453,10 +453,10 @@ class MixinLowering(
 
                 is ArrayHook -> IrArrayInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     ordinal = ordinal,
                     componentTypeName = hook.componentTypeName,
@@ -466,11 +466,11 @@ class MixinLowering(
 
                 is CallHook -> IrWrapOperationInjection(
                     jvmName = hook.jvmName,
-                    methodMixinReference = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinReference(),
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     isConstructorCall = hook.targetDescriptor is ConstructorDescriptor,
                     ordinal = ordinal,

@@ -116,10 +116,12 @@ fun buildKotlinProperty(
     }
     useSiteTargets.forEach { useSiteTarget ->
         finalBuilder.addAnnotation<JvmName>(useSiteTarget) {
-            setArgumentValue(
-                JvmName::name,
-                jvmNamespace.simpleName + "_" + useSiteTarget.name.lowercase() + name.capitalize()
-            )
+            val suffix = if (useSiteTargets.size == 1) {
+                name
+            } else {
+                useSiteTarget.name.lowercase() + name.capitalize()
+            }
+            setArgumentValue(JvmName::name, jvmNamespace.simpleName + "_" + suffix)
         }
     }
     return finalBuilder.build()

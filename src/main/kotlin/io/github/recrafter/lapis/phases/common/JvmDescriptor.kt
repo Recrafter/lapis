@@ -21,7 +21,7 @@ class JvmDescriptor(private val type: JPTypeName) {
             else -> null
         }
 
-    fun getName(): String =
+    override fun toString(): String =
         when (type) {
             is JPClassName -> type.objectName
             is JPParameterizedTypeName -> type.rawType().objectName
@@ -40,17 +40,17 @@ class JvmDescriptor(private val type: JPTypeName) {
                         prefix = "(",
                         separator = "",
                         postfix = ")",
-                    ) { it.jvmDescriptor }
+                    ) { it.jvmDescriptor.toString() }
                 )
                 append(returnTypeName?.jvmDescriptor ?: VOID_NAME)
             }
     }
 }
 
-val IrTypeName.jvmDescriptor: String
+val IrTypeName.jvmDescriptor: JvmDescriptor
     get() = java.jvmDescriptor
 
-fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
+fun Descriptor.getMixinReference(isTarget: Boolean = false): String =
     when (this) {
         is ConstructorDescriptor -> buildString {
             if (!isTarget) {
@@ -96,5 +96,5 @@ val InvokableDescriptor.binaryName: String
 private const val CONSTRUCTOR_NAME: String = "<init>"
 private const val VOID_NAME: String = "V"
 
-private val JPTypeName.jvmDescriptor: String
-    get() = JvmDescriptor(this).getName()
+private val JPTypeName.jvmDescriptor: JvmDescriptor
+    get() = JvmDescriptor(this)

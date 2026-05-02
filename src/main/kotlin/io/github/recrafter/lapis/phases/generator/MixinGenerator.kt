@@ -794,7 +794,7 @@ class MixinGenerator(
     private fun generateTweakerAccessorConfigs(accessors: List<IrTweakerAccessor>) {
         options.accessWidenerConfig?.let { configPath ->
             val header = if (options.isUnobfuscated) "classTweaker v1 official" else "accessWidener v2 named"
-            val config = buildAccessorTweakerConfig(accessors, header, IrTweakerAccessorEntry::buildWidenerTweak)
+            val config = buildTweakerAccessorConfig(accessors, header, IrTweakerAccessorEntry::buildWidenerTweak)
             codeGenerator.createResourceFile(configPath, config, aggregating = true)
             logger.info(buildString {
                 appendLine("Access Widener config generated:")
@@ -802,7 +802,7 @@ class MixinGenerator(
             })
         }
         options.accessTransformerConfig?.let { configPath ->
-            val config = buildAccessorTweakerConfig(accessors, tweak = IrTweakerAccessorEntry::buildTransformerTweak)
+            val config = buildTweakerAccessorConfig(accessors, tweak = IrTweakerAccessorEntry::buildTransformerTweak)
             codeGenerator.createResourceFile(configPath, config, aggregating = true)
             logger.info(buildString {
                 appendLine("Access Transformer config generated:")
@@ -811,7 +811,7 @@ class MixinGenerator(
         }
     }
 
-    private fun buildAccessorTweakerConfig(
+    private fun buildTweakerAccessorConfig(
         accessors: List<IrTweakerAccessor>,
         header: String? = null,
         tweak: (IrTweakerAccessorEntry, JvmClassName) -> String
