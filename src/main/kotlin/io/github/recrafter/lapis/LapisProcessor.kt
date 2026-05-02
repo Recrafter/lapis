@@ -16,7 +16,7 @@ import io.github.recrafter.lapis.phases.validator.FrontendValidator
 import java.util.*
 
 class LapisProcessor(
-    private val options: Options,
+    private val options: LapisOptions,
     private val codeGenerator: CodeGenerator,
     private val logger: LapisLogger,
 ) : SymbolProcessor {

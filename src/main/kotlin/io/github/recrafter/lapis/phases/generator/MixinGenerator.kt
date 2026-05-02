@@ -12,7 +12,7 @@ import com.llamalad7.mixinextras.sugar.Local
 import com.llamalad7.mixinextras.sugar.Share
 import com.squareup.kotlinpoet.ksp.writeTo
 import io.github.recrafter.lapis.LapisLogger
-import io.github.recrafter.lapis.Options
+import io.github.recrafter.lapis.LapisOptions
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.InternalPrefix.*
@@ -42,7 +42,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
 class MixinGenerator(
-    private val options: Options,
+    private val options: LapisOptions,
     private val builtins: Builtins,
     private val codeGenerator: CodeGenerator,
     private val logger: LapisLogger,

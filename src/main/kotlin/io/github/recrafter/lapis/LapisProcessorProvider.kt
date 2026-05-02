@@ -24,17 +24,17 @@ class LapisProcessorProvider : SymbolProcessorProvider {
         )
     }
 
-    private fun parseOptions(options: Map<String, String>, logger: LapisLogger): Options {
+    private fun parseOptions(options: Map<String, String>, logger: LapisLogger): LapisOptions {
         val processorOptions = options
             .filterKeys { it.startsWith(ARGUMENT_PREFIX) }
             .mapKeys { it.key.removeArgumentPrefix() }
 
-        val descriptorElements = serialDescriptor<Options>().elements
+        val descriptorElements = serialDescriptor<LapisOptions>().elements
         val existingOptions = descriptorElements.map { it.name }.toSet()
 
         val unknownKeys = processorOptions.keys - existingOptions
         if (unknownKeys.isNotEmpty()) {
-            logger.fatal(
+            logger.warn(
                 buildString {
                     append("Unknown options: ${unknownKeys.joinToString { it.withArgumentPrefix() }}.")
                     appendLine()
@@ -54,8 +54,7 @@ class LapisProcessorProvider : SymbolProcessorProvider {
                 }
             )
         }
-
-        return Json.decodeFromJsonElement(
+        return optionsJson.decodeFromJsonElement(
             buildJsonObject {
                 processorOptions.forEach { (key, value) ->
                     put(key, JsonPrimitive(value))
@@ -74,3 +73,5 @@ class LapisProcessorProvider : SymbolProcessorProvider {
         private val ARGUMENT_PREFIX: String = LapisMeta.NAME.lowercase() + "."
     }
 }
+
+private val optionsJson: Json = Json { ignoreUnknownKeys = true }

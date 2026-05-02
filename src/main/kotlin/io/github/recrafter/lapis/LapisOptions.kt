@@ -3,7 +3,7 @@ package io.github.recrafter.lapis
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Options(
+data class LapisOptions(
     val modId: String,
     private val packageName: String,
     val isUnobfuscated: Boolean,

@@ -2,7 +2,7 @@ package io.github.recrafter.lapis.phases.lowering
 
 import com.squareup.kotlinpoet.asTypeName
 import io.github.recrafter.lapis.LapisLogger
-import io.github.recrafter.lapis.Options
+import io.github.recrafter.lapis.LapisOptions
 import io.github.recrafter.lapis.annotations.Accessor
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.Constant
 import kotlin.reflect.KClass
 
 class MixinLowering(
-    private val options: Options,
+    private val options: LapisOptions,
     private val builtins: Builtins,
     @Suppress("unused") private val logger: LapisLogger,
 ) {

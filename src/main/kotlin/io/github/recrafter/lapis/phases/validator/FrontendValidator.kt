@@ -6,7 +6,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Variance
 import com.squareup.kotlinpoet.ksp.toClassName
 import io.github.recrafter.lapis.LapisLogger
-import io.github.recrafter.lapis.Options
+import io.github.recrafter.lapis.LapisOptions
 import io.github.recrafter.lapis.annotations.Accessor
 import io.github.recrafter.lapis.annotations.At
 import io.github.recrafter.lapis.annotations.Op
@@ -29,7 +29,7 @@ import kotlin.contracts.contract
 
 class FrontendValidator(
     private val logger: LapisLogger,
-    private val options: Options,
+    private val options: LapisOptions,
     private val builtins: Builtins,
     private val types: KSTypes,
 ) {
