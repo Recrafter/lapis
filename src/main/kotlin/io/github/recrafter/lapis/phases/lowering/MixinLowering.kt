@@ -280,27 +280,7 @@ class MixinLowering(
             if (!hook.isInjectBased && hook.parameters.any { it is HookCancelDescriptorWrapperParameter }) {
                 add(IrInjectionCallbackParameter(hook.descriptor.returnTypeName))
             }
-            addAll(
-                hook.parameters.mapNotNull { lowerInjectionLocalParameter(hook, it) }.sortedWith(
-                    compareBy<IrInjectionLocalParameter> { parameter ->
-                        when (parameter) {
-                            is IrInjectionParamLocalParameter -> 0
-                            is IrInjectionBodyLocalParameter -> {
-                                if (parameter.local is IrNamedLocal) 1
-                                else 2
-                            }
-
-                            is IrInjectionShareParameter -> 3
-                        }
-                    }.thenBy { parameter ->
-                        (parameter as? IrInjectionParamLocalParameter)?.localIndex
-                    }.thenBy { parameter ->
-                        ((parameter as? IrInjectionBodyLocalParameter)?.local as? IrPositionalLocal)?.ordinal
-                    }.thenBy { parameter ->
-                        (parameter as? IrInjectionShareParameter)?.key
-                    }
-                )
-            )
+            addAll(hook.parameters.mapNotNull { lowerInjectionLocalParameter(hook, it) })
         }
         val hookArguments = hook.parameters.map(::lowerHookArgument)
         return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
