@@ -593,8 +593,32 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                 setConstructor(callbackParameter)
                 addSuperInterface(impl.superClassTypeName)
             })
-            impl.returnTypeName?.let {
-                buildKotlinProperty("returnValue", it.makeNullable(), jvmNamespace = impl.className) {
+            buildKotlinProperty("isCanceled", KPBoolean.asIrTypeName(), jvmNamespace = impl.className) {
+                setReceiverType(impl.superClassTypeName)
+                setGetter {
+                    setModifiers(IrModifier.INLINE)
+                    setBody {
+                        return_(buildString {
+                            append("(this as %T).%N.%L()")
+                            if (impl.returnTypeName != null) {
+                                append(" != null")
+                            }
+                        }) {
+                            arg(impl.className)
+                            arg(callbackParameter)
+                            if (impl.returnTypeName != null) {
+                                arg(CallbackInfoReturnable<*>::getReturnValue)
+                            } else {
+                                arg(CallbackInfo::isCancelled)
+                            }
+                        }
+                    }
+                }
+            }.also(destination::addProperty)
+            impl.returnTypeName?.let { returnTypeName ->
+                val primitiveJvmName = returnTypeName.jvmDescriptor.getPrimitiveName(allowVoid = false)
+                val type = if (primitiveJvmName != null) returnTypeName else returnTypeName.makeNullable()
+                buildKotlinProperty("returnValue", type, jvmNamespace = impl.className) {
                     setReceiverType(impl.superClassTypeName)
                     setGetter {
                         setModifiers(IrModifier.INLINE)
@@ -602,26 +626,13 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                             return_("(this as %T).%N.%L()") {
                                 arg(impl.className)
                                 arg(callbackParameter)
-                                arg(CallbackInfoReturnable<*>::getReturnValue)
+                                primitiveJvmName
+                                    ?.let { arg(CallbackInfoReturnable<*>::getReturnValue.name + it) }
+                                    ?: arg(CallbackInfoReturnable<*>::getReturnValue)
                             }
                         }
                     }
                 }.also(destination::addProperty)
-                it.jvmDescriptor.getPrimitiveName(allowVoid = false)?.let { primitiveName ->
-                    buildKotlinProperty("returnPrimitiveValue", it, jvmNamespace = impl.className) {
-                        setReceiverType(impl.superClassTypeName)
-                        setGetter {
-                            setModifiers(IrModifier.INLINE)
-                            setBody {
-                                return_("(this as %T).%N.%L()") {
-                                    arg(impl.className)
-                                    arg(callbackParameter)
-                                    arg(CallbackInfoReturnable<*>::getReturnValue.name + primitiveName)
-                                }
-                            }
-                        }
-                    }.also(destination::addProperty)
-                }
             }
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
