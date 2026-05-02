@@ -99,7 +99,6 @@ class ParsedPatchCompanionObject(
     symbol: KSNode,
 
     val isPublic: Boolean,
-    val properties: List<ParsedPatchProperty>,
     val functions: List<ParsedPatchFunction>,
 ) : SymbolSource(symbol)
 

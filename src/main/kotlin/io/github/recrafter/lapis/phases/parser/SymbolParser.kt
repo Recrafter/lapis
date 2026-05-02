@@ -226,7 +226,6 @@ class SymbolParser(
         ParsedPatchCompanionObject(
             symbol = classDeclaration,
             isPublic = classDeclaration.isPublic(),
-            properties = classDeclaration.bodyPropertyDeclarations.map(::parsePatchProperty).toList(),
             functions = classDeclaration.functionDeclarations.map(::parsePatchFunction).toList(),
         )
 
