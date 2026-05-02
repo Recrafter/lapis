@@ -13,6 +13,7 @@ import io.github.recrafter.lapis.phases.lowering.models.IrSchema
 import io.github.recrafter.lapis.phases.parser.KSTypes
 import io.github.recrafter.lapis.phases.parser.SymbolParser
 import io.github.recrafter.lapis.phases.validator.FrontendValidator
+import java.util.*
 
 class LapisProcessor(
     private val options: Options,
@@ -23,8 +24,8 @@ class LapisProcessor(
     private val builtins: Builtins = Builtins(options.generatedPackageName, codeGenerator)
     private val mixinLowering: MixinLowering = MixinLowering(options, builtins, logger)
 
-    private val schemas: MutableMap<String, IrSchema> = mutableMapOf()
-    private val patches: MutableMap<String, IrPatch> = mutableMapOf()
+    private val schemas: MutableList<IrSchema> = mutableListOf()
+    private val patches: SortedMap<String, IrPatch> = sortedMapOf()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val types = KSTypes(resolver.builtIns)
@@ -43,7 +44,7 @@ class LapisProcessor(
 
         logger.setPhase(LapisPhase.TRANSFORMATION)
         val irResult = mixinLowering.lower(validatorResult)
-        irResult.schemas.forEach { schemas[it.className.qualifiedName] = it }
+        irResult.schemas.forEach { schemas += it }
         irResult.patches.forEach { patches[it.className.qualifiedName] = it }
 
         return emptyList()
@@ -59,9 +60,7 @@ class LapisProcessor(
 
     private fun generate() {
         logger.setPhase(LapisPhase.GENERATION)
-        val sortedSchemas = schemas.values.sortedBy { it.className.qualifiedName }
-        val sortedMixins = patches.values.sortedBy { it.className.qualifiedName }
-        MixinGenerator(options, builtins, codeGenerator, logger).generate(sortedSchemas, sortedMixins)
+        MixinGenerator(options, builtins, codeGenerator, logger).generate(schemas, patches.values.toList())
         builtins.generateInternal()
     }
 }

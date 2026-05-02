@@ -26,7 +26,8 @@ class ParsedSchema(
     val hasAnonymousSchemaAnnotation: Boolean,
     val hasAccessAnnotation: Boolean,
     val isAccessible: Boolean,
-    val unfinal: Boolean,
+    val isAccessUnfinal: Boolean,
+    val accessor: Accessor?,
     val descriptors: List<ParsedDescriptor>,
     val nestedSchemas: List<ParsedSchema>,
 ) : SymbolSource(symbol)
@@ -38,9 +39,10 @@ class ParsedDescriptor(
     val classDeclaration: KSClassDeclaration,
     val hasStaticAnnotation: Boolean,
     val hasAccessAnnotation: Boolean,
+    val isAccessUnfinal: Boolean,
+    val accessor: Accessor?,
     val hasMappingNameAnnotation: Boolean,
     val mappingName: String?,
-    val unfinal: Boolean,
     val superClassDeclaration: KSClassDeclaration?,
     val genericType: ParsedDescriptorGenericType?,
 ) : SymbolSource(symbol)

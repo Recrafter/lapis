@@ -2,14 +2,8 @@ package io.github.recrafter.lapis.phases.common
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
-import io.github.recrafter.lapis.phases.lowering.models.IrConstructorDescriptor
-import io.github.recrafter.lapis.phases.lowering.models.IrInvokableDescriptor
-import io.github.recrafter.lapis.phases.lowering.models.IrMethodDescriptor
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-import io.github.recrafter.lapis.phases.validator.ConstructorDescriptor
-import io.github.recrafter.lapis.phases.validator.Descriptor
-import io.github.recrafter.lapis.phases.validator.FieldDescriptor
-import io.github.recrafter.lapis.phases.validator.MethodDescriptor
+import io.github.recrafter.lapis.phases.validator.*
 
 class JvmDescriptor(private val type: JPTypeName) {
 
@@ -93,10 +87,10 @@ fun Descriptor.getMixinRef(isTarget: Boolean = false): String =
         }
     }
 
-val IrInvokableDescriptor.binaryName: String
+val InvokableDescriptor.binaryName: String
     get() = when (this) {
-        is IrConstructorDescriptor -> CONSTRUCTOR_NAME
-        is IrMethodDescriptor -> mappingName
+        is ConstructorDescriptor -> CONSTRUCTOR_NAME
+        is MethodDescriptor -> mappingName
     }
 
 private const val CONSTRUCTOR_NAME: String = "<init>"

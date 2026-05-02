@@ -104,7 +104,8 @@ class SymbolParser(
             hasAnonymousSchemaAnnotation = anonymousSchemaAnnotation != null,
             hasAccessAnnotation = accessAnnotation != null,
             isAccessible = isResolvable,
-            unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
+            isAccessUnfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
+            accessor = accessAnnotation?.getArgumentValue(Access::accessor),
             descriptors = descriptors.map(::parseDescriptor),
             nestedSchemas = nestedSchemas.map { parseSchema(it, currentJvmClassName) },
         )
@@ -139,7 +140,8 @@ class SymbolParser(
             hasAccessAnnotation = accessAnnotation != null,
             hasMappingNameAnnotation = mappingNameAnnotation != null,
             mappingName = mappingNameAnnotation?.getArgumentValue(MappingName::name),
-            unfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
+            isAccessUnfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
+            accessor = accessAnnotation?.getArgumentValue(Access::accessor),
 
             genericType = parseDescriptorGenericType(superClassType?.genericTypes?.firstOrNull(), ktFunctionType),
             superClassDeclaration = superClassType?.toClassDeclaration(),

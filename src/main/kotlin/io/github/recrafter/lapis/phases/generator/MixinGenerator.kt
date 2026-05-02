@@ -26,11 +26,6 @@ import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin
 import io.github.recrafter.lapis.phases.common.JvmClassName
-import io.github.recrafter.lapis.phases.common.binaryName
-import io.github.recrafter.lapis.phases.generator.accessor.AccessorConfigEntry
-import io.github.recrafter.lapis.phases.generator.accessor.ClassEntry
-import io.github.recrafter.lapis.phases.generator.accessor.FieldEntry
-import io.github.recrafter.lapis.phases.generator.accessor.MethodEntry
 import io.github.recrafter.lapis.phases.generator.builders.*
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
@@ -59,20 +54,23 @@ class MixinGenerator(
         val schemaOriginatingFiles = schemas.mapNotNull { it.originatingFile }
         val patchOriginatingFiles = patches.mapNotNull { it.originatingFile }
 
-        generateDescriptorWrappers(schemas.flatMap { it.descriptors }, schemaOriginatingFiles + patchOriginatingFiles)
+        generateDescriptorWrapperImpls(
+            schemas.flatMap { it.descriptors },
+            schemaOriginatingFiles + patchOriginatingFiles
+        )
         patches.forEach { patch ->
             val originatingFiles = listOfNotNull(patch.originatingFile)
             patch.impl?.let { generatePatchImpl(patch, it, originatingFiles) }
             patch.mixin.bridge?.let { generateMixinBridge(patch, it, originatingFiles) }
             generateMixin(patch, originatingFiles)
         }
+        generateAccessors(schemas)
         generateExtensions(schemaOriginatingFiles + patchOriginatingFiles)
 
         generateMixinConfig(patches)
-        generateAccessorConfig(schemas)
     }
 
-    private fun generateDescriptorWrappers(descriptors: List<IrDescriptor>, originatingFiles: List<KSFile>) {
+    private fun generateDescriptorWrapperImpls(descriptors: List<IrDescriptor>, originatingFiles: List<KSFile>) {
         if (descriptors.isEmpty()) {
             return
         }
@@ -337,11 +335,11 @@ class MixinGenerator(
             val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelDescriptorWrapperImplArgument }
             when (injection) {
                 is IrWrapMethodInjection -> addAnnotation<WrapMethod> {
-                    setArgumentValue(WrapMethod::method, injection.methodMixinRef)
+                    setArgumentValue(WrapMethod::method, injection.methodMixinReference)
                 }
 
                 is IrInjectInjection -> addAnnotation<Inject> {
-                    setArgumentValue(Inject::method, injection.methodMixinRef)
+                    setArgumentValue(Inject::method, injection.methodMixinReference)
                     setArgumentValue<Inject, At>(Inject::at) {
                         setArgumentValue(
                             At::value,
@@ -366,7 +364,7 @@ class MixinGenerator(
                 }
 
                 is IrModifyVariableInjection -> addAnnotation<ModifyVariable> {
-                    setArgumentValue(ModifyVariable::method, injection.methodMixinRef)
+                    setArgumentValue(ModifyVariable::method, injection.methodMixinReference)
                     when (val local = injection.local) {
                         is IrNamedLocal -> setArgumentValue(ModifyVariable::name, local.name)
                         is IrPositionalLocal -> setArgumentValue(ModifyVariable::ordinal, local.ordinal)
@@ -385,7 +383,7 @@ class MixinGenerator(
                 }
 
                 is IrModifyReturnValueInjection -> addAnnotation<ModifyReturnValue> {
-                    setArgumentValue(ModifyReturnValue::method, injection.methodMixinRef)
+                    setArgumentValue(ModifyReturnValue::method, injection.methodMixinReference)
                     setArgumentValue<ModifyReturnValue, At>(ModifyReturnValue::at) {
                         setArgumentValue(At::value, "RETURN")
                         injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
@@ -394,17 +392,17 @@ class MixinGenerator(
                 }
 
                 is IrWrapOperationInjection -> addAnnotation<WrapOperation> {
-                    setArgumentValue(WrapOperation::method, injection.methodMixinRef)
+                    setArgumentValue(WrapOperation::method, injection.methodMixinReference)
                     setArgumentValue<WrapOperation, At>(WrapOperation::at) {
                         setArgumentValue(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
-                        setArgumentValue(At::target, injection.targetMixinRef)
+                        setArgumentValue(At::target, injection.targetMixinReference)
                         injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
                         setArgumentValue(At::unsafe, true)
                     }
                 }
 
                 is IrModifyExpressionValueInjection -> addAnnotation<ModifyExpressionValue> {
-                    setArgumentValue(ModifyExpressionValue::method, injection.methodMixinRef)
+                    setArgumentValue(ModifyExpressionValue::method, injection.methodMixinReference)
                     setArgumentValue<ModifyExpressionValue, At>(ModifyExpressionValue::at) {
                         setArgumentValue(At::value, "CONSTANT")
                         setArgumentValue(
@@ -417,10 +415,10 @@ class MixinGenerator(
                 }
 
                 is IrFieldGetInjection, is IrFieldSetInjection -> addAnnotation<WrapOperation> {
-                    setArgumentValue(WrapOperation::method, injection.methodMixinRef)
+                    setArgumentValue(WrapOperation::method, injection.methodMixinReference)
                     setArgumentValue<WrapOperation, At>(WrapOperation::at) {
                         setArgumentValue(At::value, "FIELD")
-                        setArgumentValue(At::target, injection.targetMixinRef)
+                        setArgumentValue(At::target, injection.targetMixinReference)
                         val opcode = when (injection) {
                             is IrFieldGetInjection -> {
                                 if (injection.isStaticTarget) Opcodes.GETSTATIC
@@ -439,10 +437,10 @@ class MixinGenerator(
                 }
 
                 is IrArrayInjection -> addAnnotation<Redirect> {
-                    setArgumentValue(Redirect::method, injection.methodMixinRef)
+                    setArgumentValue(Redirect::method, injection.methodMixinReference)
                     setArgumentValue<Redirect, At>(Redirect::at) {
                         setArgumentValue(At::value, "FIELD")
-                        setArgumentValue(At::target, injection.targetMixinRef)
+                        setArgumentValue(At::target, injection.targetMixinReference)
                         setArgumentValue(
                             At::opcode,
                             if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD
@@ -458,7 +456,7 @@ class MixinGenerator(
                 }
 
                 is IrInstanceofInjection -> addAnnotation<WrapOperation> {
-                    setArgumentValue(WrapOperation::method, injection.methodMixinRef)
+                    setArgumentValue(WrapOperation::method, injection.methodMixinReference)
                     setArgumentValue<WrapOperation, Constant>(WrapOperation::constant) {
                         setArgumentValue(Constant::classValue, injection.className)
                         injection.ordinal?.let { setArgumentValue(Constant::ordinal, it) }
@@ -694,11 +692,7 @@ class MixinGenerator(
             }
         }
 
-    private fun generateMixinBridge(
-        patch: IrPatch,
-        bridge: IrBridge,
-        originatingFiles: List<KSFile>,
-    ) {
+    private fun generateMixinBridge(patch: IrPatch, bridge: IrBridge, originatingFiles: List<KSFile>) {
         buildKotlinFile(bridge.className) {
             addType(buildKotlinInterface(bridge.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
@@ -775,7 +769,7 @@ class MixinGenerator(
     }
 
     private fun generateMixinConfig(patches: List<IrPatch>) {
-        val contents = configJson.encodeToString(
+        val config = configJson.encodeToString(
             MixinConfig.of(
                 mixinPackage = options.mixinPackageName,
                 qualifiedNames = patches.groupBy { it.side }.mapValues { (_, patches) ->
@@ -783,98 +777,55 @@ class MixinGenerator(
                 },
             )
         )
+        codeGenerator.createResourceFile(options.mixinConfig, config, aggregating = true)
         logger.info(buildString {
             appendLine("Mixin config generated:")
-            append(contents)
+            append(config)
         })
-        codeGenerator.createResourceFile(
-            path = options.mixinConfigName,
-            contents = contents,
-            aggregating = true,
-        )
     }
 
-    private fun generateAccessorConfig(schemas: List<IrSchema>) {
-        val entries = mutableListOf<AccessorConfigEntry>()
-        schemas.forEach { schema ->
-            if (schema.makePublic) {
-                entries += ClassEntry(
-                    ownerJvmClassName = schema.ownerJvmClassName,
-                    removeFinal = schema.removeFinal,
-                )
-            }
-            schema.descriptors.filter { it.makePublic }.forEach { descriptor ->
-                entries += when (descriptor) {
-                    is IrInvokableDescriptor -> {
-                        MethodEntry(
-                            ownerJvmClassName = schema.ownerJvmClassName,
-                            name = descriptor.binaryName,
-                            parameterTypes = descriptor.parameters.map { it.typeName },
-                            returnTypeName = when (descriptor) {
-                                is IrConstructorDescriptor -> null
-                                else -> descriptor.returnTypeName
-                            },
-                            removeFinal = descriptor.removeFinal,
-                            isConstructor = descriptor is IrConstructorDescriptor,
-                        )
-                    }
-
-                    is IrFieldDescriptor -> {
-                        FieldEntry(
-                            ownerJvmClassName = schema.ownerJvmClassName,
-                            name = descriptor.mappingName,
-                            typeName = descriptor.typeName,
-                            removeFinal = descriptor.removeFinal,
-                        )
-                    }
-                }
-            }
+    private fun generateAccessors(schemas: List<IrSchema>) {
+        val tweakerAccessors = schemas.mapNotNull { it.tweakerAccessor }
+        if (tweakerAccessors.isNotEmpty()) {
+            generateTweakerAccessorConfigs(tweakerAccessors)
         }
-        if (entries.isEmpty()) {
-            return
-        }
-        val sortedEntries = entries.distinctBy { it.awEntry }.sorted()
+    }
 
-        fun formatConfig(header: String? = null, directive: (AccessorConfigEntry) -> String): String = buildString {
-            header?.let(::appendLine)
-            var lastOwner: JvmClassName? = null
-            sortedEntries.forEach { entry ->
-                appendLine()
-                if (lastOwner != entry.ownerJvmClassName) {
-                    if (lastOwner != null) {
-                        appendLine()
-                    }
-                    appendLine("# ${entry.ownerJvmClassName.nestedName}")
-                    lastOwner = entry.ownerJvmClassName
-                }
-                append(directive(entry))
-            }
-        }
-
-        options.accessWidenerConfigName?.let { name ->
+    private fun generateTweakerAccessorConfigs(accessors: List<IrTweakerAccessor>) {
+        options.accessWidenerConfig?.let { configPath ->
             val header = if (options.isUnobfuscated) "classTweaker v1 official" else "accessWidener v2 named"
-            val contents = formatConfig(header) { it.awEntry }
+            val config = buildAccessorTweakerConfig(accessors, header, IrTweakerAccessorEntry::buildWidenerTweak)
+            codeGenerator.createResourceFile(configPath, config, aggregating = true)
             logger.info(buildString {
-                appendLine("AW config generated:")
-                append(contents)
+                appendLine("Access Widener config generated:")
+                append(config)
             })
-            codeGenerator.createResourceFile(
-                path = name,
-                contents = contents,
-                aggregating = true,
-            )
         }
-        options.accessTransformerConfigName?.let { name ->
-            val contents = formatConfig { it.atEntry }
+        options.accessTransformerConfig?.let { configPath ->
+            val config = buildAccessorTweakerConfig(accessors, tweak = IrTweakerAccessorEntry::buildTransformerTweak)
+            codeGenerator.createResourceFile(configPath, config, aggregating = true)
             logger.info(buildString {
-                appendLine("AT config generated:")
-                append(contents)
+                appendLine("Access Transformer config generated:")
+                append(config)
             })
-            codeGenerator.createResourceFile(
-                path = name,
-                contents = contents,
-                aggregating = true,
-            )
+        }
+    }
+
+    private fun buildAccessorTweakerConfig(
+        accessors: List<IrTweakerAccessor>,
+        header: String? = null,
+        tweak: (IrTweakerAccessorEntry, JvmClassName) -> String
+    ): String = buildString {
+        header?.let {
+            appendLine(it)
+            appendLine()
+        }
+        accessors.forEach {
+            appendLine("# ${it.ownerJvmClassName.nestedName}")
+            it.entries.forEach { entry ->
+                appendLine(tweak(entry, it.ownerJvmClassName))
+            }
+            appendLine()
         }
     }
 }

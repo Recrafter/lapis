@@ -30,14 +30,18 @@ class Schema(
 
     val isAccessible: Boolean,
 
-    val makePublic: Boolean,
-    val removeFinal: Boolean,
+    val accessRequest: AccessRequest?,
     val descriptors: List<Descriptor>,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
     val originTypeName: IrTypeName = originClassDeclaration.starProjectedType.asIrTypeName()
     val containingFile: KSFile? = source.containingFile
 }
+
+class AccessRequest(
+    val accessor: Accessor,
+    val shouldStripFinal: Boolean,
+)
 
 sealed class Descriptor(
     val name: String,
@@ -48,8 +52,7 @@ sealed class Descriptor(
     val parameters: List<FunctionTypeParameter>,
     val returnType: KSType?,
     val isStatic: Boolean,
-    val makePublic: Boolean,
-    val removeFinal: Boolean,
+    val accessRequest: AccessRequest?,
 ) {
     val className: IrClassName = classDeclaration.asIrClassName()
     val receiverTypeName: IrTypeName = receiverType.asIrTypeName()
@@ -65,8 +68,7 @@ sealed class InvokableDescriptor(
     parameters: List<FunctionTypeParameter>,
     returnType: KSType?,
     isStatic: Boolean,
-    makePublic: Boolean,
-    removeFinal: Boolean,
+    accessRequest: AccessRequest?,
 ) : Descriptor(
     name,
     mappingName,
@@ -76,8 +78,7 @@ sealed class InvokableDescriptor(
     parameters,
     returnType,
     isStatic,
-    makePublic,
-    removeFinal,
+    accessRequest,
 )
 
 class ConstructorDescriptor(
@@ -85,9 +86,9 @@ class ConstructorDescriptor(
     classDeclaration: KSClassDeclaration,
     returnType: KSType,
     parameters: List<FunctionTypeParameter>,
-    makePublic: Boolean,
+    accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
-    name, "", classDeclaration, returnType, null, parameters, returnType, false, makePublic, false,
+    name, "", classDeclaration, returnType, null, parameters, returnType, false, accessRequest,
 )
 
 open class MethodDescriptor(
@@ -99,8 +100,7 @@ open class MethodDescriptor(
     returnType: KSType?,
     parameters: List<FunctionTypeParameter>,
     isStatic: Boolean,
-    makePublic: Boolean,
-    removeFinal: Boolean,
+    accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
     name,
     mappingName,
@@ -110,8 +110,7 @@ open class MethodDescriptor(
     parameters,
     returnType,
     isStatic,
-    makePublic,
-    removeFinal,
+    accessRequest,
 )
 
 class FieldDescriptor(
@@ -123,8 +122,7 @@ class FieldDescriptor(
     val fieldType: KSType,
     val arrayComponentType: KSType?,
     isStatic: Boolean,
-    makePublic: Boolean,
-    removeFinal: Boolean,
+    accessRequest: AccessRequest?,
 ) : Descriptor(
     name,
     mappingName,
@@ -134,8 +132,7 @@ class FieldDescriptor(
     emptyList(),
     fieldType,
     isStatic,
-    makePublic,
-    removeFinal,
+    accessRequest,
 ) {
     val fieldTypeName: IrTypeName = fieldType.asIrTypeName()
 }

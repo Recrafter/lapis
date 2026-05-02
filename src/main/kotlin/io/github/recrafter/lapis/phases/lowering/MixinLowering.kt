@@ -3,6 +3,7 @@ package io.github.recrafter.lapis.phases.lowering
 import com.squareup.kotlinpoet.asTypeName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.Options
+import io.github.recrafter.lapis.annotations.Accessor
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
@@ -12,6 +13,7 @@ import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
+import io.github.recrafter.lapis.phases.common.binaryName
 import io.github.recrafter.lapis.phases.common.getMixinRef
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.*
@@ -33,15 +35,53 @@ class MixinLowering(
                 IrSchema(
                     originatingFile = schema.containingFile,
 
-                    makePublic = schema.makePublic,
-                    removeFinal = schema.removeFinal,
                     className = schema.className,
-                    ownerJvmClassName = schema.originJvmClassName,
                     descriptors = schema.descriptors.map(::lowerDescriptor),
+                    tweakerAccessor = lowerTweakerAccessor(schema),
                 )
             },
             patches = patches,
         )
+    }
+
+    private fun lowerTweakerAccessor(schema: Schema): IrTweakerAccessor? {
+        val descriptorsToTweak = schema.descriptors.mapNotNull {
+            if (it.accessRequest?.accessor != Accessor.Tweaker) {
+                return@mapNotNull null
+            }
+            it to it.accessRequest
+        }
+        if (schema.accessRequest == null && descriptorsToTweak.isEmpty()) {
+            return null
+        }
+        val entries = mutableListOf<IrTweakerAccessorEntry>()
+        if (schema.accessRequest != null) {
+            entries += IrTweakerAccessorClassEntry(
+                removeFinal = schema.accessRequest.shouldStripFinal,
+            )
+        }
+        descriptorsToTweak.forEach { (descriptor, accessRequest) ->
+            entries += when (descriptor) {
+                is InvokableDescriptor -> {
+                    val isConstructor = descriptor is ConstructorDescriptor
+                    IrTweakerAccessorMethodEntry(
+                        name = descriptor.binaryName,
+                        parameterTypes = descriptor.parameters.map { it.typeName },
+                        returnTypeName = if (isConstructor) null else descriptor.returnTypeName,
+                        removeFinal = accessRequest.shouldStripFinal,
+                    )
+                }
+
+                is FieldDescriptor -> {
+                    IrTweakerAccessorFieldEntry(
+                        name = descriptor.mappingName,
+                        typeName = descriptor.fieldTypeName,
+                        removeFinal = accessRequest.shouldStripFinal,
+                    )
+                }
+            }
+        }
+        return IrTweakerAccessor(schema.originJvmClassName, entries)
     }
 
     private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor =
@@ -49,17 +89,13 @@ class MixinLowering(
             is InvokableDescriptor -> {
                 if (descriptor is ConstructorDescriptor) {
                     IrConstructorDescriptor(
-                        makePublic = descriptor.makePublic,
                         callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.className,
                     )
                 } else {
                     IrMethodDescriptor(
-                        makePublic = descriptor.makePublic,
-                        removeFinal = descriptor.removeFinal,
                         name = descriptor.name,
-                        mappingName = descriptor.mappingName,
                         bodyWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         cancelWrapperImpl = findCancelDescriptorWrapperImpl(descriptor.className),
@@ -71,10 +107,7 @@ class MixinLowering(
 
             is FieldDescriptor -> {
                 IrFieldDescriptor(
-                    makePublic = descriptor.makePublic,
-                    removeFinal = descriptor.removeFinal,
                     name = descriptor.name,
-                    mappingName = descriptor.mappingName,
                     fieldGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                     fieldSetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                     arrayGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
@@ -274,7 +307,7 @@ class MixinLowering(
             when (hook) {
                 is MethodHeadHook -> IrMethodHeadInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
                     isStatic = hook.descriptor.isStatic,
@@ -282,7 +315,7 @@ class MixinLowering(
 
                 is ConstructorHeadHook -> IrConstructorHeadInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
                     atArgs = listOf(
@@ -297,7 +330,7 @@ class MixinLowering(
 
                 is BodyHook -> IrWrapMethodInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.targetDescriptor.getMixinRef(),
+                    methodMixinReference = hook.targetDescriptor.getMixinRef(),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
@@ -307,7 +340,7 @@ class MixinLowering(
 
                 is TailHook -> IrReturnInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
                     ordinal = null,
@@ -317,7 +350,7 @@ class MixinLowering(
 
                 is LocalHook -> IrModifyVariableInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -329,7 +362,7 @@ class MixinLowering(
 
                 is InstanceofHook -> IrInstanceofInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     className = hook.className,
                     parameters = parameters,
                     hookArguments = hookArguments,
@@ -341,7 +374,7 @@ class MixinLowering(
                     if (hook.isInjectBased) {
                         IrReturnInjection(
                             jvmName = hook.jvmName,
-                            methodMixinRef = hook.descriptor.getMixinRef(),
+                            methodMixinReference = hook.descriptor.getMixinRef(),
                             parameters = parameters,
                             hookArguments = hookArguments,
                             ordinal = ordinal,
@@ -351,7 +384,7 @@ class MixinLowering(
                     } else {
                         IrModifyReturnValueInjection(
                             jvmName = hook.jvmName,
-                            methodMixinRef = hook.descriptor.getMixinRef(),
+                            methodMixinReference = hook.descriptor.getMixinRef(),
                             returnTypeName = hook.returnTypeName,
                             parameters = parameters,
                             hookArguments = hookArguments,
@@ -385,7 +418,7 @@ class MixinLowering(
                     }
                     IrModifyExpressionValueInjection(
                         jvmName = hook.jvmName,
-                        methodMixinRef = hook.descriptor.getMixinRef(),
+                        methodMixinReference = hook.descriptor.getMixinRef(),
                         parameters = parameters,
                         hookArguments = hookArguments,
                         constantTypeName = hook.typeName,
@@ -397,10 +430,10 @@ class MixinLowering(
 
                 is FieldGetHook -> IrFieldGetInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinRef = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     fieldTypeName = hook.typeName,
                     ordinal = ordinal,
@@ -409,10 +442,10 @@ class MixinLowering(
 
                 is FieldSetHook -> IrFieldSetInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinRef = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     ordinal = ordinal,
                     isStatic = hook.descriptor.isStatic,
@@ -420,10 +453,10 @@ class MixinLowering(
 
                 is ArrayHook -> IrArrayInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinRef = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     ordinal = ordinal,
                     componentTypeName = hook.componentTypeName,
@@ -433,11 +466,11 @@ class MixinLowering(
 
                 is CallHook -> IrWrapOperationInjection(
                     jvmName = hook.jvmName,
-                    methodMixinRef = hook.descriptor.getMixinRef(),
+                    methodMixinReference = hook.descriptor.getMixinRef(),
                     returnTypeName = hook.returnTypeName,
                     parameters = parameters,
                     hookArguments = hookArguments,
-                    targetMixinRef = hook.targetDescriptor.getMixinRef(isTarget = true),
+                    targetMixinReference = hook.targetDescriptor.getMixinRef(isTarget = true),
                     isStaticTarget = hook.targetDescriptor.isStatic,
                     isConstructorCall = hook.targetDescriptor is ConstructorDescriptor,
                     ordinal = ordinal,
