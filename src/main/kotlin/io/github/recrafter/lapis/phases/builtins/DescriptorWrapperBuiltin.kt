@@ -68,13 +68,15 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                 receiverParameter?.let(::addParameter)
                 setReturnType(impl.fieldTypeName)
                 setBody {
-                    return_(buildString {
-                        append("(this as %T).%N.%L(")
-                        if (receiverParameter != null) {
-                            append("%N")
+                    return_(
+                        buildString {
+                            append("(this as %T).%N.%L(")
+                            if (receiverParameter != null) {
+                                append("%N")
+                            }
+                            append(")")
                         }
-                        append(")")
-                    }) {
+                    ) {
                         arg(impl.className)
                         arg(operationParameter)
                         arg(Operation<*>::call)
@@ -598,12 +600,14 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_(buildString {
-                            append("(this as %T).%N.%L()")
-                            if (impl.returnTypeName != null) {
-                                append(" != null")
+                        return_(
+                            buildString {
+                                append("(this as %T).%N.%L()")
+                                if (impl.returnTypeName != null) {
+                                    append(" != null")
+                                }
                             }
-                        }) {
+                        ) {
                             arg(impl.className)
                             arg(callbackParameter)
                             if (impl.returnTypeName != null) {

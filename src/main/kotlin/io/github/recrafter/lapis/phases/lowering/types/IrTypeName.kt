@@ -12,7 +12,6 @@ open class IrTypeName(
 ) {
     val javaPrimitiveType: JPTypeName? by lazy {
         when (makeNotNullable().kotlin) {
-            KPUnit -> JPVoid
             KPBoolean -> JPBoolean
             KPByte -> JPByte
             KPShort -> JPShort
@@ -21,6 +20,7 @@ open class IrTypeName(
             KPChar -> JPChar
             KPFloat -> JPFloat
             KPDouble -> JPDouble
+            KPUnit -> JPVoid
             else -> null
         }?.run {
             if (boxed) box()

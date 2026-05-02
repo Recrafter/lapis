@@ -40,7 +40,7 @@ class Schema(
 
 class AccessRequest(
     val accessor: Accessor,
-    val shouldStripFinal: Boolean,
+    val shouldRemoveFinal: Boolean,
 )
 
 sealed class Descriptor(

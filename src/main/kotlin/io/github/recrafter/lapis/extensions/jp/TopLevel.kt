@@ -37,7 +37,6 @@ typealias JPArrayTypeName = ArrayTypeName
 
 typealias JPModifier = javax.lang.model.element.Modifier
 
-val JPVoid: JPTypeName = JPTypeName.VOID
 val JPBoolean: JPTypeName = JPTypeName.BOOLEAN
 val JPByte: JPTypeName = JPTypeName.BYTE
 val JPShort: JPTypeName = JPTypeName.SHORT
@@ -46,6 +45,7 @@ val JPLong: JPTypeName = JPTypeName.LONG
 val JPChar: JPTypeName = JPTypeName.CHAR
 val JPFloat: JPTypeName = JPTypeName.FLOAT
 val JPDouble: JPTypeName = JPTypeName.DOUBLE
+val JPVoid: JPTypeName = JPTypeName.VOID
 
 val JPObject: JPClassName = JPClassName.OBJECT
 val JPString: JPClassName = JPClassName.get(String::class.java)

@@ -246,7 +246,7 @@ class SymbolParser(
             isExtension = propertyDeclaration.isExtension,
             isMutable = propertyDeclaration.isMutable && propertyDeclaration.setter?.isPublic == true,
 
-            hasExtensionAnnotation = propertyDeclaration.hasAnnotation<Extension>()
+            hasExtensionAnnotation = propertyDeclaration.hasAnnotation<Extension>(),
         )
 
     @OptIn(KspExperimental::class)

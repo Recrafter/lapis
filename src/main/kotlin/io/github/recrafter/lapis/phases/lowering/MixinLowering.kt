@@ -57,7 +57,7 @@ class MixinLowering(
         val entries = mutableListOf<IrTweakerAccessorEntry>()
         if (schema.accessRequest != null) {
             entries += IrTweakerAccessorClassEntry(
-                removeFinal = schema.accessRequest.shouldStripFinal,
+                removeFinal = schema.accessRequest.shouldRemoveFinal,
             )
         }
         descriptorsToTweak.forEach { (descriptor, accessRequest) ->
@@ -68,7 +68,7 @@ class MixinLowering(
                         name = descriptor.binaryName,
                         parameterTypes = descriptor.parameters.map { it.typeName },
                         returnTypeName = if (isConstructor) null else descriptor.returnTypeName,
-                        removeFinal = accessRequest.shouldStripFinal,
+                        removeFinal = accessRequest.shouldRemoveFinal,
                     )
                 }
 
@@ -76,7 +76,7 @@ class MixinLowering(
                     IrTweakerAccessorFieldEntry(
                         name = descriptor.mappingName,
                         typeName = descriptor.fieldTypeName,
-                        removeFinal = accessRequest.shouldStripFinal,
+                        removeFinal = accessRequest.shouldRemoveFinal,
                     )
                 }
             }

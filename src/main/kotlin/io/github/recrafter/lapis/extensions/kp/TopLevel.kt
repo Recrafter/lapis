@@ -46,7 +46,6 @@ typealias KPModifier = KModifier
 
 val KPNothing: KPClassName = NOTHING
 
-val KPUnit: KPClassName = UNIT
 val KPBoolean: KPClassName = BOOLEAN
 val KPByte: KPClassName = BYTE
 val KPShort: KPClassName = SHORT
@@ -55,6 +54,7 @@ val KPLong: KPClassName = LONG
 val KPChar: KPClassName = CHAR
 val KPFloat: KPClassName = FLOAT
 val KPDouble: KPClassName = DOUBLE
+val KPUnit: KPClassName = UNIT
 
 val KPAny: KPClassName = ANY
 val KPString: KPClassName = STRING
