@@ -1,12 +1,15 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
+import com.google.devtools.ksp.symbol.KSFile
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 class IrBridge(
+    originatingFile: KSFile?,
+
     val className: IrClassName,
     val functions: List<IrBridgeFunction>,
-)
+) : IrGeneratedSource(originatingFile)
 
 sealed class IrBridgeFunction(
     val sourceName: String,

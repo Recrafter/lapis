@@ -7,7 +7,7 @@ import com.google.devtools.ksp.symbol.Variance
 import com.squareup.kotlinpoet.ksp.toClassName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.LapisOptions
-import io.github.recrafter.lapis.annotations.Accessor
+import io.github.recrafter.lapis.annotations.AccessStrategy
 import io.github.recrafter.lapis.annotations.At
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
@@ -60,15 +60,19 @@ class FrontendValidator(
             hasAnonymousSchemaAnnotation,
         ).count { it } == 1
         kspRequire(hasSingleSchemaAnnotation) { "62" }
-        val accessRequest = validateAccessRequest(hasAccessAnnotation, isAccessible, accessor, isAccessUnfinal)?.also {
-            kspRequire(accessor == Accessor.Tweaker) { "64" }
+        if (hasSchemaAnnotation) {
+            kspRequire(isTopLevel) { "56" }
         }
+        kspRequire(isObject) { "67" }
+        val accessRequest = validateAccessRequest(
+            hasAccessAnnotation, isResolvable, accessStrategy, isAccessUnfinal, emptyList()
+        )
         val qualifiedName = kspRequireNotNull(classDeclaration.qualifiedName?.asString()) { "66" }
-        val descriptors = parsedSchema.descriptors.mapNotNull { parsedDescriptor ->
+        val descriptors = descriptors.mapNotNull { parsedDescriptor ->
             val descriptorQualifiedName = parsedDescriptor.classDeclaration.qualifiedName?.asString()
                 ?: return@mapNotNull null
             val validatedDescriptor = runOrNullOnSkip {
-                validateDescriptor(parsedDescriptor, originClassDeclaration, originJvmClassName, isAccessible)
+                validateDescriptor(parsedDescriptor, originClassDeclaration, originJvmClassName, isResolvable)
             }
             if (validatedDescriptor != null) {
                 validDescriptors[descriptorQualifiedName] = validatedDescriptor
@@ -82,7 +86,8 @@ class FrontendValidator(
             classDeclaration = classDeclaration,
             originJvmClassName = originJvmClassName,
             originClassDeclaration = originClassDeclaration,
-            isAccessible = isAccessible,
+            side = kspRequireNotNull(side) { "85" },
+            isAccessible = isResolvable,
             accessRequest = accessRequest,
             descriptors = descriptors,
         )
@@ -99,11 +104,14 @@ class FrontendValidator(
         descriptor: ParsedDescriptor,
         schemaOriginClassDeclaration: KSClassDeclaration,
         schemaOriginJvmClassName: JvmClassName,
-        isAccessible: Boolean,
+        isResolvable: Boolean,
     ): Descriptor = with(descriptor) {
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "104" }
         kspRequire(superClassDeclaration?.isValid == true) { "105" }
-        val accessRequest = validateAccessRequest(hasAccessAnnotation, isAccessible, accessor, isAccessUnfinal)
+        kspRequire(isObject) { "131" }
+        val accessRequest = validateAccessRequest(
+            hasAccessAnnotation, isResolvable, accessStrategy, isAccessUnfinal, accessFieldOps,
+        )
         val mappingName = if (mappingName != null) {
             kspRequire(mappingName.isNotEmpty()) { "108" }
             mappingName
@@ -114,11 +122,15 @@ class FrontendValidator(
         if (superClassDeclaration.isBuiltin(SimpleBuiltin.Field)) {
             kspRequire(genericType is ParsedTypeDescriptorGenericType) { "115" }
             kspRequireNotNull(genericType.type) { "116" }
+            if (accessRequest is MixinAccessRequest) {
+                kspRequire(accessRequest.fieldOps.isNotEmpty()) { "131" }
+            }
             return FieldDescriptor(
+                source = symbol,
                 name = name,
                 classDeclaration = classDeclaration,
                 receiverType = receiverType,
-                inaccessibleReceiverJvmClassName = if (isAccessible) null else schemaOriginJvmClassName,
+                inaccessibleReceiverJvmClassName = if (isResolvable) null else schemaOriginJvmClassName,
                 mappingName = mappingName,
                 fieldType = genericType.type,
                 arrayComponentType = genericType.arrayComponentType,
@@ -135,13 +147,17 @@ class FrontendValidator(
                 name = parameter.name,
             )
         }
+        if (accessRequest != null) {
+            kspRequire(parameters.all { it.name != null }) { "168" }
+        }
         return when {
             superClassDeclaration.isBuiltin(SimpleBuiltin.Method) -> {
                 MethodDescriptor(
+                    source = symbol,
                     name = name,
                     classDeclaration = classDeclaration,
                     receiverType = receiverType,
-                    inaccessibleReceiverJvmClassName = if (isAccessible) null else schemaOriginJvmClassName,
+                    inaccessibleReceiverJvmClassName = if (isResolvable) null else schemaOriginJvmClassName,
                     returnType = genericType.returnType,
                     mappingName = mappingName,
                     parameters = parameters,
@@ -154,7 +170,11 @@ class FrontendValidator(
                 kspRequire(!isAccessUnfinal) { "154" }
                 kspRequire(genericType.returnType == null) { "155" }
                 kspRequire(!hasMappingNameAnnotation) { "156" }
+                if (accessRequest is MixinAccessRequest) {
+                    kspRequire(isResolvable) { "168" }
+                }
                 ConstructorDescriptor(
+                    source = symbol,
                     name = name,
                     classDeclaration = classDeclaration,
                     returnType = receiverType,
@@ -169,17 +189,19 @@ class FrontendValidator(
 
     private fun SymbolSource.validateAccessRequest(
         hasAccessAnnotation: Boolean,
-        isAccessible: Boolean,
-        accessor: Accessor?,
-        isAccessUnfinal: Boolean,
+        isResolvable: Boolean,
+        strategy: AccessStrategy?,
+        unfinal: Boolean,
+        fieldOps: List<Op>,
     ): AccessRequest? {
         if (!hasAccessAnnotation) return null
-        kspRequire(isAccessible) { "177" }
-        kspRequireNotNull(accessor) { "178" }
-        if (accessor == Accessor.Tweaker) {
+        kspRequireNotNull(strategy) { "178" }
+        if (strategy == AccessStrategy.Tweak) {
+            kspRequire(isResolvable) { "177" }
             kspRequire(options.accessWidenerConfig != null || options.accessTransformerConfig != null) { "180" }
+            return TweakAccessRequest(unfinal)
         }
-        return AccessRequest(accessor, isAccessUnfinal)
+        return MixinAccessRequest(unfinal, fieldOps)
     }
 
     private fun validatePatch(patch: ParsedPatch): Patch = with(patch) {

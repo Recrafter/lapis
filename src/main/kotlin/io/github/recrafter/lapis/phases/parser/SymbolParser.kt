@@ -31,7 +31,6 @@ class SymbolParser(
             resolver
                 .getSymbolsAnnotatedWith<Schema>()
                 .filterIsInstance<KSClassDeclaration>()
-                .filterNot { it.parentDeclaration != null }
                 .toList(),
             resolver
                 .getSymbolsAnnotatedWith<Patch>()
@@ -47,19 +46,26 @@ class SymbolParser(
             )
         }
 
-    private fun parseSchema(symbol: KSClassDeclaration, parentJvmClassName: JvmClassName? = null): ParsedSchema {
-        val schemaAnnotation = symbol.findAnnotation<Schema>()
-        val innerSchemaAnnotation = symbol.findAnnotation<InnerSchema>()
-        val localSchemaAnnotation = symbol.findAnnotation<LocalSchema>()
-        val anonymousSchemaAnnotation = symbol.findAnnotation<AnonymousSchema>()
-        val isResolvable = symbol.parentDeclarations(includeSelf = true).none {
+    private fun parseSchema(
+        classDeclaration: KSClassDeclaration,
+        parentJvmClassName: JvmClassName? = null,
+    ): ParsedSchema {
+        val schemaAnnotation = classDeclaration.findAnnotation<Schema>()
+        val innerSchemaAnnotation = classDeclaration.findAnnotation<InnerSchema>()
+        val localSchemaAnnotation = classDeclaration.findAnnotation<LocalSchema>()
+        val anonymousSchemaAnnotation = classDeclaration.findAnnotation<AnonymousSchema>()
+        val isResolvable = classDeclaration.parentDeclarations(includeSelf = true).none {
             it.hasAnnotation<LocalSchema>() || it.hasAnnotation<AnonymousSchema>()
         }
-        val (currentJvmClassName, originClassDeclaration) = when {
+        val (currentJvmClassName, originClassDeclaration, side) = when {
             parentJvmClassName == null -> {
                 val qualifiedName = schemaAnnotation?.getArgumentValue(Schema::qualifiedName)
                 val rootJvmClassName = qualifiedName?.let { JvmClassName.of(it) }
-                rootJvmClassName to qualifiedName?.let(resolver::getClassDeclarationByName)
+                Triple(
+                    rootJvmClassName,
+                    qualifiedName?.let(resolver::getClassDeclarationByName),
+                    schemaAnnotation?.getArgumentValue(Schema::side),
+                )
             }
 
             innerSchemaAnnotation != null -> {
@@ -68,9 +74,14 @@ class SymbolParser(
                 val classDeclaration = if (isResolvable) {
                     innerJvmClassName?.qualifiedName?.let(resolver::getClassDeclarationByName)
                 } else {
-                    innerSchemaAnnotation.getArgumentValue(InnerSchema::delegate)?.toClassDeclaration()
+                    innerSchemaAnnotation.getArgumentValue(InnerSchema::delegate)
+                        ?.toClassDeclaration()
                 }
-                innerJvmClassName to classDeclaration
+                Triple(
+                    innerJvmClassName,
+                    classDeclaration,
+                    innerSchemaAnnotation.getArgumentValue(InnerSchema::side),
+                )
             }
 
             localSchemaAnnotation != null -> {
@@ -79,40 +90,51 @@ class SymbolParser(
                 val localJvmClassName = if (index != null && name != null) {
                     parentJvmClassName.local(index, name)
                 } else null
-                localJvmClassName to localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)?.toClassDeclaration()
+                Triple(
+                    localJvmClassName,
+                    localSchemaAnnotation.getArgumentValue(LocalSchema::delegate)?.toClassDeclaration(),
+                    localSchemaAnnotation.getArgumentValue(LocalSchema::side),
+                )
             }
 
             anonymousSchemaAnnotation != null -> {
                 val index = anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::index)
                 val anonymousJvmClassName = index?.let { parentJvmClassName.anonymous(it) }
-                anonymousJvmClassName to anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)
-                    ?.toClassDeclaration()
+                Triple(
+                    anonymousJvmClassName,
+                    anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::delegate)?.toClassDeclaration(),
+                    anonymousSchemaAnnotation.getArgumentValue(AnonymousSchema::side),
+                )
             }
 
-            else -> null to null
+            else -> Triple(null, null, null)
         }
-        val accessAnnotation = symbol.findAnnotation<Access>()
-        val (nestedSchemas, descriptors) = symbol.classDeclarations.partition { it.getSuperTypeOrNull() == null }
+        val accessAnnotation = classDeclaration.findAnnotation<Access>()
+        val (nestedSchemas, descriptors) = classDeclaration.classDeclarations.partition {
+            it.getSuperTypeOrNull() == null
+        }
         return ParsedSchema(
-            symbol = symbol,
-            classDeclaration = symbol,
+            symbol = classDeclaration,
+            classDeclaration = classDeclaration,
+            side = side ?: Side.Common,
+            isObject = classDeclaration.isObject,
+            isTopLevel = classDeclaration.parentDeclaration == null,
             originClassDeclaration = originClassDeclaration,
             originJvmClassName = currentJvmClassName,
             hasSchemaAnnotation = schemaAnnotation != null,
             hasInnerSchemaAnnotation = innerSchemaAnnotation != null,
             hasLocalSchemaAnnotation = localSchemaAnnotation != null,
             hasAnonymousSchemaAnnotation = anonymousSchemaAnnotation != null,
+            isResolvable = isResolvable,
             hasAccessAnnotation = accessAnnotation != null,
-            isAccessible = isResolvable,
             isAccessUnfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
-            accessor = accessAnnotation?.getArgumentValue(Access::accessor),
+            accessStrategy = accessAnnotation?.getArgumentValue(Access::strategy),
             descriptors = descriptors.map(::parseDescriptor),
             nestedSchemas = nestedSchemas.map { parseSchema(it, currentJvmClassName) },
         )
     }
 
     private fun parseDescriptor(classDeclaration: KSClassDeclaration): ParsedDescriptor {
-        val accessAnnotation = classDeclaration.findAnnotation<Access>()
         val mappingNameAnnotation = classDeclaration.findAnnotation<MappingName>()
         val superClassType = classDeclaration.getSuperTypeOrNull()
         val ktFunctionType = classDeclaration
@@ -131,17 +153,20 @@ class SymbolParser(
             ?.typeReference
             ?.typeElement
             ?.castOrNull<KtFunctionType>()
+        val accessAnnotation = classDeclaration.findAnnotation<Access>()
         return ParsedDescriptor(
             symbol = classDeclaration,
 
             name = classDeclaration.name,
             classDeclaration = classDeclaration,
+            isObject = classDeclaration.isObject,
             hasStaticAnnotation = classDeclaration.hasAnnotation<Static>(),
-            hasAccessAnnotation = accessAnnotation != null,
             hasMappingNameAnnotation = mappingNameAnnotation != null,
             mappingName = mappingNameAnnotation?.getArgumentValue(MappingName::name),
+            hasAccessAnnotation = accessAnnotation != null,
             isAccessUnfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
-            accessor = accessAnnotation?.getArgumentValue(Access::accessor),
+            accessFieldOps = accessAnnotation?.getArgumentValue(Access::field).orEmpty(),
+            accessStrategy = accessAnnotation?.getArgumentValue(Access::strategy),
 
             genericType = parseDescriptorGenericType(superClassType?.genericTypes?.firstOrNull(), ktFunctionType),
             superClassDeclaration = superClassType?.toClassDeclaration(),
@@ -178,31 +203,30 @@ class SymbolParser(
             )
         }
 
-    private fun parsePatch(symbol: KSAnnotated): ParsedPatch {
-        val patchAnnotation = symbol.findAnnotation<Patch>()
-        val classDeclaration = symbol.castOrNull<KSClassDeclaration>()
+    private fun parsePatch(classDeclaration: KSClassDeclaration): ParsedPatch {
+        val patchAnnotation = classDeclaration.findAnnotation<Patch>()
         return ParsedPatch(
-            symbol = symbol,
+            symbol = classDeclaration,
 
-            name = classDeclaration?.name,
-            side = patchAnnotation?.getArgumentValue(Patch::side),
-            isClass = classDeclaration?.isClass == true,
-            isObject = classDeclaration?.isObject == true,
-            isOpen = classDeclaration?.isExplicitlyOpen == true,
-            isAbstract = classDeclaration?.isExplicitlyAbstract == true,
-            isSealed = classDeclaration?.isSealed == true,
-            isTopLevel = classDeclaration?.parentDeclaration == null,
-            isPublic = classDeclaration?.isPublic() == true,
+            name = classDeclaration.name,
+            side = patchAnnotation?.getArgumentValue(Patch::side) ?: Side.Common,
+            isClass = classDeclaration.isClass,
+            isObject = classDeclaration.isObject,
+            isOpen = classDeclaration.isExplicitlyOpen,
+            isAbstract = classDeclaration.isExplicitlyAbstract,
+            isSealed = classDeclaration.isSealed,
+            isTopLevel = classDeclaration.parentDeclaration == null,
+            isPublic = classDeclaration.isPublic(),
             initStrategy = patchAnnotation?.getArgumentValue(Patch::initStrategy),
             classDeclaration = classDeclaration,
 
             schemaClassDeclaration = patchAnnotation?.getArgumentValue(Patch::schema)?.toClassDeclaration(),
 
-            companionObjects = classDeclaration?.companionObjectClassDeclarations
-                ?.map(::parsePatchCompanionObject).orEmpty().toList(),
-            constructors = classDeclaration?.constructorDeclarations?.map(::parsePatchConstructor).orEmpty().toList(),
-            properties = classDeclaration?.bodyPropertyDeclarations?.map(::parsePatchProperty).orEmpty().toList(),
-            functions = classDeclaration?.functionDeclarations?.map(::parsePatchFunction).orEmpty().toList(),
+            companionObjects = classDeclaration.companionObjectClassDeclarations.map(::parsePatchCompanionObject)
+                .toList(),
+            constructors = classDeclaration.constructorDeclarations.map(::parsePatchConstructor).toList(),
+            properties = classDeclaration.bodyPropertyDeclarations.map(::parsePatchProperty).toList(),
+            functions = classDeclaration.functionDeclarations.map(::parsePatchFunction).toList(),
         )
     }
 
@@ -449,9 +473,8 @@ class SymbolParser(
     private inline fun <reified A : Annotation, reified E : Enum<E>> KSAnnotation.getArgumentValue(
         property: KProperty1<A, E>,
         explicit: Boolean = false,
-        default: E? = null,
     ): E? =
-        findArgumentValue(property, explicit)?.asEnum(default)
+        findArgumentValue(property, explicit)?.asEnum()
 
     private inline fun <reified A : Annotation, reified Embedded : Annotation> KSAnnotation.getArgumentValue(
         property: KProperty1<A, Embedded>,

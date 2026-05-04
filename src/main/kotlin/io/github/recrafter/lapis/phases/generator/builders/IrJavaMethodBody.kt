@@ -47,6 +47,13 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
         withControlFlow(buildJavaCodeBlock("if (%L)") { arg(condition) }, body)
     }
 
+    fun IrJavaMethodBody.throw_(
+        format: String,
+        arguments: Builder<IrJavaCodeBlock.Arguments> = {}
+    ) {
+        builder.addStatement(buildJavaCodeBlock("throw $format", arguments))
+    }
+
     @Suppress("LocalVariableName")
     fun IrJavaMethodBody.try_(
         block: Builder<IrJavaCodeBlock>,

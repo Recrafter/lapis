@@ -27,6 +27,7 @@ class Schema(
     classDeclaration: KSClassDeclaration,
     val originJvmClassName: JvmClassName,
     val originClassDeclaration: KSClassDeclaration,
+    val side: Side,
 
     val isAccessible: Boolean,
 
@@ -38,12 +39,13 @@ class Schema(
     val containingFile: KSFile? = source.containingFile
 }
 
-class AccessRequest(
-    val accessor: Accessor,
-    val shouldRemoveFinal: Boolean,
-)
+sealed class AccessRequest(val shouldRemoveFinal: Boolean)
+class TweakAccessRequest(shouldRemoveFinal: Boolean) : AccessRequest(shouldRemoveFinal)
+class MixinAccessRequest(shouldRemoveFinal: Boolean, val fieldOps: List<Op>) : AccessRequest(shouldRemoveFinal)
 
 sealed class Descriptor(
+    source: KSNode,
+
     val name: String,
     val mappingName: String,
     classDeclaration: KSClassDeclaration,
@@ -57,9 +59,12 @@ sealed class Descriptor(
     val className: IrClassName = classDeclaration.asIrClassName()
     val receiverTypeName: IrTypeName = receiverType.asIrTypeName()
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
+    val containingFile: KSFile? = source.containingFile
 }
 
 sealed class InvokableDescriptor(
+    source: KSNode,
+
     name: String,
     mappingName: String,
     classDeclaration: KSClassDeclaration,
@@ -70,6 +75,7 @@ sealed class InvokableDescriptor(
     isStatic: Boolean,
     accessRequest: AccessRequest?,
 ) : Descriptor(
+    source,
     name,
     mappingName,
     classDeclaration,
@@ -82,16 +88,20 @@ sealed class InvokableDescriptor(
 )
 
 class ConstructorDescriptor(
+    source: KSNode,
+
     name: String,
     classDeclaration: KSClassDeclaration,
     returnType: KSType,
     parameters: List<FunctionTypeParameter>,
     accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
-    name, "", classDeclaration, returnType, null, parameters, returnType, false, accessRequest,
+    source, name, "", classDeclaration, returnType, null, parameters, returnType, false, accessRequest,
 )
 
 open class MethodDescriptor(
+    source: KSNode,
+
     name: String,
     mappingName: String,
     classDeclaration: KSClassDeclaration,
@@ -102,6 +112,7 @@ open class MethodDescriptor(
     isStatic: Boolean,
     accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
+    source,
     name,
     mappingName,
     classDeclaration,
@@ -114,6 +125,8 @@ open class MethodDescriptor(
 )
 
 class FieldDescriptor(
+    source: KSNode,
+
     name: String,
     mappingName: String,
     classDeclaration: KSClassDeclaration,
@@ -124,6 +137,7 @@ class FieldDescriptor(
     isStatic: Boolean,
     accessRequest: AccessRequest?,
 ) : Descriptor(
+    source,
     name,
     mappingName,
     classDeclaration,

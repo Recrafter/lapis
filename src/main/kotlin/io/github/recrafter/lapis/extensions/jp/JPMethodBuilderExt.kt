@@ -5,6 +5,7 @@ import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaMethodBody
 import io.github.recrafter.lapis.phases.lowering.IrModifier
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
@@ -14,6 +15,10 @@ inline fun <reified A : Annotation> JPMethodBuilder.addAnnotation(builder: Build
 
 fun JPMethodBuilder.setBody(builder: Builder<IrJavaMethodBody> = {}) {
     IrJavaMethodBody(this).builder()
+}
+
+fun JPMethodBuilder.setStubBody() {
+    setBody { throw_("new %T(%S)") { arg(AssertionError::class.asIrTypeName()); arg("Stub!") } }
 }
 
 fun JPMethodBuilder.setReturnType(typeName: IrTypeName?) {

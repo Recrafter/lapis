@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.phases.generator.builders
 
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import kotlin.reflect.KClass
 
@@ -59,6 +60,10 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
 
         fun arg(typeName: IrTypeName) {
             arguments += typeName.java
+        }
+
+        fun arg(parameter: IrParameter) {
+            arguments += buildJavaMethod(parameter.name)
         }
 
         fun build(): List<Any> =

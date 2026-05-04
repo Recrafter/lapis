@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.recrafter.lapis.extensions.jp.JPMethod
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
@@ -51,6 +52,10 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
 
         fun arg(function: KPFunction) {
             arguments += function
+        }
+
+        fun arg(method: JPMethod) {
+            arguments += buildKotlinFunction(method.name())
         }
 
         fun arg(typeName: IrTypeName) {

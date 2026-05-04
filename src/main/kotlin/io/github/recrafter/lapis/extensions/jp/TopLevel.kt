@@ -4,7 +4,6 @@ import com.palantir.javapoet.*
 import io.github.recrafter.lapis.phases.generator.GeneratorConstants
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
-import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
@@ -72,9 +71,6 @@ fun buildJavaMethod(name: String, builder: Builder<JPMethodBuilder> = {}): JPMet
 
 fun buildJavaParameter(name: String, typeName: IrTypeName, builder: Builder<JPParameterBuilder> = {}): JPParameter =
     JPParameter.builder(typeName.java, name).apply(builder).build()
-
-fun buildJavaParameter(parameter: IrParameter, builder: Builder<JPParameterBuilder> = {}): JPParameter =
-    buildJavaParameter(parameter.name, parameter.typeName, builder)
 
 fun buildJavaInterface(name: String, builder: Builder<JPClassBuilder> = {}): JPClass =
     JPClass.interfaceBuilder(name).apply(builder).build()

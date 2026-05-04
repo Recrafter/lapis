@@ -3,7 +3,6 @@ package io.github.recrafter.lapis.phases.lowering
 import com.squareup.kotlinpoet.asTypeName
 import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.LapisOptions
-import io.github.recrafter.lapis.annotations.Accessor
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
@@ -33,11 +32,10 @@ class MixinLowering(
         return IrResult(
             schemas = validatorResult.schemas.map { schema ->
                 IrSchema(
-                    originatingFile = schema.containingFile,
-
                     className = schema.className,
                     descriptors = schema.descriptors.map(::lowerDescriptor),
                     tweakerAccessor = lowerTweakerAccessor(schema),
+                    mixinAccessor = lowerMixinAccessor(schema),
                 )
             },
             patches = patches,
@@ -45,13 +43,13 @@ class MixinLowering(
     }
 
     private fun lowerTweakerAccessor(schema: Schema): IrTweakerAccessor? {
-        val descriptorsToTweak = schema.descriptors.mapNotNull {
-            if (it.accessRequest?.accessor != Accessor.Tweaker) {
+        val descriptors = schema.descriptors.mapNotNull {
+            if (it.accessRequest !is TweakAccessRequest) {
                 return@mapNotNull null
             }
             it to it.accessRequest
         }
-        if (schema.accessRequest == null && descriptorsToTweak.isEmpty()) {
+        if (schema.accessRequest == null && descriptors.isEmpty()) {
             return null
         }
         val entries = mutableListOf<IrTweakerAccessorEntry>()
@@ -60,7 +58,7 @@ class MixinLowering(
                 removeFinal = schema.accessRequest.shouldRemoveFinal,
             )
         }
-        descriptorsToTweak.forEach { (descriptor, accessRequest) ->
+        descriptors.forEach { (descriptor, accessRequest) ->
             entries += when (descriptor) {
                 is InvokableDescriptor -> {
                     val isConstructor = descriptor is ConstructorDescriptor
@@ -81,7 +79,61 @@ class MixinLowering(
                 }
             }
         }
-        return IrTweakerAccessor(schema.originJvmClassName, entries)
+        return IrTweakerAccessor(schema.containingFile, schema.originJvmClassName, entries)
+    }
+
+    private fun lowerMixinAccessor(schema: Schema): IrMixinAccessor? {
+        val descriptors = schema.descriptors.mapNotNull {
+            if (it.accessRequest !is MixinAccessRequest) {
+                return@mapNotNull null
+            }
+            it to it.accessRequest
+        }
+        if (descriptors.isEmpty()) {
+            return null
+        }
+        val members = mutableListOf<IrMixinAccessorMember>()
+        descriptors.forEach { (descriptor, accessRequest) ->
+            members += when (descriptor) {
+                is InvokableDescriptor -> {
+                    val parameters = descriptor.parameters.map {
+                        IrParameter(it.name ?: lapisError("Parameter name cannot be null"), it.typeName)
+                    }
+                    IrMixinAccessorMethodMember(
+                        name = descriptor.name,
+                        mappingName = descriptor.binaryName,
+                        parameters = parameters,
+                        returnTypeName = descriptor.returnTypeName,
+                        isStatic = descriptor is ConstructorDescriptor || descriptor.isStatic,
+                    )
+                }
+
+                is FieldDescriptor -> {
+                    IrMixinAccessorFieldMember(
+                        name = descriptor.name,
+                        mappingName = descriptor.mappingName,
+                        typeName = descriptor.fieldTypeName,
+                        isStatic = descriptor.isStatic,
+                        removeFinal = accessRequest.shouldRemoveFinal,
+                        ops = accessRequest.fieldOps,
+                        descriptorClassName = descriptor.className,
+                    )
+                }
+            }
+        }
+        return IrMixinAccessor(
+            originatingFile = schema.containingFile,
+            className = IrClassName.of(
+                options.mixinPackageName,
+                "Accessor".withQualifiedNamePrefix(schema.className)
+            ),
+            schemaClassName = schema.className,
+            schemaSide = schema.side,
+            targetInternalName = schema.originJvmClassName.internalName,
+            receiverTypeName = schema.originTypeName,
+            isAccessibleSchema = schema.isAccessible,
+            members = members,
+        )
     }
 
     private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor =
@@ -120,8 +172,6 @@ class MixinLowering(
     private fun lowerPatch(patch: Patch): IrPatch {
         val constructorArguments = patch.constructorParameters.map(::lowerPatchConstructorArgument)
         return IrPatch(
-            originatingFile = patch.containingFile,
-
             side = patch.side,
             isObject = patch.isObject,
             className = patch.className,
@@ -139,6 +189,7 @@ class MixinLowering(
     private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl? =
         if (patch.hasStaticHooksOnly) null
         else IrPatchImpl(
+            originatingFile = patch.containingFile,
             className = IrClassName.of(
                 options.generatedPackageName,
                 "Impl".withQualifiedNamePrefix(patch.className)
@@ -153,6 +204,7 @@ class MixinLowering(
 
     private fun lowerMixin(patch: Patch): IrMixin =
         IrMixin(
+            originatingFiles = listOfNotNull(patch.containingFile),
             className = IrClassName.of(
                 options.mixinPackageName,
                 "Mixin".withQualifiedNamePrefix(patch.className)
@@ -167,6 +219,8 @@ class MixinLowering(
     private fun lowerBridge(patch: Patch): IrBridge? =
         if (patch.bridgeSources.isEmpty()) null
         else IrBridge(
+            originatingFile = patch.containingFile,
+
             className = IrClassName.of(
                 options.generatedPackageName,
                 "Bridge".withQualifiedNamePrefix(patch.className)
@@ -531,6 +585,7 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 IrHookOriginBodyDescriptorWrapperImplArgument(
                     IrBodyDescriptorWrapperImpl(
+                        originatingFile = descriptor.containingFile,
                         className = IrClassName.of(
                             options.generatedPackageName,
                             DescriptorWrapperBuiltin.Body.name.withQualifiedNamePrefix(descriptor.className)
@@ -547,6 +602,7 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 IrHookOriginFieldGetDescriptorWrapperImplArgument(
                     IrFieldGetDescriptorWrapperImpl(
+                        originatingFile = descriptor.containingFile,
                         className = IrClassName.of(
                             options.generatedPackageName,
                             DescriptorWrapperBuiltin.FieldGet.name.withQualifiedNamePrefix(descriptor.className)
@@ -563,6 +619,7 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 IrHookOriginFieldSetDescriptorWrapperImplArgument(
                     IrFieldSetDescriptorWrapperImpl(
+                        originatingFile = descriptor.containingFile,
                         className = IrClassName.of(
                             options.generatedPackageName,
                             DescriptorWrapperBuiltin.FieldSet.name.withQualifiedNamePrefix(descriptor.className)
@@ -579,6 +636,7 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 IrHookOriginArrayGetDescriptorWrapperImplArgument(
                     IrArrayGetDescriptorWrapperImpl(
+                        originatingFile = descriptor.containingFile,
                         className = IrClassName.of(
                             options.generatedPackageName,
                             DescriptorWrapperBuiltin.ArrayGet.name.withQualifiedNamePrefix(descriptor.className)
@@ -595,6 +653,7 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 IrHookOriginArraySetDescriptorWrapperImplArgument(
                     IrArraySetDescriptorWrapperImpl(
+                        originatingFile = descriptor.containingFile,
                         className = IrClassName.of(
                             options.generatedPackageName,
                             DescriptorWrapperBuiltin.ArraySet.name.withQualifiedNamePrefix(descriptor.className)
@@ -611,6 +670,7 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 IrHookOriginCallDescriptorWrapperImplArgument(
                     IrCallDescriptorWrapperImpl(
+                        originatingFile = descriptor.containingFile,
                         className = IrClassName.of(
                             options.generatedPackageName,
                             DescriptorWrapperBuiltin.Call.name.withQualifiedNamePrefix(descriptor.className)
@@ -628,6 +688,7 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 IrHookCancelDescriptorWrapperImplArgument(
                     IrCancelDescriptorWrapperImpl(
+                        originatingFile = descriptor.containingFile,
                         className = IrClassName.of(
                             options.generatedPackageName,
                             DescriptorWrapperBuiltin.Cancel.name.withQualifiedNamePrefix(descriptor.className)
@@ -713,5 +774,5 @@ fun KPLambdaTypeName.asIrLambdaTypeName(): IrLambdaTypeName =
 fun KPDynamic.asIrDynamic(): IrDynamic =
     IrDynamic(this)
 
-private fun String.withQualifiedNamePrefix(className: IrClassName): String =
+fun String.withQualifiedNamePrefix(className: IrClassName): String =
     className.qualifiedName.replace('.', '_') + "_$this"

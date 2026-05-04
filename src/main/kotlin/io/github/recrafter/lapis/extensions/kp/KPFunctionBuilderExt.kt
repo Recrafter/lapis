@@ -10,6 +10,7 @@ import io.github.recrafter.lapis.phases.generator.builders.IrKotlinFunctionBody
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 
 inline fun <reified A : Annotation> KPFunctionBuilder.addAnnotation(
     useSiteTarget: UseSiteTarget? = null,
@@ -32,6 +33,10 @@ fun KPFunctionBuilder.addReturnStatement(codeBlock: KPCodeBlock?) {
     } else {
         addStatement("return")
     }
+}
+
+fun KPFunctionBuilder.setVariableTypes(vararg types: IrTypeVariableName) {
+    addTypeVariables(types.map { it.kotlin })
 }
 
 fun KPFunctionBuilder.setReturnType(typeName: IrTypeName?) {
