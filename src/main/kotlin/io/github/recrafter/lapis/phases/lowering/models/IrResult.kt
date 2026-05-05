@@ -26,33 +26,33 @@ class IrMixinAccessor(
     originatingFile: KSFile?,
 
     val className: IrClassName,
-    val schemaClassName: IrClassName,
-    val schemaSide: Side,
+    val side: Side,
     val isAccessibleSchema: Boolean,
     val targetInternalName: String,
     val receiverTypeName: IrTypeName,
     val members: List<IrMixinAccessorMember>,
 ) : IrAccessor(originatingFile)
 
-sealed interface IrMixinAccessorMember
+sealed class IrMixinAccessorMember(val isStatic: Boolean, val schemaReceiverClassName: IrClassName)
 
 class IrMixinAccessorFieldMember(
     val name: String,
     val mappingName: String,
     val typeName: IrTypeName,
-    val isStatic: Boolean,
+    isStatic: Boolean,
     val removeFinal: Boolean,
     val ops: List<Op>,
-    val descriptorClassName: IrClassName,
-) : IrMixinAccessorMember
+    schemaReceiverClassName: IrClassName,
+) : IrMixinAccessorMember(isStatic, schemaReceiverClassName)
 
 class IrMixinAccessorMethodMember(
     val name: String,
     val mappingName: String,
     val parameters: List<IrParameter>,
     val returnTypeName: IrTypeName?,
-    val isStatic: Boolean,
-) : IrMixinAccessorMember
+    isStatic: Boolean,
+    schemaReceiverClassName: IrClassName,
+) : IrMixinAccessorMember(isStatic, schemaReceiverClassName)
 
 class IrTweakerAccessor(
     originatingFile: KSFile?,

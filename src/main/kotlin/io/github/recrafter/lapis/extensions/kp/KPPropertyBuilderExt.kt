@@ -1,10 +1,13 @@
 package io.github.recrafter.lapis.extensions.kp
 
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
+import com.squareup.kotlinpoet.ContextParameter
+import com.squareup.kotlinpoet.ExperimentalKotlinPoetApi
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.lowering.IrModifier
+import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> KPPropertyBuilder.addAnnotation(
@@ -25,6 +28,11 @@ fun KPPropertyBuilder.setSetter(builder: Builder<KPFunctionBuilder> = {}) {
 
 fun KPPropertyBuilder.setReceiverType(typeName: IrTypeName) {
     receiver(typeName.kotlin)
+}
+
+@OptIn(ExperimentalKotlinPoetApi::class)
+fun KPPropertyBuilder.setContextParameters(parameters: List<IrParameter>) {
+    contextParameters(parameters.map { ContextParameter(it.name, it.typeName.kotlin) })
 }
 
 fun KPPropertyBuilder.setModifiers(vararg modifiers: IrModifier) {

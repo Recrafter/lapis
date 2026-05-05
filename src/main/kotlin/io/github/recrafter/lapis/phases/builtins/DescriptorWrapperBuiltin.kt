@@ -527,9 +527,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl>(
             val receiverTypeName = impl.receiverTypeName ?: return
             destination.addFunction(buildKotlinFunction("call", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE)
-                setReceiverType(impl.superClassTypeName)
                 val receiverParameter = IrParameter("_receiver", receiverTypeName)
                 setContextParameters(listOf(receiverParameter))
+                setReceiverType(impl.superClassTypeName)
                 addParameters(namedArgumentParameters)
                 setReturnType(impl.returnTypeName)
                 setBody {

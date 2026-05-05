@@ -8,6 +8,7 @@ import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrKotlinFunctionBody
 import io.github.recrafter.lapis.phases.lowering.IrModifier
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
@@ -21,6 +22,10 @@ inline fun <reified A : Annotation> KPFunctionBuilder.addAnnotation(
 
 fun KPFunctionBuilder.setBody(builder: Builder<IrKotlinFunctionBody> = {}) {
     IrKotlinFunctionBody(this).builder()
+}
+
+fun KPFunctionBuilder.setStubBody(message: String = "Stub!") {
+    setBody { throw_("%T(%S)") { arg(AssertionError::class.asIrTypeName()); arg(message) } }
 }
 
 fun KPFunctionBuilder.addStatement(codeBlock: KPCodeBlock) {

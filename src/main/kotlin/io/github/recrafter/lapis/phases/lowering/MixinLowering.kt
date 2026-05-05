@@ -105,6 +105,7 @@ class MixinLowering(
                         parameters = parameters,
                         returnTypeName = descriptor.returnTypeName,
                         isStatic = descriptor is ConstructorDescriptor || descriptor.isStatic,
+                        schemaReceiverClassName = schema.className,
                     )
                 }
 
@@ -116,7 +117,7 @@ class MixinLowering(
                         isStatic = descriptor.isStatic,
                         removeFinal = accessRequest.shouldRemoveFinal,
                         ops = accessRequest.fieldOps,
-                        descriptorClassName = descriptor.className,
+                        schemaReceiverClassName = descriptor.className,
                     )
                 }
             }
@@ -127,8 +128,7 @@ class MixinLowering(
                 options.mixinPackageName,
                 "Accessor".withQualifiedNamePrefix(schema.className)
             ),
-            schemaClassName = schema.className,
-            schemaSide = schema.side,
+            side = schema.side,
             targetInternalName = schema.originJvmClassName.internalName,
             receiverTypeName = schema.originTypeName,
             isAccessibleSchema = schema.isAccessible,

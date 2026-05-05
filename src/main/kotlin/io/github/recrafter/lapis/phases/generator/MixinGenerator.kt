@@ -32,7 +32,6 @@ import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
-import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 import io.github.recrafter.lapis.phases.lowering.types.orVoid
 import kotlinx.serialization.json.Json
 import org.objectweb.asm.Opcodes
@@ -774,11 +773,32 @@ class MixinGenerator(
                 }
                 setModifiers(IrModifier.PUBLIC)
                 accessor.members.forEach { member ->
+                    val isDelegated = !accessor.isAccessibleSchema && !member.isStatic
+                    val delegateParameter = if (isDelegated) {
+                        IrParameter("delegate", accessor.receiverTypeName)
+                    } else null
+                    val jvmNamespace = if (isDelegated) member.schemaReceiverClassName else null
+                    val extensionReceiverTypeName = if (member.isStatic || isDelegated) {
+                        member.schemaReceiverClassName
+                    } else {
+                        accessor.receiverTypeName
+                    }
+                    val interfaceCodeBlock = buildKotlinCodeBlock(
+                        when {
+                            member.isStatic -> "%T"
+                            delegateParameter != null -> "(%N as %T)"
+                            else -> "(this as %T)"
+                        }
+                    ) {
+                        delegateParameter?.let(::arg)
+                        arg(accessor.className)
+                    }
                     when (member) {
                         is IrMixinAccessorFieldMember -> {
-                            val setterParameters = listOf(IrSetterParameter(member.typeName))
-                            val opMethods = member.ops.associateWith { op ->
-                                val accessorMethod = buildJavaMethod("_access_${op.name.lowercase()}_" + member.name) {
+                            val methods = member.ops.associateWith { op ->
+                                buildJavaMethod(
+                                    member.name.withInternalPrefix(op.name.lowercase()).withInternalPrefix(ACCESS)
+                                ) {
                                     setModifiers(
                                         IrModifier.PUBLIC,
                                         if (member.isStatic) IrModifier.STATIC else IrModifier.ABSTRACT
@@ -790,7 +810,7 @@ class MixinGenerator(
                                         if (member.removeFinal) {
                                             addAnnotation<Mutable>()
                                         }
-                                        setParameters(setterParameters)
+                                        setParameters(listOf(IrSetterParameter(member.typeName)))
                                     }
                                     if (op == Op.Get) {
                                         setReturnType(member.typeName)
@@ -799,42 +819,35 @@ class MixinGenerator(
                                         setStubBody()
                                     }
                                 }.also(::addMethod)
-                                accessorMethod
                             }
                             extensionProperties += buildKotlinProperty(
-                                if (member.isStatic) "value" else member.name,
-                                member.typeName
+                                if (member.isStatic || isDelegated) "value" else member.name,
+                                member.typeName,
+                                jvmNamespace = jvmNamespace
                             ) {
-                                setReceiverType(
-                                    if (member.isStatic) member.descriptorClassName
-                                    else accessor.receiverTypeName
-                                )
+                                delegateParameter?.let { setContextParameters(listOf(it)) }
+                                setReceiverType(extensionReceiverTypeName)
                                 setGetter {
                                     setModifiers(IrModifier.INLINE)
-                                    setBody {
-                                        val getter = opMethods[Op.Get]
-                                        if (getter != null) {
-                                            val interfaceFormat = if (member.isStatic) "%T" else "(this as %T)"
-                                            return_("$interfaceFormat.%N()") {
-                                                arg(accessor.className)
-                                                arg(getter)
-                                            }
-                                        } else {
-                                            throw_("%T()") { arg(UnsupportedOperationException::class.asIrTypeName()) }
-                                        }
-                                    }
-                                }
-                                opMethods[Op.Set]?.let { setter ->
-                                    setSetter {
-                                        setModifiers(IrModifier.INLINE)
-                                        setParameters(setterParameters)
+                                    methods[Op.Get]?.let { getterMethod ->
                                         setBody {
-                                            val interfaceFormat = if (member.isStatic) "%T" else "(this as %T)"
-                                            val parametersFormat = setterParameters.joinToString { "%N" }
-                                            code_("$interfaceFormat.%N($parametersFormat)") {
-                                                arg(accessor.className)
-                                                arg(setter)
-                                                setterParameters.forEach(::arg)
+                                            return_("%L.%N()") {
+                                                arg(interfaceCodeBlock)
+                                                arg(getterMethod)
+                                            }
+                                        }
+                                    } ?: setStubBody()
+                                }
+                                methods[Op.Set]?.let { setterMethod ->
+                                    setSetter {
+                                        val setterParameter = IrSetterParameter(member.typeName)
+                                        setModifiers(IrModifier.INLINE)
+                                        setParameters(listOf(setterParameter))
+                                        setBody {
+                                            code_("%L.%N(%N)") {
+                                                arg(interfaceCodeBlock)
+                                                arg(setterMethod)
+                                                arg(setterParameter)
                                             }
                                         }
                                     }
@@ -843,7 +856,7 @@ class MixinGenerator(
                         }
 
                         is IrMixinAccessorMethodMember -> {
-                            val invokerMethod = buildJavaMethod("_access_" + member.name) {
+                            val invokerMethod = buildJavaMethod(member.name.withInternalPrefix(ACCESS)) {
                                 setModifiers(
                                     IrModifier.PUBLIC,
                                     if (member.isStatic) IrModifier.STATIC else IrModifier.ABSTRACT
@@ -856,35 +869,20 @@ class MixinGenerator(
                                 if (member.isStatic) {
                                     setStubBody()
                                 }
-                            }
-                            addMethod(invokerMethod)
-                            val isInaccessibleInstance = !accessor.isAccessibleSchema && !member.isStatic
-                            extensionFunctions += buildKotlinFunction(
-                                member.name,
-                                jvmNamespace = if (isInaccessibleInstance) accessor.schemaClassName else null
-                            ) {
+                            }.also(::addMethod)
+                            extensionFunctions += buildKotlinFunction(member.name, jvmNamespace = jvmNamespace) {
                                 setModifiers(IrModifier.INLINE)
-                                if (isInaccessibleInstance) {
-                                    setVariableTypes(IrTypeVariableName.of("T", accessor.schemaClassName))
-                                }
-                                setReceiverType(
-                                    if (member.isStatic) accessor.schemaClassName
-                                    else accessor.receiverTypeName
-                                )
+                                delegateParameter?.let { setContextParameters(listOf(it)) }
+                                setReceiverType(extensionReceiverTypeName)
                                 setParameters(member.parameters)
-                                setReturnType(
-                                    if (isInaccessibleInstance) member.returnTypeName?.makeNullable()
-                                    else member.returnTypeName
-                                )
+                                setReturnType(member.returnTypeName)
                                 setBody {
-                                    val guestFormat = if (isInaccessibleInstance) "?" else ""
-                                    val interfaceFormat = if (member.isStatic) "%T" else "(this as$guestFormat %T)"
                                     val parametersFormat = member.parameters.joinToString { "%N" }
                                     code_(
-                                        format = "$interfaceFormat$guestFormat.%N($parametersFormat)",
+                                        format = "%L.%N($parametersFormat)",
                                         isReturn = member.returnTypeName != null,
                                     ) {
-                                        arg(accessor.className)
+                                        arg(interfaceCodeBlock)
                                         arg(invokerMethod)
                                         member.parameters.forEach(::arg)
                                     }
@@ -914,7 +912,7 @@ class MixinGenerator(
 
     private fun generateMixinConfig(mixinAccessors: List<IrMixinAccessor>, patches: List<IrPatch>) {
         val qualifiedNames = buildList {
-            addAll(mixinAccessors.map { it.schemaSide to it.className.qualifiedName })
+            addAll(mixinAccessors.map { it.side to it.className.qualifiedName })
             addAll(patches.map { it.side to it.mixin.className.qualifiedName })
         }.groupBy({ it.first }, { it.second })
         val config = configJson.encodeToString(
@@ -943,7 +941,8 @@ class MixinGenerator(
             })
         }
         options.accessTransformerConfig?.let { configPath ->
-            val config = buildTweakerAccessorConfig(accessors, tweak = IrTweakerAccessorEntry::buildTransformerTweak)
+            val config =
+                buildTweakerAccessorConfig(accessors, tweak = IrTweakerAccessorEntry::buildTransformerTweak)
             codeGenerator.createResourceFile(configPath, config, aggregating = true, originatingFiles)
             logger.info(buildString {
                 appendLine("Access Transformer config generated:")
