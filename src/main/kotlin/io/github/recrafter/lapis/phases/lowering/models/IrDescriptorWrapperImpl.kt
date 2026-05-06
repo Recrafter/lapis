@@ -6,16 +6,13 @@ import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 sealed class IrDescriptorWrapperImpl<T : IrDescriptorWrapperImpl<T>>(
-    originatingFile: KSFile?,
+    override val originatingFiles: List<KSFile>,
 
     val descriptorClassName: IrClassName,
     val wrapperBuiltin: DescriptorWrapperBuiltin<T>,
     val receiverTypeName: IrTypeName?,
-) : IrGeneratedSource(originatingFile) {
-    override val className = IrClassName.of(
-        descriptorClassName.packageName,
-        descriptorClassName.nestedName.replace('.', '_') + "_" + wrapperBuiltin.name
-    )
+) : IrGeneratedSourceFile {
+    override val className = descriptorClassName.derived(wrapperBuiltin.name)
 }
 
 sealed interface IrInvokableDescriptorWrapperImpl {
@@ -23,75 +20,79 @@ sealed interface IrInvokableDescriptorWrapperImpl {
 }
 
 class IrBodyDescriptorWrapperImpl(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrBodyDescriptorWrapperImpl>,
     override val parameters: List<IrFunctionTypeParameter>,
     val returnTypeName: IrTypeName?,
-) : IrDescriptorWrapperImpl<IrBodyDescriptorWrapperImpl>
-    (originatingFile, descriptorClassName, wrapperBuiltin, null),
-    IrInvokableDescriptorWrapperImpl
+) : IrDescriptorWrapperImpl<IrBodyDescriptorWrapperImpl>(
+    originatingFiles, descriptorClassName, wrapperBuiltin, null
+), IrInvokableDescriptorWrapperImpl
 
 class IrFieldGetDescriptorWrapperImpl(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrFieldGetDescriptorWrapperImpl>,
     receiverTypeName: IrTypeName?,
     val fieldTypeName: IrTypeName,
-) : IrDescriptorWrapperImpl<IrFieldGetDescriptorWrapperImpl>
-    (originatingFile, descriptorClassName, wrapperBuiltin, receiverTypeName)
+) : IrDescriptorWrapperImpl<IrFieldGetDescriptorWrapperImpl>(
+    originatingFiles, descriptorClassName, wrapperBuiltin, receiverTypeName
+)
 
 class IrFieldSetDescriptorWrapperImpl(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrFieldSetDescriptorWrapperImpl>,
     receiverTypeName: IrTypeName?,
     val fieldTypeName: IrTypeName,
-) : IrDescriptorWrapperImpl<IrFieldSetDescriptorWrapperImpl>
-    (originatingFile, descriptorClassName, wrapperBuiltin, receiverTypeName)
+) : IrDescriptorWrapperImpl<IrFieldSetDescriptorWrapperImpl>(
+    originatingFiles, descriptorClassName, wrapperBuiltin, receiverTypeName
+)
 
 class IrArrayGetDescriptorWrapperImpl(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrArrayGetDescriptorWrapperImpl>,
     val arrayTypeName: IrTypeName,
     val arrayComponentTypeName: IrTypeName,
-) : IrDescriptorWrapperImpl<IrArrayGetDescriptorWrapperImpl>
-    (originatingFile, descriptorClassName, wrapperBuiltin, null)
+) : IrDescriptorWrapperImpl<IrArrayGetDescriptorWrapperImpl>(
+    originatingFiles, descriptorClassName, wrapperBuiltin, null
+)
 
 class IrArraySetDescriptorWrapperImpl(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrArraySetDescriptorWrapperImpl>,
     val arrayTypeName: IrTypeName,
     val arrayComponentTypeName: IrTypeName,
-) : IrDescriptorWrapperImpl<IrArraySetDescriptorWrapperImpl>
-    (originatingFile, descriptorClassName, wrapperBuiltin, null)
+) : IrDescriptorWrapperImpl<IrArraySetDescriptorWrapperImpl>(
+    originatingFiles, descriptorClassName, wrapperBuiltin, null
+)
 
 class IrCallDescriptorWrapperImpl(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrCallDescriptorWrapperImpl>,
     receiverTypeName: IrTypeName?,
     override val parameters: List<IrFunctionTypeParameter>,
     val returnTypeName: IrTypeName?,
-) : IrDescriptorWrapperImpl<IrCallDescriptorWrapperImpl>
-    (originatingFile, descriptorClassName, wrapperBuiltin, receiverTypeName),
-    IrInvokableDescriptorWrapperImpl
+) : IrDescriptorWrapperImpl<IrCallDescriptorWrapperImpl>(
+    originatingFiles, descriptorClassName, wrapperBuiltin, receiverTypeName
+), IrInvokableDescriptorWrapperImpl
 
 class IrCancelDescriptorWrapperImpl(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrCancelDescriptorWrapperImpl>,
     override val parameters: List<IrFunctionTypeParameter>,
     val returnTypeName: IrTypeName?,
-) : IrDescriptorWrapperImpl<IrCancelDescriptorWrapperImpl>
-    (originatingFile, descriptorClassName, wrapperBuiltin, null),
-    IrInvokableDescriptorWrapperImpl
+) : IrDescriptorWrapperImpl<IrCancelDescriptorWrapperImpl>(
+    originatingFiles, descriptorClassName, wrapperBuiltin, null
+), IrInvokableDescriptorWrapperImpl

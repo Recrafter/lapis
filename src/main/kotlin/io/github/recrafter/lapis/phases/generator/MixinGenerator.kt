@@ -19,7 +19,7 @@ import io.github.recrafter.lapis.extensions.InternalPrefix.*
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.ksp.createResourceFile
+import io.github.recrafter.lapis.extensions.ksp.createNewResourceFile
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
@@ -111,25 +111,25 @@ class MixinGenerator(
                     }
                     addSuperInterface(bridge.className)
                     addMethods(bridge.functions.flatMap { function ->
-                        function.accessors.map { accessor ->
-                            buildJavaMethod(accessor.name) {
+                        function.kinds.map { kind ->
+                            buildJavaMethod(kind.name) {
                                 setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
-                                setParameters(accessor.parameters)
-                                setReturnType(accessor.returnTypeName)
+                                setParameters(kind.parameters)
+                                setReturnType(kind.returnTypeName)
                                 setBody {
                                     when (function.impl) {
-                                        is IrBridgeFunctionExtensionImpl -> {
-                                            val parametersFormat = accessor.parameters.joinToString { "%N" }
+                                        is IrMixinBridgeFunctionExtensionImpl -> {
+                                            val parametersFormat = kind.parameters.joinToString { "%N" }
                                             code_(
                                                 format = "${patchImplReference.format}.%L($parametersFormat)",
-                                                isReturn = accessor.returnTypeName != null,
+                                                isReturn = kind.returnTypeName != null,
                                             ) {
                                                 when (patchImplReference) {
                                                     is PatchImplFieldReference -> arg(patchImplReference.field)
                                                     is PatchImplMethodReference -> arg(patchImplReference.method)
                                                 }
-                                                arg(accessor.sourceJvmName)
-                                                accessor.parameters.forEach(::arg)
+                                                arg(kind.sourceJvmName)
+                                                kind.parameters.forEach(::arg)
                                             }
                                         }
                                     }
@@ -675,25 +675,25 @@ class MixinGenerator(
             }
         }
 
-    private fun generateBridge(patch: IrPatch, bridge: IrBridge) {
+    private fun generateBridge(patch: IrPatch, bridge: IrMixinBridge) {
         buildKotlinFile(bridge.className) {
             suppressWarnings(KSuppressWarning.RedundantVisibilityModifier)
             addType(buildKotlinInterface(bridge.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
                 addFunctions(bridge.functions.flatMap { function ->
-                    function.accessors.map { accessor ->
-                        buildKotlinFunction(accessor.name) {
+                    function.kinds.map { kind ->
+                        buildKotlinFunction(kind.name) {
                             setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
-                            setParameters(accessor.parameters)
-                            setReturnType(accessor.returnTypeName)
+                            setParameters(kind.parameters)
+                            setReturnType(kind.returnTypeName)
                         }
                     }
                 })
             })
         }.writeTo(codeGenerator, aggregating = false, bridge.originatingFiles)
 
-        val bridgeExtensions = bridge.functions.filter { it.impl is IrBridgeFunctionExtensionImpl }
-        val extensionProperties = bridgeExtensions.filterIsInstance<IrBridgeFunctionProperty>().map { function ->
+        val bridgeExtensions = bridge.functions.filter { it.impl is IrMixinBridgeFunctionExtensionImpl }
+        val extensionProperties = bridgeExtensions.filterIsInstance<IrMixinBridgeFunctionProperty>().map { function ->
             buildKotlinProperty(function.sourceName, function.typeName) {
                 setReceiverType(patch.mixin.targetInstanceTypeName)
                 setGetter {
@@ -721,7 +721,7 @@ class MixinGenerator(
                 }
             }
         }
-        val extensionFunctions = bridgeExtensions.filterIsInstance<IrBridgeFunctionFunction>().map { function ->
+        val extensionFunctions = bridgeExtensions.filterIsInstance<IrMixinBridgeFunctionFunction>().map { function ->
             buildKotlinFunction(function.sourceName) {
                 setModifiers(IrModifier.INLINE)
                 setReceiverType(patch.mixin.targetInstanceTypeName)
@@ -891,7 +891,7 @@ class MixinGenerator(
         originatingFiles: List<KSFile>,
     ) {
         if (properties.isEmpty() && functions.isEmpty()) return
-        buildKotlinFile(sourceClassName.packageName, sourceClassName.simpleName + "_Extensions") {
+        buildKotlinFile(sourceClassName.derived("_Extensions")) {
             suppressWarnings(
                 KSuppressWarning.RedundantVisibilityModifier,
                 KSuppressWarning.UnusedReceiverParameter,
@@ -903,13 +903,13 @@ class MixinGenerator(
         }.writeTo(codeGenerator, aggregating = false, originatingFiles)
     }
 
-    private fun generateMixinConfig(generatedMixins: List<IrGeneratedMixin>) {
-        val qualifiedNames = generatedMixins
-            .map { it.side to it.className.qualifiedName }
+    private fun generateMixinConfig(generatedMixinFiles: List<IrGeneratedMixinFile>) {
+        val qualifiedNames = generatedMixinFiles
+            .map { it.side to it.className }
             .groupBy({ it.first }, { it.second })
         val config = configJson.encodeToString(MixinConfig.of(options.generatedMixinPackageName, qualifiedNames))
-        val originatingFiles = generatedMixins.flatMap { it.originatingFiles }
-        codeGenerator.createResourceFile(options.mixinConfig, config, aggregating = true, originatingFiles)
+        val originatingFiles = generatedMixinFiles.flatMap { it.originatingFiles }
+        codeGenerator.createNewResourceFile(options.mixinConfig, config, aggregating = true, originatingFiles)
         logger.info(buildString {
             appendLine("Mixin config generated:")
             append(config)
@@ -921,7 +921,7 @@ class MixinGenerator(
         options.accessWidenerConfig?.let { configPath ->
             val header = if (options.isUnobfuscated) "classTweaker v1 official" else "accessWidener v2 named"
             val config = buildTweakAccessorConfig(accessors, header, IrTweakAccessorEntry::buildWidenerTweak)
-            codeGenerator.createResourceFile(configPath, config, aggregating = true, originatingFiles)
+            codeGenerator.createNewResourceFile(configPath, config, aggregating = true, originatingFiles)
             logger.info(buildString {
                 appendLine("Access Widener config generated:")
                 append(config)
@@ -929,7 +929,7 @@ class MixinGenerator(
         }
         options.accessTransformerConfig?.let { configPath ->
             val config = buildTweakAccessorConfig(accessors, tweak = IrTweakAccessorEntry::buildTransformerTweak)
-            codeGenerator.createResourceFile(configPath, config, aggregating = true, originatingFiles)
+            codeGenerator.createNewResourceFile(configPath, config, aggregating = true, originatingFiles)
             logger.info(buildString {
                 appendLine("Access Transformer config generated:")
                 append(config)

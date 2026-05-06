@@ -28,8 +28,11 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
         }
     }
 
-    fun nested(name: String): IrClassName =
+    fun inner(name: String): IrClassName =
         kotlin.nestedClass(name).asIrClassName()
+
+    fun derived(suffix: String): IrClassName =
+        of(packageName, (kotlin.simpleNames + suffix).joinToString("_"))
 
     companion object {
         fun of(packageName: String, vararg names: String): IrClassName =

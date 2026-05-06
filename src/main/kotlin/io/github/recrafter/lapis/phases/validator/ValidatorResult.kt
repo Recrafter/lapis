@@ -21,10 +21,18 @@ class ValidatorResult(
     val patches: List<Patch>,
 )
 
-class Schema(
-    source: KSNode,
-
+open class SourceFile(
+    symbol: KSNode,
     classDeclaration: KSClassDeclaration,
+) {
+    val className: IrClassName = classDeclaration.asIrClassName()
+    val containingFile: KSFile? = symbol.containingFile
+}
+
+class Schema(
+    symbol: KSNode,
+    classDeclaration: KSClassDeclaration,
+
     val originJvmClassName: JvmClassName,
     val originClassDeclaration: KSClassDeclaration,
     val side: Side,
@@ -33,37 +41,36 @@ class Schema(
 
     val accessRequest: AccessRequest?,
     val descriptors: List<Descriptor>,
-) {
-    val className: IrClassName = classDeclaration.asIrClassName()
+) : SourceFile(symbol, classDeclaration) {
     val originTypeName: IrTypeName = originClassDeclaration.starProjectedType.asIrTypeName()
-    val containingFile: KSFile? = source.containingFile
 }
 
 sealed class AccessRequest(val shouldRemoveFinal: Boolean)
 class TweakAccessRequest(shouldRemoveFinal: Boolean) : AccessRequest(shouldRemoveFinal)
-class MixinAccessRequest(shouldRemoveFinal: Boolean, val fieldOps: List<Op>) : AccessRequest(shouldRemoveFinal)
+class MixinAccessRequest(
+    shouldRemoveFinal: Boolean,
+    val fieldOps: List<Op>,
+) : AccessRequest(shouldRemoveFinal)
 
 sealed class Descriptor(
-    source: KSNode,
+    symbol: KSNode,
+    classDeclaration: KSClassDeclaration,
 
     val name: String,
     val mappingName: String,
-    classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     val inaccessibleReceiverJvmClassName: JvmClassName?,
     val parameters: List<FunctionTypeParameter>,
     val returnType: KSType?,
     val isStatic: Boolean,
     val accessRequest: AccessRequest?,
-) {
-    val className: IrClassName = classDeclaration.asIrClassName()
+) : SourceFile(symbol, classDeclaration) {
     val receiverTypeName: IrTypeName = receiverType.asIrTypeName()
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
-    val containingFile: KSFile? = source.containingFile
 }
 
 sealed class InvokableDescriptor(
-    source: KSNode,
+    symbol: KSNode,
 
     name: String,
     mappingName: String,
@@ -75,10 +82,10 @@ sealed class InvokableDescriptor(
     isStatic: Boolean,
     accessRequest: AccessRequest?,
 ) : Descriptor(
-    source,
+    symbol,
+    classDeclaration,
     name,
     mappingName,
-    classDeclaration,
     receiverType,
     inaccessibleReceiverJvmClassName,
     parameters,
@@ -88,7 +95,7 @@ sealed class InvokableDescriptor(
 )
 
 class ConstructorDescriptor(
-    source: KSNode,
+    symbol: KSNode,
 
     name: String,
     classDeclaration: KSClassDeclaration,
@@ -96,11 +103,11 @@ class ConstructorDescriptor(
     parameters: List<FunctionTypeParameter>,
     accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
-    source, name, "", classDeclaration, returnType, null, parameters, returnType, false, accessRequest,
+    symbol, name, "", classDeclaration, returnType, null, parameters, returnType, false, accessRequest,
 )
 
 open class MethodDescriptor(
-    source: KSNode,
+    symbol: KSNode,
 
     name: String,
     mappingName: String,
@@ -112,7 +119,7 @@ open class MethodDescriptor(
     isStatic: Boolean,
     accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
-    source,
+    symbol,
     name,
     mappingName,
     classDeclaration,
@@ -125,7 +132,7 @@ open class MethodDescriptor(
 )
 
 class FieldDescriptor(
-    source: KSNode,
+    symbol: KSNode,
 
     name: String,
     mappingName: String,
@@ -137,10 +144,10 @@ class FieldDescriptor(
     isStatic: Boolean,
     accessRequest: AccessRequest?,
 ) : Descriptor(
-    source,
+    symbol,
+    classDeclaration,
     name,
     mappingName,
-    classDeclaration,
     receiverType,
     inaccessibleReceiverJvmClassName,
     emptyList(),
@@ -152,26 +159,21 @@ class FieldDescriptor(
 }
 
 class Patch(
-    source: KSNode,
+    symbol: KSNode,
+    classDeclaration: KSClassDeclaration,
 
     val name: String,
     val side: Side,
     val initStrategy: InitStrategy,
     val isObject: Boolean,
     val hasStaticHooksOnly: Boolean,
-
-    classDeclaration: KSClassDeclaration,
-
     val schema: Schema,
 
     val constructorParameters: List<PatchConstructorParameter>,
     val bridgeSources: List<PatchBridgeSource>,
 
     val hooks: List<PatchHook>,
-) {
-    val className: IrClassName = classDeclaration.asIrClassName()
-    val containingFile: KSFile? = source.containingFile
-}
+) : SourceFile(symbol, classDeclaration)
 
 sealed interface PatchConstructorParameter
 object PatchConstructorOriginParameter : PatchConstructorParameter
@@ -273,12 +275,12 @@ class LocalHook(
 class InstanceofHook(
     jvmName: String,
     descriptor: InvokableDescriptor,
-    classDeclaration: KSClassDeclaration,
+    typeClassDeclaration: KSClassDeclaration,
     returnType: KSType,
     parameters: List<HookParameter>,
     ordinals: List<Int>,
 ) : PatchHook(jvmName, descriptor, returnType, parameters, ordinals) {
-    val className: IrClassName = classDeclaration.asIrClassName()
+    val typeClassName: IrClassName = typeClassDeclaration.asIrClassName()
 }
 
 class ReturnHook(
@@ -327,9 +329,9 @@ class StringLiteral(val value: String) : Literal {
     override fun getType(types: KSTypes): KSType = types.string
 }
 
-class ClassLiteral(classDeclaration: KSClassDeclaration) : Literal {
+class ClassLiteral(typeClassDeclaration: KSClassDeclaration) : Literal {
     override fun getType(types: KSTypes): KSType = types.any
-    val className: IrClassName = classDeclaration.asIrClassName()
+    val typeClassName: IrClassName = typeClassDeclaration.asIrClassName()
 }
 
 object NullLiteral : Literal {
@@ -423,7 +425,10 @@ class HookOriginArraySetDescriptorWrapperParameter(
 class HookOriginCallDescriptorWrapperParameter(override val descriptor: InvokableDescriptor) :
     HookOriginDescriptorWrapperParameter(descriptor)
 
-class HookCancelDescriptorWrapperParameter(val descriptor: InvokableDescriptor) : HookParameter
+class HookCancelDescriptorWrapperParameter(
+    override val descriptor: InvokableDescriptor
+) : HookOriginDescriptorWrapperParameter(descriptor)
+
 object HookOrdinalParameter : HookParameter
 
 sealed class HookLocalParameter(

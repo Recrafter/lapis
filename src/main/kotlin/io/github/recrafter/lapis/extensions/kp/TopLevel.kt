@@ -9,7 +9,6 @@ import io.github.recrafter.lapis.phases.generator.builders.IrKotlinCodeBlock
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-import io.github.recrafter.lapis.phases.lowering.withNestedNamePrefix
 
 typealias KPAnnotationBuilder = AnnotationSpec.Builder
 typealias KPAnnotation = AnnotationSpec
@@ -122,7 +121,7 @@ fun buildKotlinProperty(
             } else {
                 useSiteTarget.name.lowercase() + name.capitalize()
             }
-            setArgumentValue(JvmName::name, suffix.withNestedNamePrefix(jvmNamespace))
+            setArgumentValue(JvmName::name, jvmNamespace.derived(suffix).simpleName)
         }
     }
     return finalBuilder.build()
@@ -142,7 +141,7 @@ fun buildKotlinFunction(
     KPFunction.builder(name).apply {
         jvmNamespace?.let {
             addAnnotation<JvmName> {
-                setArgumentValue(JvmName::name, name.withNestedNamePrefix(jvmNamespace))
+                setArgumentValue(JvmName::name, jvmNamespace.derived(name).simpleName)
             }
         }
         builder(name)

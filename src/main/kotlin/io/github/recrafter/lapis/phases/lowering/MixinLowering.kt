@@ -111,7 +111,11 @@ class MixinLowering(
                 }
             }
         }
-        return IrTweakAccessor(schema.containingFile, schema.originJvmClassName, entries)
+        return IrTweakAccessor(
+            originatingFiles = listOfNotNull(schema.containingFile),
+            ownerJvmClassName = schema.originJvmClassName,
+            entries = entries,
+        )
     }
 
     private fun lowerMixinAccessor(schema: Schema, sourcePackageLCP: String): IrMixinAccessor? {
@@ -185,11 +189,8 @@ class MixinLowering(
     private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl? =
         if (patch.hasStaticHooksOnly) null
         else IrPatchImpl(
-            originatingFile = patch.containingFile,
-            className = IrClassName.of(
-                patch.className.packageName,
-                patch.className.simpleName + "_Impl"
-            ),
+            originatingFiles = listOfNotNull(patch.containingFile),
+            className = patch.className.derived("_Impl"),
             constructorParameters = buildList {
                 if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
                     add(IrPatchImplConstructorInstanceParameter)
@@ -210,19 +211,16 @@ class MixinLowering(
             bridge = lowerBridge(patch),
         )
 
-    private fun lowerBridge(patch: Patch): IrBridge? =
+    private fun lowerBridge(patch: Patch): IrMixinBridge? =
         if (patch.bridgeSources.isEmpty()) null
-        else IrBridge(
-            originatingFile = patch.containingFile,
+        else IrMixinBridge(
+            originatingFiles = listOfNotNull(patch.containingFile),
 
-            className = IrClassName.of(
-                patch.className.packageName,
-                patch.className.simpleName + "_Bridge"
-            ),
+            className = patch.className.derived("Bridge"),
             functions = patch.bridgeSources.map(::lowerBridgeFunction),
         )
 
-    private fun lowerBridgeFunction(source: PatchBridgeSource): IrBridgeFunction =
+    private fun lowerBridgeFunction(source: PatchBridgeSource): IrMixinBridgeFunction =
         when (source) {
             is PatchBridgeSourceProperty -> {
                 val (setterName, setterSourceJvmName) = if (source.isMutable) {
@@ -230,7 +228,7 @@ class MixinLowering(
                 } else {
                     null to null
                 }
-                IrBridgeFunctionProperty(
+                IrMixinBridgeFunctionProperty(
                     sourceName = source.name,
                     typeName = source.typeName,
                     impl = lowerPropertyBridgeFunctionImpl(source),
@@ -241,7 +239,7 @@ class MixinLowering(
                 )
             }
 
-            is PatchBridgeSourceFunction -> IrBridgeFunctionFunction(
+            is PatchBridgeSourceFunction -> IrMixinBridgeFunctionFunction(
                 sourceName = source.name,
                 name = source.jvmName.withModIdPrefix(),
                 sourceJvmName = source.jvmName,
@@ -251,14 +249,14 @@ class MixinLowering(
             )
         }
 
-    private fun lowerPropertyBridgeFunctionImpl(property: PatchBridgeSourceProperty): IrBridgeFunctionPropertyImpl =
+    private fun lowerPropertyBridgeFunctionImpl(property: PatchBridgeSourceProperty): IrMixinBridgeFunctionPropertyImpl =
         when (property) {
-            is PatchExtensionProperty -> IrBridgeFunctionPropertyExtensionImpl
+            is PatchExtensionProperty -> IrMixinBridgeFunctionPropertyExtensionImpl
         }
 
-    private fun lowerFunctionBridgeFunctionImpl(function: PatchBridgeSourceFunction): IrBridgeFunctionFunctionImpl =
+    private fun lowerFunctionBridgeFunctionImpl(function: PatchBridgeSourceFunction): IrMixinBridgeFunctionFunctionImpl =
         when (function) {
-            is PatchExtensionFunction -> IrBridgeFunctionFunctionExtensionImpl
+            is PatchExtensionFunction -> IrMixinBridgeFunctionFunctionExtensionImpl
         }
 
     private fun lowerInjections(hook: PatchHook): List<IrInjection> {
@@ -391,7 +389,7 @@ class MixinLowering(
                 is InstanceofHook -> IrInstanceofInjection(
                     jvmName = hook.jvmName,
                     methodMixinReference = hook.descriptor.getMixinReference(),
-                    className = hook.className,
+                    className = hook.typeClassName,
                     parameters = parameters,
                     hookArguments = hookArguments,
                     ordinal = ordinal,
@@ -441,7 +439,7 @@ class MixinLowering(
                         is LongLiteral -> listOf("longValue" to literal.value.toString())
                         is DoubleLiteral -> listOf("doubleValue" to literal.value.toString())
                         is StringLiteral -> listOf("stringValue" to literal.value)
-                        is ClassLiteral -> listOf("classValue" to literal.className.internalName)
+                        is ClassLiteral -> listOf("classValue" to literal.typeClassName.internalName)
                         NullLiteral -> listOf("nullValue" to "true")
                     }
                     IrModifyExpressionValueInjection(
@@ -575,96 +573,89 @@ class MixinLowering(
         when (parameter) {
             is HookOriginValueParameter -> IrHookOriginValueArgument
 
-            is HookOriginBodyDescriptorWrapperParameter -> {
+            is HookOriginDescriptorWrapperParameter -> {
                 val descriptor = parameter.descriptor
-                IrHookOriginBodyDescriptorWrapperImplArgument(
-                    IrBodyDescriptorWrapperImpl(
-                        originatingFile = descriptor.containingFile,
-                        descriptorClassName = descriptor.className,
-                        wrapperBuiltin = DescriptorWrapperBuiltin.Body,
-                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                        returnTypeName = descriptor.returnTypeName,
+                val originatingFiles = listOfNotNull(descriptor.containingFile)
+                when (parameter) {
+                    is HookOriginBodyDescriptorWrapperParameter -> IrHookOriginBodyDescriptorWrapperImplArgument(
+                        IrBodyDescriptorWrapperImpl(
+                            originatingFiles = originatingFiles,
+                            descriptorClassName = descriptor.className,
+                            wrapperBuiltin = DescriptorWrapperBuiltin.Body,
+                            parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                            returnTypeName = descriptor.returnTypeName,
+                        )
                     )
-                )
-            }
 
-            is HookOriginFieldGetDescriptorWrapperParameter -> {
-                val descriptor = parameter.descriptor
-                IrHookOriginFieldGetDescriptorWrapperImplArgument(
-                    IrFieldGetDescriptorWrapperImpl(
-                        originatingFile = descriptor.containingFile,
-                        descriptorClassName = descriptor.className,
-                        wrapperBuiltin = DescriptorWrapperBuiltin.FieldGet,
-                        receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
-                        fieldTypeName = descriptor.fieldTypeName,
-                    )
-                )
-            }
+                    is HookOriginFieldGetDescriptorWrapperParameter -> {
+                        IrHookOriginFieldGetDescriptorWrapperImplArgument(
+                            IrFieldGetDescriptorWrapperImpl(
+                                originatingFiles = originatingFiles,
+                                descriptorClassName = descriptor.className,
+                                wrapperBuiltin = DescriptorWrapperBuiltin.FieldGet,
+                                receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
+                                fieldTypeName = parameter.descriptor.fieldTypeName,
+                            )
+                        )
+                    }
 
-            is HookOriginFieldSetDescriptorWrapperParameter -> {
-                val descriptor = parameter.descriptor
-                IrHookOriginFieldSetDescriptorWrapperImplArgument(
-                    IrFieldSetDescriptorWrapperImpl(
-                        originatingFile = descriptor.containingFile,
-                        descriptorClassName = descriptor.className,
-                        wrapperBuiltin = DescriptorWrapperBuiltin.FieldSet,
-                        receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
-                        fieldTypeName = descriptor.fieldTypeName,
-                    )
-                )
-            }
+                    is HookOriginFieldSetDescriptorWrapperParameter -> {
+                        IrHookOriginFieldSetDescriptorWrapperImplArgument(
+                            IrFieldSetDescriptorWrapperImpl(
+                                originatingFiles = originatingFiles,
+                                descriptorClassName = descriptor.className,
+                                wrapperBuiltin = DescriptorWrapperBuiltin.FieldSet,
+                                receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
+                                fieldTypeName = parameter.descriptor.fieldTypeName,
+                            )
+                        )
+                    }
 
-            is HookOriginArrayGetDescriptorWrapperParameter -> {
-                val descriptor = parameter.descriptor
-                IrHookOriginArrayGetDescriptorWrapperImplArgument(
-                    IrArrayGetDescriptorWrapperImpl(
-                        originatingFile = descriptor.containingFile,
-                        descriptorClassName = descriptor.className,
-                        wrapperBuiltin = DescriptorWrapperBuiltin.ArrayGet,
-                        arrayTypeName = descriptor.fieldTypeName,
-                        arrayComponentTypeName = parameter.arrayComponentTypeName,
-                    )
-                )
-            }
+                    is HookOriginArrayGetDescriptorWrapperParameter -> {
+                        IrHookOriginArrayGetDescriptorWrapperImplArgument(
+                            IrArrayGetDescriptorWrapperImpl(
+                                originatingFiles = originatingFiles,
+                                descriptorClassName = descriptor.className,
+                                wrapperBuiltin = DescriptorWrapperBuiltin.ArrayGet,
+                                arrayTypeName = parameter.descriptor.fieldTypeName,
+                                arrayComponentTypeName = parameter.arrayComponentTypeName,
+                            )
+                        )
+                    }
 
-            is HookOriginArraySetDescriptorWrapperParameter -> {
-                val descriptor = parameter.descriptor
-                IrHookOriginArraySetDescriptorWrapperImplArgument(
-                    IrArraySetDescriptorWrapperImpl(
-                        originatingFile = descriptor.containingFile,
-                        descriptorClassName = descriptor.className,
-                        wrapperBuiltin = DescriptorWrapperBuiltin.ArraySet,
-                        arrayTypeName = descriptor.fieldTypeName,
-                        arrayComponentTypeName = parameter.arrayComponentTypeName,
-                    )
-                )
-            }
+                    is HookOriginArraySetDescriptorWrapperParameter -> {
+                        IrHookOriginArraySetDescriptorWrapperImplArgument(
+                            IrArraySetDescriptorWrapperImpl(
+                                originatingFiles = originatingFiles,
+                                descriptorClassName = descriptor.className,
+                                wrapperBuiltin = DescriptorWrapperBuiltin.ArraySet,
+                                arrayTypeName = parameter.descriptor.fieldTypeName,
+                                arrayComponentTypeName = parameter.arrayComponentTypeName,
+                            )
+                        )
+                    }
 
-            is HookOriginCallDescriptorWrapperParameter -> {
-                val descriptor = parameter.descriptor
-                IrHookOriginCallDescriptorWrapperImplArgument(
-                    IrCallDescriptorWrapperImpl(
-                        originatingFile = descriptor.containingFile,
-                        descriptorClassName = descriptor.className,
-                        wrapperBuiltin = DescriptorWrapperBuiltin.Call,
-                        receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
-                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                        returnTypeName = descriptor.returnTypeName,
+                    is HookOriginCallDescriptorWrapperParameter -> IrHookOriginCallDescriptorWrapperImplArgument(
+                        IrCallDescriptorWrapperImpl(
+                            originatingFiles = originatingFiles,
+                            descriptorClassName = descriptor.className,
+                            wrapperBuiltin = DescriptorWrapperBuiltin.Call,
+                            receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
+                            parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                            returnTypeName = descriptor.returnTypeName,
+                        )
                     )
-                )
-            }
 
-            is HookCancelDescriptorWrapperParameter -> {
-                val descriptor = parameter.descriptor
-                IrHookCancelDescriptorWrapperImplArgument(
-                    IrCancelDescriptorWrapperImpl(
-                        originatingFile = descriptor.containingFile,
-                        descriptorClassName = descriptor.className,
-                        wrapperBuiltin = DescriptorWrapperBuiltin.Cancel,
-                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                        returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
+                    is HookCancelDescriptorWrapperParameter -> IrHookCancelDescriptorWrapperImplArgument(
+                        IrCancelDescriptorWrapperImpl(
+                            originatingFiles = originatingFiles,
+                            descriptorClassName = descriptor.className,
+                            wrapperBuiltin = DescriptorWrapperBuiltin.Cancel,
+                            parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                            returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
+                        )
                     )
-                )
+                }
             }
 
             is HookOriginInstanceofWrapperParameter -> IrHookOriginInstanceofWrapperImplArgument
@@ -688,14 +679,13 @@ class MixinLowering(
         suffix: String,
     ): IrClassName {
         val fullPackage = sourceClassName.packageName
-        val relativePackage = if (fullPackage == sourcePackageLCP) {
-            ""
-        } else {
-            fullPackage.removePrefix("$sourcePackageLCP.")
+        val finalPackageName = buildString {
+            append(options.generatedMixinPackageName)
+            if (fullPackage != sourcePackageLCP) {
+                append(".")
+                append(fullPackage.removePrefix("$sourcePackageLCP."))
+            }
         }
-        val finalPackageName = listOf(options.generatedMixinPackageName, relativePackage)
-            .filter { it.isNotEmpty() }
-            .joinToString(".")
         return IrClassName.of(finalPackageName, "${sourceClassName.simpleName}_$suffix")
     }
 
@@ -719,7 +709,7 @@ class MixinLowering(
             .find { it.descriptorClassName == descriptorClassName }
 
     private fun findMixinSourcePackageLCP(schemas: List<Schema>, patches: List<Patch>): String {
-        val classNames = schemas.map { it.className } + patches.map { it.className }
+        val classNames = (schemas + patches).map { it.className }
         return when {
             classNames.isEmpty() -> ""
             classNames.size == 1 -> classNames.first().packageName
@@ -770,6 +760,3 @@ fun KPLambdaTypeName.asIrLambdaTypeName(): IrLambdaTypeName =
 
 fun KPDynamic.asIrDynamic(): IrDynamic =
     IrDynamic(this)
-
-fun String.withNestedNamePrefix(className: IrClassName): String =
-    className.nestedName.replace('.', '_') + "_$this"

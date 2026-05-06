@@ -20,15 +20,14 @@ class IrSchema(
     val mixinAccessor: IrMixinAccessor?,
 )
 
-sealed interface IrAccessor
-
-abstract class IrGeneratedMixin(originatingFiles: List<KSFile>) : IrGeneratedSource(originatingFiles) {
-    abstract val side: Side
+interface IrGeneratedMixinFile : IrGeneratedSourceFile {
+    val side: Side
 }
 
-class IrMixinAccessor(
-    originatingFiles: List<KSFile>,
+sealed interface IrAccessor
 
+class IrMixinAccessor(
+    override val originatingFiles: List<KSFile>,
     override val className: IrClassName,
     override val side: Side,
     val schemaClassName: IrClassName,
@@ -36,7 +35,7 @@ class IrMixinAccessor(
     val targetInternalName: String,
     val receiverTypeName: IrTypeName,
     val members: List<IrMixinAccessorMember>,
-) : IrGeneratedMixin(originatingFiles), IrAccessor
+) : IrGeneratedMixinFile, IrAccessor
 
 sealed class IrMixinAccessorMember(val isStatic: Boolean, val schemaReceiverClassName: IrClassName)
 
@@ -60,11 +59,11 @@ class IrMixinAccessorMethodMember(
 ) : IrMixinAccessorMember(isStatic, schemaReceiverClassName)
 
 class IrTweakAccessor(
-    originatingFile: KSFile?,
+    override val originatingFiles: List<KSFile>,
 
     val ownerJvmClassName: JvmClassName,
     val entries: List<IrTweakAccessorEntry>,
-) : IrGeneratedFile(originatingFile), IrAccessor
+) : IrGeneratedFile, IrAccessor
 
 class IrPatch(
     val isObject: Boolean,
@@ -75,27 +74,26 @@ class IrPatch(
 )
 
 class IrMixin(
-    originatingFiles: List<KSFile>,
-
+    override val originatingFiles: List<KSFile>,
     override val className: IrClassName,
     override val side: Side,
     val targetInstanceTypeName: IrTypeName,
     val isInterfaceTarget: Boolean,
     val targetInternalName: String,
     val injections: List<IrInjection>,
-    val bridge: IrBridge?,
-) : IrGeneratedMixin(originatingFiles)
+    val bridge: IrMixinBridge?,
+) : IrGeneratedMixinFile
 
 sealed interface IrPatchConstructorArgument
 object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
 
 class IrPatchImpl(
-    originatingFile: KSFile?,
+    override val originatingFiles: List<KSFile>,
 
     override val className: IrClassName,
     val constructorParameters: List<IrPatchImplConstructorParameter>,
     val initStrategy: InitStrategy,
-) : IrGeneratedSource(originatingFile)
+) : IrGeneratedSourceFile
 
 sealed interface IrPatchImplConstructorParameter
 object IrPatchImplConstructorInstanceParameter : IrPatchImplConstructorParameter

@@ -79,7 +79,7 @@ class Builtins(
         if (builtin is TypeAliasBuiltin) {
             return IrClassName.of(rootClassName.packageName, builtin.name)
         }
-        return rootClassName.nested(builtin.name)
+        return rootClassName.inner(builtin.name)
     }
 
     fun <T : IrDescriptorWrapperImpl<T>> generateDescriptorWrapperImpl(

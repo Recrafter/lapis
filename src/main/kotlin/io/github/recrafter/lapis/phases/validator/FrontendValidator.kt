@@ -83,8 +83,9 @@ class FrontendValidator(
             return@mapNotNull validatedDescriptor
         }
         val schema = Schema(
-            source = symbol,
+            symbol = symbol,
             classDeclaration = classDeclaration,
+
             originJvmClassName = originJvmClassName,
             originClassDeclaration = originClassDeclaration,
             side = kspRequireNotNull(side) { "85" },
@@ -127,9 +128,10 @@ class FrontendValidator(
                 kspRequire(accessRequest.fieldOps.isNotEmpty()) { "131" }
             }
             return FieldDescriptor(
-                source = symbol,
-                name = name,
+                symbol = symbol,
                 classDeclaration = classDeclaration,
+
+                name = name,
                 receiverType = receiverType,
                 inaccessibleReceiverJvmClassName = if (isResolvable) null else schemaOriginJvmClassName,
                 mappingName = mappingName,
@@ -154,9 +156,10 @@ class FrontendValidator(
         return when {
             superClassDeclaration.isBuiltin(SimpleBuiltin.Method) -> {
                 MethodDescriptor(
-                    source = symbol,
-                    name = name,
+                    symbol = symbol,
                     classDeclaration = classDeclaration,
+
+                    name = name,
                     receiverType = receiverType,
                     inaccessibleReceiverJvmClassName = if (isResolvable) null else schemaOriginJvmClassName,
                     returnType = genericType.returnType,
@@ -175,9 +178,10 @@ class FrontendValidator(
                     kspRequire(isResolvable) { "168" }
                 }
                 ConstructorDescriptor(
-                    source = symbol,
-                    name = name,
+                    symbol = symbol,
                     classDeclaration = classDeclaration,
+
+                    name = name,
                     returnType = receiverType,
                     parameters = parameters,
                     accessRequest = accessRequest,
@@ -250,16 +254,14 @@ class FrontendValidator(
             kspRequire(isAbstract) { "226" }
         }
         return Patch(
-            source = symbol,
+            symbol = symbol,
+            classDeclaration = classDeclaration,
 
             name = name,
             side = side,
             initStrategy = initStrategy,
             isObject = isObject,
             hasStaticHooksOnly = hasStaticHooksOnly,
-
-            classDeclaration = classDeclaration,
-
             schema = schema,
 
             constructorParameters = constructorParameters,
@@ -419,7 +421,7 @@ class FrontendValidator(
                 InstanceofHook(
                     jvmName = jvmName,
                     descriptor = hookDescriptor,
-                    classDeclaration = atInstanceofTypeClassDeclaration,
+                    typeClassDeclaration = atInstanceofTypeClassDeclaration,
                     returnType = returnType,
                     ordinals = ordinals(atInstanceofOrdinals),
                     parameters = parameters(),

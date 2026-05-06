@@ -5,7 +5,7 @@ import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.symbol.KSFile
 import java.io.File
 
-fun CodeGenerator.createResourceFile(
+fun CodeGenerator.createNewResourceFile(
     path: String,
     contents: String,
     aggregating: Boolean,

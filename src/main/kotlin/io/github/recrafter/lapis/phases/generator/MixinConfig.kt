@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.phases.generator
 
 import io.github.recrafter.lapis.annotations.Side
+import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -33,7 +34,7 @@ data class MixinConfig(
     val clientOnlyMixins: List<String>? = null,
 
     @SerialName("server")
-    val dedicatedServerOnlyMixins: List<String>? = null,
+    val serverOnlyMixins: List<String>? = null,
 ) {
     @Serializable
     data class ExtrasConfig(val minVersion: String)
@@ -45,21 +46,21 @@ data class MixinConfig(
     data class OverwriteConfig(val requireAnnotations: Boolean)
 
     companion object {
-        fun of(packageName: String, qualifiedNames: Map<Side, List<String>>): MixinConfig =
+        fun of(mixinPackage: String, qualifiedNames: Map<Side, List<IrClassName>>): MixinConfig =
             MixinConfig(
                 isRequired = true,
                 minVersion = "0.8.6",
                 extrasConfig = ExtrasConfig(minVersion = "0.4.0"),
-                mixinPackage = packageName,
+                mixinPackage = mixinPackage,
                 javaVersion = "JAVA_8",
                 injectorConfig = InjectorConfig(defaultRequire = 1),
                 overwriteConfig = OverwriteConfig(requireAnnotations = true),
-                commonMixins = qualifiedNames.getRelativeClasses(Side.Common, packageName),
-                clientOnlyMixins = qualifiedNames.getRelativeClasses(Side.ClientOnly, packageName),
-                dedicatedServerOnlyMixins = qualifiedNames.getRelativeClasses(Side.DedicatedServerOnly, packageName),
+                commonMixins = qualifiedNames.getRelativeNames(Side.Common, mixinPackage),
+                clientOnlyMixins = qualifiedNames.getRelativeNames(Side.ClientOnly, mixinPackage),
+                serverOnlyMixins = qualifiedNames.getRelativeNames(Side.ServerOnly, mixinPackage),
             )
 
-        private fun Map<Side, List<String>>.getRelativeClasses(side: Side, packageName: String): List<String>? =
-            get(side)?.ifEmpty { null }?.map { it.removePrefix("$packageName.") }
+        private fun Map<Side, List<IrClassName>>.getRelativeNames(side: Side, basePackage: String): List<String>? =
+            get(side)?.ifEmpty { null }?.map { it.qualifiedName.removePrefix("$basePackage.") }
     }
 }
