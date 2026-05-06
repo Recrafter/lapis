@@ -7,7 +7,7 @@ sealed interface IrHookArgument
 sealed interface IrHookOriginArgument : IrHookArgument
 object IrHookOriginValueArgument : IrHookOriginArgument
 
-sealed class IrHookOriginDescriptorWrapperImplArgument<T : IrDescriptorWrapperImpl>(
+sealed class IrHookOriginDescriptorWrapperImplArgument<T : IrDescriptorWrapperImpl<T>>(
     open val wrapperImpl: T
 ) : IrHookOriginArgument
 

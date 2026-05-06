@@ -9,9 +9,10 @@ import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.generator.KSuppressWarning
 import io.github.recrafter.lapis.phases.lowering.models.IrDescriptorWrapperImpl
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
+import io.github.recrafter.lapis.phases.lowering.types.IrParameterizedTypeName
 
 class Builtins(
-    generatedPackageName: String,
+    generatedModPackageName: String,
     private val codeGenerator: CodeGenerator,
 ) {
     var isExternalGenerated: Boolean = false
@@ -20,7 +21,7 @@ class Builtins(
     private var isInternalGenerated: Boolean = false
 
     private val externalClassName: IrClassName =
-        IrClassName.of(generatedPackageName, LapisMeta.NAME)
+        IrClassName.of(generatedModPackageName, LapisMeta.NAME)
 
     private val internalClassName: IrClassName =
         IrClassName.of(externalClassName.packageName, externalClassName.simpleName + "Internal")
@@ -81,11 +82,11 @@ class Builtins(
         return rootClassName.nested(builtin.name)
     }
 
-    fun <T : IrDescriptorWrapperImpl> generateDescriptorWrapperImpl(
+    fun <T : IrDescriptorWrapperImpl<T>> generateDescriptorWrapperImpl(
         destination: KPFileBuilder,
-        builtin: DescriptorWrapperBuiltin<T>,
         impl: T,
+        superClassTypeName: IrParameterizedTypeName,
     ) {
-        builtin.generateImpl(destination, impl, ::get)
+        impl.wrapperBuiltin.generateImpl(destination, impl, superClassTypeName, ::get)
     }
 }

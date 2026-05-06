@@ -7,6 +7,7 @@ enum class KSuppressWarning(private val isScreamingSnake: Boolean = false) {
     ObjectInheritsException,
     JavaIoSerializableObjectMustHaveReadResolve,
     NothingToInline(isScreamingSnake = true),
+    CastNeverSucceeds(isScreamingSnake = true),
     LocalVariableName;
 
     val suppressionKey: String

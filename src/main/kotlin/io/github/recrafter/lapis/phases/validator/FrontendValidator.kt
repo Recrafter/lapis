@@ -38,12 +38,12 @@ class FrontendValidator(
     private val validDescriptors: MutableMap<String, Descriptor> = mutableMapOf()
     private val invalidDescriptors: MutableList<String> = mutableListOf()
 
-    fun validate(parserResult: ParserResult): ValidatorResult =
+    fun validate(result: ParserResult): ValidatorResult =
         ValidatorResult(
-            schemas = parserResult.schemas.flatMap { rootSchema ->
+            schemas = result.schemas.flatMap { rootSchema ->
                 runOrNullOnSkip { validateSchema(rootSchema) } ?: emptyList()
             },
-            patches = parserResult.patches.mapNotNull {
+            patches = result.patches.mapNotNull {
                 runOrNullOnSkip { validatePatch(it) }
             },
         )
@@ -63,6 +63,7 @@ class FrontendValidator(
         if (hasSchemaAnnotation) {
             kspRequire(isTopLevel) { "56" }
         }
+        kspRequire(hasPackageName) { "66" }
         kspRequire(isObject) { "67" }
         val accessRequest = validateAccessRequest(
             hasAccessAnnotation, isResolvable, accessStrategy, isAccessUnfinal, emptyList()
@@ -212,6 +213,7 @@ class FrontendValidator(
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "190" }
         kspRequire(schemaClassDeclaration?.isValid == true) { "191" }
         kspRequire(isTopLevel) { "192" }
+        kspRequire(hasPackageName) { "216" }
         kspRequire(isPublic) { "193" }
         val schema = validSchemas[schemaClassDeclaration.qualifiedName?.asString()]
         kspRequireNotNull(schema) { "195" }
@@ -587,7 +589,7 @@ class FrontendValidator(
         if (invalidDescriptors.contains(qualifiedName)) {
             skipWithError { "566" }
         }
-        return validDescriptors[qualifiedName] ?: lapisError("Failed to find descriptor for $qualifiedName")
+        return validDescriptors[qualifiedName] ?: lapisError("Descriptor cannot be null")
     }
 
     private fun validateHookParameter(

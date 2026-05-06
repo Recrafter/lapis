@@ -21,8 +21,8 @@ class LapisProcessor(
     private val logger: LapisLogger,
 ) : SymbolProcessor {
 
-    private val builtins: Builtins = Builtins(options.generatedPackageName, codeGenerator)
-    private val mixinLowering: MixinLowering = MixinLowering(options, builtins, logger)
+    private val builtins: Builtins = Builtins(options.generatedModPackageName, codeGenerator)
+    private val mixinLowering: MixinLowering = MixinLowering(options, logger)
 
     private val schemas: MutableList<IrSchema> = mutableListOf()
     private val patches: SortedMap<String, IrPatch> = sortedMapOf()

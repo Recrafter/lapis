@@ -9,7 +9,6 @@ import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ks.isInterface
 import io.github.recrafter.lapis.extensions.withInternalPrefix
-import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.common.binaryName
@@ -22,27 +21,60 @@ import kotlin.reflect.KClass
 
 class MixinLowering(
     private val options: LapisOptions,
-    private val builtins: Builtins,
     @Suppress("unused") private val logger: LapisLogger,
 ) {
     private val patches: MutableList<IrPatch> = mutableListOf()
 
-    fun lower(validatorResult: ValidatorResult): IrResult {
-        patches += validatorResult.patches.map(::lowerPatch)
+    fun lower(result: ValidatorResult): IrResult {
+        val mixinSourcePackageLCP = findMixinSourcePackageLCP(result.schemas, result.patches)
+        patches += result.patches.map { lowerPatch(it, mixinSourcePackageLCP) }
         return IrResult(
-            schemas = validatorResult.schemas.map { schema ->
+            schemas = result.schemas.map { schema ->
                 IrSchema(
                     className = schema.className,
                     descriptors = schema.descriptors.map(::lowerDescriptor),
-                    tweakerAccessor = lowerTweakerAccessor(schema),
-                    mixinAccessor = lowerMixinAccessor(schema),
+                    tweakAccessor = lowerTweakAccessor(schema),
+                    mixinAccessor = lowerMixinAccessor(schema, mixinSourcePackageLCP),
                 )
             },
             patches = patches,
         )
     }
 
-    private fun lowerTweakerAccessor(schema: Schema): IrTweakerAccessor? {
+    private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor =
+        when (descriptor) {
+            is InvokableDescriptor -> {
+                if (descriptor is ConstructorDescriptor) {
+                    IrConstructorDescriptor(
+                        callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                        returnTypeName = descriptor.className,
+                    )
+                } else {
+                    IrMethodDescriptor(
+                        name = descriptor.name,
+                        bodyWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                        callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                        cancelWrapperImpl = findCancelDescriptorWrapperImpl(descriptor.className),
+                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                        returnTypeName = descriptor.returnTypeName,
+                    )
+                }
+            }
+
+            is FieldDescriptor -> {
+                IrFieldDescriptor(
+                    name = descriptor.name,
+                    fieldGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                    fieldSetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                    arrayGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                    arraySetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
+                    typeName = descriptor.fieldTypeName,
+                )
+            }
+        }
+
+    private fun lowerTweakAccessor(schema: Schema): IrTweakAccessor? {
         val descriptors = schema.descriptors.mapNotNull {
             if (it.accessRequest !is TweakAccessRequest) {
                 return@mapNotNull null
@@ -52,9 +84,9 @@ class MixinLowering(
         if (schema.accessRequest == null && descriptors.isEmpty()) {
             return null
         }
-        val entries = mutableListOf<IrTweakerAccessorEntry>()
+        val entries = mutableListOf<IrTweakAccessorEntry>()
         if (schema.accessRequest != null) {
-            entries += IrTweakerAccessorClassEntry(
+            entries += IrTweakAccessorClassEntry(
                 removeFinal = schema.accessRequest.shouldRemoveFinal,
             )
         }
@@ -62,7 +94,7 @@ class MixinLowering(
             entries += when (descriptor) {
                 is InvokableDescriptor -> {
                     val isConstructor = descriptor is ConstructorDescriptor
-                    IrTweakerAccessorMethodEntry(
+                    IrTweakAccessorMethodEntry(
                         name = descriptor.binaryName,
                         parameterTypes = descriptor.parameters.map { it.typeName },
                         returnTypeName = if (isConstructor) null else descriptor.returnTypeName,
@@ -71,7 +103,7 @@ class MixinLowering(
                 }
 
                 is FieldDescriptor -> {
-                    IrTweakerAccessorFieldEntry(
+                    IrTweakAccessorFieldEntry(
                         name = descriptor.mappingName,
                         typeName = descriptor.fieldTypeName,
                         removeFinal = accessRequest.shouldRemoveFinal,
@@ -79,10 +111,10 @@ class MixinLowering(
                 }
             }
         }
-        return IrTweakerAccessor(schema.containingFile, schema.originJvmClassName, entries)
+        return IrTweakAccessor(schema.containingFile, schema.originJvmClassName, entries)
     }
 
-    private fun lowerMixinAccessor(schema: Schema): IrMixinAccessor? {
+    private fun lowerMixinAccessor(schema: Schema, sourcePackageLCP: String): IrMixinAccessor? {
         val descriptors = schema.descriptors.mapNotNull {
             if (it.accessRequest !is MixinAccessRequest) {
                 return@mapNotNull null
@@ -123,11 +155,9 @@ class MixinLowering(
             }
         }
         return IrMixinAccessor(
-            originatingFile = schema.containingFile,
-            className = IrClassName.of(
-                options.mixinPackageName,
-                "Accessor".withQualifiedNamePrefix(schema.className)
-            ),
+            originatingFiles = listOfNotNull(schema.containingFile),
+            className = lowerMixinRelatedClassName(schema.className, sourcePackageLCP, "Accessor"),
+            schemaClassName = schema.className,
             side = schema.side,
             targetInternalName = schema.originJvmClassName.internalName,
             receiverTypeName = schema.originTypeName,
@@ -136,48 +166,14 @@ class MixinLowering(
         )
     }
 
-    private fun lowerDescriptor(descriptor: Descriptor): IrDescriptor =
-        when (descriptor) {
-            is InvokableDescriptor -> {
-                if (descriptor is ConstructorDescriptor) {
-                    IrConstructorDescriptor(
-                        callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                        returnTypeName = descriptor.className,
-                    )
-                } else {
-                    IrMethodDescriptor(
-                        name = descriptor.name,
-                        bodyWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                        callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                        cancelWrapperImpl = findCancelDescriptorWrapperImpl(descriptor.className),
-                        parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                        returnTypeName = descriptor.returnTypeName,
-                    )
-                }
-            }
-
-            is FieldDescriptor -> {
-                IrFieldDescriptor(
-                    name = descriptor.name,
-                    fieldGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                    fieldSetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                    arrayGetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                    arraySetWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                    typeName = descriptor.fieldTypeName,
-                )
-            }
-        }
-
-    private fun lowerPatch(patch: Patch): IrPatch {
+    private fun lowerPatch(patch: Patch, mixinSourcePackageLCP: String): IrPatch {
         val constructorArguments = patch.constructorParameters.map(::lowerPatchConstructorArgument)
         return IrPatch(
-            side = patch.side,
             isObject = patch.isObject,
             className = patch.className,
             constructorArguments = constructorArguments,
             impl = lowerPatchImpl(patch, constructorArguments),
-            mixin = lowerMixin(patch),
+            mixin = lowerMixin(patch, mixinSourcePackageLCP),
         )
     }
 
@@ -191,8 +187,8 @@ class MixinLowering(
         else IrPatchImpl(
             originatingFile = patch.containingFile,
             className = IrClassName.of(
-                options.generatedPackageName,
-                "Impl".withQualifiedNamePrefix(patch.className)
+                patch.className.packageName,
+                patch.className.simpleName + "_Impl"
             ),
             constructorParameters = buildList {
                 if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
@@ -202,16 +198,14 @@ class MixinLowering(
             initStrategy = patch.initStrategy,
         )
 
-    private fun lowerMixin(patch: Patch): IrMixin =
+    private fun lowerMixin(patch: Patch, sourcePackageLCP: String): IrMixin =
         IrMixin(
             originatingFiles = listOfNotNull(patch.containingFile),
-            className = IrClassName.of(
-                options.mixinPackageName,
-                "Mixin".withQualifiedNamePrefix(patch.className)
-            ),
+            className = lowerMixinRelatedClassName(patch.className, sourcePackageLCP, "Mixin"),
             targetInstanceTypeName = patch.schema.originTypeName,
             isInterfaceTarget = patch.schema.originClassDeclaration.isInterface,
             targetInternalName = patch.schema.originJvmClassName.internalName,
+            side = patch.side,
             injections = patch.hooks.flatMap(::lowerInjections),
             bridge = lowerBridge(patch),
         )
@@ -222,8 +216,8 @@ class MixinLowering(
             originatingFile = patch.containingFile,
 
             className = IrClassName.of(
-                options.generatedPackageName,
-                "Bridge".withQualifiedNamePrefix(patch.className)
+                patch.className.packageName,
+                patch.className.simpleName + "_Bridge"
             ),
             functions = patch.bridgeSources.map(::lowerBridgeFunction),
         )
@@ -318,7 +312,7 @@ class MixinLowering(
                 }
 
                 hook is ReturnHook && !hook.isInjectBased -> {
-                    val returnTypeName = hook.returnTypeName ?: lapisError("Return type not found")
+                    val returnTypeName = hook.returnTypeName ?: lapisError("Return type cannot be null")
                     add(IrInjectionValueParameter(returnTypeName))
                 }
 
@@ -586,12 +580,8 @@ class MixinLowering(
                 IrHookOriginBodyDescriptorWrapperImplArgument(
                     IrBodyDescriptorWrapperImpl(
                         originatingFile = descriptor.containingFile,
-                        className = IrClassName.of(
-                            options.generatedPackageName,
-                            DescriptorWrapperBuiltin.Body.name.withQualifiedNamePrefix(descriptor.className)
-                        ),
                         descriptorClassName = descriptor.className,
-                        wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.Body],
+                        wrapperBuiltin = DescriptorWrapperBuiltin.Body,
                         parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.returnTypeName,
                     )
@@ -603,12 +593,8 @@ class MixinLowering(
                 IrHookOriginFieldGetDescriptorWrapperImplArgument(
                     IrFieldGetDescriptorWrapperImpl(
                         originatingFile = descriptor.containingFile,
-                        className = IrClassName.of(
-                            options.generatedPackageName,
-                            DescriptorWrapperBuiltin.FieldGet.name.withQualifiedNamePrefix(descriptor.className)
-                        ),
                         descriptorClassName = descriptor.className,
-                        wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.FieldGet],
+                        wrapperBuiltin = DescriptorWrapperBuiltin.FieldGet,
                         receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                         fieldTypeName = descriptor.fieldTypeName,
                     )
@@ -620,12 +606,8 @@ class MixinLowering(
                 IrHookOriginFieldSetDescriptorWrapperImplArgument(
                     IrFieldSetDescriptorWrapperImpl(
                         originatingFile = descriptor.containingFile,
-                        className = IrClassName.of(
-                            options.generatedPackageName,
-                            DescriptorWrapperBuiltin.FieldSet.name.withQualifiedNamePrefix(descriptor.className)
-                        ),
                         descriptorClassName = descriptor.className,
-                        wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.FieldSet],
+                        wrapperBuiltin = DescriptorWrapperBuiltin.FieldSet,
                         receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                         fieldTypeName = descriptor.fieldTypeName,
                     )
@@ -637,12 +619,8 @@ class MixinLowering(
                 IrHookOriginArrayGetDescriptorWrapperImplArgument(
                     IrArrayGetDescriptorWrapperImpl(
                         originatingFile = descriptor.containingFile,
-                        className = IrClassName.of(
-                            options.generatedPackageName,
-                            DescriptorWrapperBuiltin.ArrayGet.name.withQualifiedNamePrefix(descriptor.className)
-                        ),
                         descriptorClassName = descriptor.className,
-                        wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.ArrayGet],
+                        wrapperBuiltin = DescriptorWrapperBuiltin.ArrayGet,
                         arrayTypeName = descriptor.fieldTypeName,
                         arrayComponentTypeName = parameter.arrayComponentTypeName,
                     )
@@ -654,12 +632,8 @@ class MixinLowering(
                 IrHookOriginArraySetDescriptorWrapperImplArgument(
                     IrArraySetDescriptorWrapperImpl(
                         originatingFile = descriptor.containingFile,
-                        className = IrClassName.of(
-                            options.generatedPackageName,
-                            DescriptorWrapperBuiltin.ArraySet.name.withQualifiedNamePrefix(descriptor.className)
-                        ),
                         descriptorClassName = descriptor.className,
-                        wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.ArraySet],
+                        wrapperBuiltin = DescriptorWrapperBuiltin.ArraySet,
                         arrayTypeName = descriptor.fieldTypeName,
                         arrayComponentTypeName = parameter.arrayComponentTypeName,
                     )
@@ -671,12 +645,8 @@ class MixinLowering(
                 IrHookOriginCallDescriptorWrapperImplArgument(
                     IrCallDescriptorWrapperImpl(
                         originatingFile = descriptor.containingFile,
-                        className = IrClassName.of(
-                            options.generatedPackageName,
-                            DescriptorWrapperBuiltin.Call.name.withQualifiedNamePrefix(descriptor.className)
-                        ),
                         descriptorClassName = descriptor.className,
-                        wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.Call],
+                        wrapperBuiltin = DescriptorWrapperBuiltin.Call,
                         receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                         parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.returnTypeName,
@@ -689,12 +659,8 @@ class MixinLowering(
                 IrHookCancelDescriptorWrapperImplArgument(
                     IrCancelDescriptorWrapperImpl(
                         originatingFile = descriptor.containingFile,
-                        className = IrClassName.of(
-                            options.generatedPackageName,
-                            DescriptorWrapperBuiltin.Cancel.name.withQualifiedNamePrefix(descriptor.className)
-                        ),
                         descriptorClassName = descriptor.className,
-                        wrapperBuiltinClassName = builtins[DescriptorWrapperBuiltin.Cancel],
+                        wrapperBuiltin = DescriptorWrapperBuiltin.Cancel,
                         parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
                     )
@@ -716,7 +682,24 @@ class MixinLowering(
         if (parameter.isVar) LocalVarImplBuiltin.of(parameter.typeName)
         else null
 
-    private inline fun <reified T : IrDescriptorWrapperImpl> findOriginDescriptorWrapperImpl(
+    private fun lowerMixinRelatedClassName(
+        sourceClassName: IrClassName,
+        sourcePackageLCP: String,
+        suffix: String,
+    ): IrClassName {
+        val fullPackage = sourceClassName.packageName
+        val relativePackage = if (fullPackage == sourcePackageLCP) {
+            ""
+        } else {
+            fullPackage.removePrefix("$sourcePackageLCP.")
+        }
+        val finalPackageName = listOf(options.generatedMixinPackageName, relativePackage)
+            .filter { it.isNotEmpty() }
+            .joinToString(".")
+        return IrClassName.of(finalPackageName, "${sourceClassName.simpleName}_$suffix")
+    }
+
+    private inline fun <reified T : IrDescriptorWrapperImpl<T>> findOriginDescriptorWrapperImpl(
         descriptorClassName: IrClassName
     ): T? =
         patches.asSequence()
@@ -734,6 +717,20 @@ class MixinLowering(
             .filterIsInstance<IrHookCancelDescriptorWrapperImplArgument>()
             .map { it.wrapperImpl }
             .find { it.descriptorClassName == descriptorClassName }
+
+    private fun findMixinSourcePackageLCP(schemas: List<Schema>, patches: List<Patch>): String {
+        val classNames = schemas.map { it.className } + patches.map { it.className }
+        return when {
+            classNames.isEmpty() -> ""
+            classNames.size == 1 -> classNames.first().packageName
+            else -> {
+                val packageNames = classNames.map { it.packageName }.sorted()
+                val first = packageNames.first().split('.')
+                val last = packageNames.last().split('.')
+                first.zip(last).takeWhile { (previous, next) -> previous == next }.joinToString(".") { it.first }
+            }
+        }
+    }
 
     private fun String.withModIdPrefix(): String =
         withInternalPrefix(options.modId)
@@ -774,5 +771,5 @@ fun KPLambdaTypeName.asIrLambdaTypeName(): IrLambdaTypeName =
 fun KPDynamic.asIrDynamic(): IrDynamic =
     IrDynamic(this)
 
-fun String.withQualifiedNamePrefix(className: IrClassName): String =
-    className.qualifiedName.replace('.', '_') + "_$this"
+fun String.withNestedNamePrefix(className: IrClassName): String =
+    className.nestedName.replace('.', '_') + "_$this"

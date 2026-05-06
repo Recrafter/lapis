@@ -16,22 +16,27 @@ class IrResult(
 class IrSchema(
     val className: IrClassName,
     val descriptors: List<IrDescriptor>,
-    val tweakerAccessor: IrTweakerAccessor?,
+    val tweakAccessor: IrTweakAccessor?,
     val mixinAccessor: IrMixinAccessor?,
 )
 
-sealed class IrAccessor(originatingFile: KSFile?) : IrGeneratedSource(originatingFile)
+sealed interface IrAccessor
+
+abstract class IrGeneratedMixin(originatingFiles: List<KSFile>) : IrGeneratedSource(originatingFiles) {
+    abstract val side: Side
+}
 
 class IrMixinAccessor(
-    originatingFile: KSFile?,
+    originatingFiles: List<KSFile>,
 
-    val className: IrClassName,
-    val side: Side,
+    override val className: IrClassName,
+    override val side: Side,
+    val schemaClassName: IrClassName,
     val isAccessibleSchema: Boolean,
     val targetInternalName: String,
     val receiverTypeName: IrTypeName,
     val members: List<IrMixinAccessorMember>,
-) : IrAccessor(originatingFile)
+) : IrGeneratedMixin(originatingFiles), IrAccessor
 
 sealed class IrMixinAccessorMember(val isStatic: Boolean, val schemaReceiverClassName: IrClassName)
 
@@ -54,15 +59,14 @@ class IrMixinAccessorMethodMember(
     schemaReceiverClassName: IrClassName,
 ) : IrMixinAccessorMember(isStatic, schemaReceiverClassName)
 
-class IrTweakerAccessor(
+class IrTweakAccessor(
     originatingFile: KSFile?,
 
     val ownerJvmClassName: JvmClassName,
-    val entries: List<IrTweakerAccessorEntry>,
-) : IrAccessor(originatingFile)
+    val entries: List<IrTweakAccessorEntry>,
+) : IrGeneratedFile(originatingFile), IrAccessor
 
 class IrPatch(
-    val side: Side,
     val isObject: Boolean,
     val className: IrClassName,
     val constructorArguments: List<IrPatchConstructorArgument>,
@@ -71,15 +75,16 @@ class IrPatch(
 )
 
 class IrMixin(
-    originatingFiles: List<KSFile?>,
+    originatingFiles: List<KSFile>,
 
-    val className: IrClassName,
+    override val className: IrClassName,
+    override val side: Side,
     val targetInstanceTypeName: IrTypeName,
     val isInterfaceTarget: Boolean,
     val targetInternalName: String,
     val injections: List<IrInjection>,
     val bridge: IrBridge?,
-) : IrGeneratedSource(originatingFiles)
+) : IrGeneratedMixin(originatingFiles)
 
 sealed interface IrPatchConstructorArgument
 object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
@@ -87,7 +92,7 @@ object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
 class IrPatchImpl(
     originatingFile: KSFile?,
 
-    val className: IrClassName,
+    override val className: IrClassName,
     val constructorParameters: List<IrPatchImplConstructorParameter>,
     val initStrategy: InitStrategy,
 ) : IrGeneratedSource(originatingFile)

@@ -23,5 +23,5 @@ enum class InternalPrefix(val value: String) {
     LOCAL("local"),
     SHARE("share"),
     ARGUMENT("argument"),
-    ACCESS("argument"),
+    ACCESS("access"),
 }

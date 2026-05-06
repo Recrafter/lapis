@@ -5,12 +5,12 @@ import io.github.recrafter.lapis.phases.common.JvmDescriptor
 import io.github.recrafter.lapis.phases.common.jvmDescriptor
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
-sealed interface IrTweakerAccessorEntry {
+sealed interface IrTweakAccessorEntry {
     fun buildWidenerTweak(ownerJvmClassName: JvmClassName): String
     fun buildTransformerTweak(ownerJvmClassName: JvmClassName): String
 }
 
-class IrTweakerAccessorClassEntry(val removeFinal: Boolean) : IrTweakerAccessorEntry {
+class IrTweakAccessorClassEntry(val removeFinal: Boolean) : IrTweakAccessorEntry {
 
     override fun buildWidenerTweak(ownerJvmClassName: JvmClassName): String = buildString {
         append(if (removeFinal) "extendable" else "accessible")
@@ -25,11 +25,11 @@ class IrTweakerAccessorClassEntry(val removeFinal: Boolean) : IrTweakerAccessorE
     }
 }
 
-class IrTweakerAccessorFieldEntry(
+class IrTweakAccessorFieldEntry(
     val name: String,
     val typeName: IrTypeName,
     val removeFinal: Boolean,
-) : IrTweakerAccessorEntry {
+) : IrTweakAccessorEntry {
 
     override fun buildWidenerTweak(ownerJvmClassName: JvmClassName): String = buildString {
         val fieldPart = buildString {
@@ -56,12 +56,12 @@ class IrTweakerAccessorFieldEntry(
     }
 }
 
-class IrTweakerAccessorMethodEntry(
+class IrTweakAccessorMethodEntry(
     val name: String,
     val parameterTypes: List<IrTypeName>,
     val returnTypeName: IrTypeName?,
     val removeFinal: Boolean,
-) : IrTweakerAccessorEntry {
+) : IrTweakAccessorEntry {
 
     override fun buildWidenerTweak(ownerJvmClassName: JvmClassName): String = buildString {
         append(if (removeFinal) "extendable" else "accessible")

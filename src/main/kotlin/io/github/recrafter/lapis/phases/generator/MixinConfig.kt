@@ -45,41 +45,21 @@ data class MixinConfig(
     data class OverwriteConfig(val requireAnnotations: Boolean)
 
     companion object {
-        fun of(mixinPackage: String, qualifiedNames: Map<Side, List<String>>): MixinConfig =
+        fun of(packageName: String, qualifiedNames: Map<Side, List<String>>): MixinConfig =
             MixinConfig(
                 isRequired = true,
-                minVersion = "0.8.6", // Specifiers
-                extrasConfig = ExtrasConfig(
-                    minVersion = "0.4.0" // WrapMethod
-                ),
-                mixinPackage = mixinPackage,
+                minVersion = "0.8.6",
+                extrasConfig = ExtrasConfig(minVersion = "0.4.0"),
+                mixinPackage = packageName,
                 javaVersion = "JAVA_8",
-                injectorConfig = InjectorConfig(
-                    defaultRequire = 1,
-                ),
-                overwriteConfig = OverwriteConfig(
-                    requireAnnotations = true,
-                ),
-                commonMixins = qualifiedNames.getPackageRelativeClassNames(
-                    Side.Common,
-                    mixinPackage
-                ),
-                clientOnlyMixins = qualifiedNames.getPackageRelativeClassNames(
-                    Side.ClientOnly,
-                    mixinPackage
-                ),
-                dedicatedServerOnlyMixins = qualifiedNames.getPackageRelativeClassNames(
-                    Side.DedicatedServerOnly,
-                    mixinPackage
-                ),
+                injectorConfig = InjectorConfig(defaultRequire = 1),
+                overwriteConfig = OverwriteConfig(requireAnnotations = true),
+                commonMixins = qualifiedNames.getRelativeClasses(Side.Common, packageName),
+                clientOnlyMixins = qualifiedNames.getRelativeClasses(Side.ClientOnly, packageName),
+                dedicatedServerOnlyMixins = qualifiedNames.getRelativeClasses(Side.DedicatedServerOnly, packageName),
             )
 
-        private fun Map<Side, List<String>>.getPackageRelativeClassNames(
-            side: Side,
-            packageName: String,
-        ): List<String>? =
-            get(side)
-                ?.ifEmpty { null }
-                ?.map { it.removePrefix("$packageName.") }
+        private fun Map<Side, List<String>>.getRelativeClasses(side: Side, packageName: String): List<String>? =
+            get(side)?.ifEmpty { null }?.map { it.removePrefix("$packageName.") }
     }
 }

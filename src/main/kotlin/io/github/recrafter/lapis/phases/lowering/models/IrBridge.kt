@@ -7,7 +7,7 @@ import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 class IrBridge(
     originatingFile: KSFile?,
 
-    val className: IrClassName,
+    override val className: IrClassName,
     val functions: List<IrBridgeFunction>,
 ) : IrGeneratedSource(originatingFile)
 
