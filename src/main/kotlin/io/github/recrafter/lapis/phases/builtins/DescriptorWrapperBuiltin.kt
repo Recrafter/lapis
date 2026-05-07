@@ -28,12 +28,12 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             resolveBuiltin: BuiltinResolver,
         ) {
             val receiverParameter = impl.receiverTypeName?.let {
-                IrParameter("receiver".withInternalPrefix(), it, listOf(IrModifier.PUBLIC))
+                IrParameter("receiver".withInternalPrefix(), it, IrModifier.PUBLIC)
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.fieldTypeName),
-                listOf(IrModifier.PUBLIC)
+                IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(listOfNotNull(receiverParameter, operationParameter))
@@ -93,21 +93,13 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             resolveBuiltin: BuiltinResolver,
         ) {
             val receiverParameter = impl.receiverTypeName?.let {
-                IrParameter(
-                    "receiver".withInternalPrefix(),
-                    it,
-                    listOf(IrModifier.PUBLIC)
-                )
+                IrParameter("receiver".withInternalPrefix(), it, IrModifier.PUBLIC)
             }
-            val valueParameter = IrParameter(
-                "value".withInternalPrefix(),
-                impl.fieldTypeName,
-                listOf(IrModifier.PUBLIC)
-            )
+            val valueParameter = IrParameter("value".withInternalPrefix(), impl.fieldTypeName, IrModifier.PUBLIC)
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(IrTypeName.VOID),
-                listOf(IrModifier.PUBLIC)
+                IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(listOfNotNull(receiverParameter, valueParameter, operationParameter))
@@ -182,16 +174,8 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             superClassTypeName: IrParameterizedTypeName,
             resolveBuiltin: BuiltinResolver,
         ) {
-            val arrayParameter = IrParameter(
-                "array".withInternalPrefix(),
-                impl.arrayTypeName,
-                listOf(IrModifier.PUBLIC)
-            )
-            val indexParameter = IrParameter(
-                "index".withInternalPrefix(),
-                KPInt.asIrTypeName(),
-                listOf(IrModifier.PUBLIC)
-            )
+            val arrayParameter = IrParameter("array".withInternalPrefix(), impl.typeName, IrModifier.PUBLIC)
+            val indexParameter = IrParameter("index".withInternalPrefix(), KPInt.asIrTypeName(), IrModifier.PUBLIC)
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(arrayParameter, indexParameter)
                 addSuperInterface(superClassTypeName)
@@ -236,7 +220,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     })
                 }
                 addParameters(listOf(arrayParameter, indexParameter))
-                setReturnType(impl.arrayComponentTypeName)
+                setReturnType(impl.componentTypeName)
                 setBody {
                     return_("%N[%N]") {
                         arg(arrayParameter)
@@ -254,21 +238,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             superClassTypeName: IrParameterizedTypeName,
             resolveBuiltin: BuiltinResolver,
         ) {
-            val arrayParameter = IrParameter(
-                "array".withInternalPrefix(),
-                impl.arrayTypeName,
-                listOf(IrModifier.PUBLIC)
-            )
-            val indexParameter = IrParameter(
-                "index".withInternalPrefix(),
-                KPInt.asIrTypeName(),
-                listOf(IrModifier.PUBLIC)
-            )
-            val valueParameter = IrParameter(
-                "value".withInternalPrefix(),
-                impl.arrayComponentTypeName,
-                listOf(IrModifier.PUBLIC)
-            )
+            val arrayParameter = IrParameter("array".withInternalPrefix(), impl.typeName, IrModifier.PUBLIC)
+            val indexParameter = IrParameter("index".withInternalPrefix(), KPInt.asIrTypeName(), IrModifier.PUBLIC)
+            val valueParameter = IrParameter("value".withInternalPrefix(), impl.componentTypeName, IrModifier.PUBLIC)
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(arrayParameter, indexParameter, valueParameter)
                 addSuperInterface(superClassTypeName)
@@ -354,16 +326,12 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             }
             val argumentParameters = impl.parameters.mapIndexed { index, parameter ->
                 val name = parameter.name ?: index.toString()
-                IrParameter(
-                    name.withInternalPrefix(ARGUMENT),
-                    parameter.typeName,
-                    listOf(IrModifier.PUBLIC)
-                )
+                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName, IrModifier.PUBLIC)
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
-                listOf(IrModifier.PUBLIC)
+                IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(argumentParameters + operationParameter)
@@ -430,28 +398,16 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             resolveBuiltin: BuiltinResolver,
         ) {
             val receiverParameter = impl.receiverTypeName?.let {
-                IrParameter(
-                    "receiver".withInternalPrefix(),
-                    it,
-                    listOf(IrModifier.PUBLIC)
-                )
+                IrParameter("receiver".withInternalPrefix(), it, IrModifier.PUBLIC)
             }
             val namedParameters = impl.parameters.mapNotNull { parameter ->
                 parameter.name?.let {
-                    IrParameter(
-                        parameter.name,
-                        parameter.typeName,
-                        listOf(IrModifier.PUBLIC)
-                    )
+                    IrParameter(parameter.name, parameter.typeName, IrModifier.PUBLIC)
                 }
             }
             val argumentParameters = impl.parameters.mapIndexed { index, parameter ->
                 val name = parameter.name ?: index.toString()
-                IrParameter(
-                    name.withInternalPrefix(ARGUMENT),
-                    parameter.typeName,
-                    listOf(IrModifier.PUBLIC)
-                )
+                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName, IrModifier.PUBLIC)
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
@@ -593,7 +549,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 impl.returnTypeName
                     ?.let { CallbackInfoReturnable::class.asIrParameterizedTypeName(it) }
                     ?: CallbackInfo::class.asIrTypeName(),
-                listOf(IrModifier.PUBLIC)
+                IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(callbackParameter)

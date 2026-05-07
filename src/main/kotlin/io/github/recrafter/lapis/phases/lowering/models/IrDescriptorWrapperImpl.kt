@@ -11,8 +11,8 @@ sealed class IrDescriptorWrapperImpl<T : IrDescriptorWrapperImpl<T>>(
     val descriptorClassName: IrClassName,
     val wrapperBuiltin: DescriptorWrapperBuiltin<T>,
     val receiverTypeName: IrTypeName?,
-) : IrGeneratedSourceFile {
-    override val className = descriptorClassName.derived(wrapperBuiltin.name)
+) : IrKotlinBlueprint() {
+    override val className: IrClassName = descriptorClassName.derived(wrapperBuiltin.name)
 }
 
 sealed interface IrInvokableDescriptorWrapperImpl {
@@ -57,8 +57,8 @@ class IrArrayGetDescriptorWrapperImpl(
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrArrayGetDescriptorWrapperImpl>,
-    val arrayTypeName: IrTypeName,
-    val arrayComponentTypeName: IrTypeName,
+    val typeName: IrTypeName,
+    val componentTypeName: IrTypeName,
 ) : IrDescriptorWrapperImpl<IrArrayGetDescriptorWrapperImpl>(
     originatingFiles, descriptorClassName, wrapperBuiltin, null
 )
@@ -68,8 +68,8 @@ class IrArraySetDescriptorWrapperImpl(
 
     descriptorClassName: IrClassName,
     wrapperBuiltin: DescriptorWrapperBuiltin<IrArraySetDescriptorWrapperImpl>,
-    val arrayTypeName: IrTypeName,
-    val arrayComponentTypeName: IrTypeName,
+    val typeName: IrTypeName,
+    val componentTypeName: IrTypeName,
 ) : IrDescriptorWrapperImpl<IrArraySetDescriptorWrapperImpl>(
     originatingFiles, descriptorClassName, wrapperBuiltin, null
 )

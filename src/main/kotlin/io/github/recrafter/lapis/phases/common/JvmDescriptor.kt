@@ -32,18 +32,11 @@ class JvmDescriptor(private val type: JPTypeName) {
     private val JPClassName.objectName: String
         get() = JvmClassName.of(binaryName).descriptor
 
-    companion object {
-        fun buildSignature(parameterTypeNames: List<IrTypeName>, returnTypeName: IrTypeName?): String =
-            buildString {
-                append(
-                    parameterTypeNames.joinToString(
-                        prefix = "(",
-                        separator = "",
-                        postfix = ")",
-                    ) { it.jvmDescriptor.toString() }
-                )
-                append(returnTypeName?.jvmDescriptor ?: VOID_NAME)
-            }
+    object Signature {
+        fun of(parameterTypeNames: List<IrTypeName>, returnTypeName: IrTypeName?): String =
+            parameterTypeNames.joinToString(prefix = "(", separator = "", postfix = ")") {
+                it.jvmDescriptor.toString()
+            } + (returnTypeName?.jvmDescriptor ?: VOID_NAME)
     }
 }
 
@@ -57,7 +50,7 @@ fun Descriptor.getMixinReference(isTarget: Boolean = false): String =
                 append(CONSTRUCTOR_NAME)
             }
             append(
-                JvmDescriptor.buildSignature(
+                JvmDescriptor.Signature.of(
                     parameters.map { it.typeName },
                     if (isTarget) returnTypeName else null
                 )
@@ -70,7 +63,7 @@ fun Descriptor.getMixinReference(isTarget: Boolean = false): String =
             }
             append(mappingName)
             append(
-                JvmDescriptor.buildSignature(
+                JvmDescriptor.Signature.of(
                     parameters.map { it.typeName },
                     returnTypeName
                 )

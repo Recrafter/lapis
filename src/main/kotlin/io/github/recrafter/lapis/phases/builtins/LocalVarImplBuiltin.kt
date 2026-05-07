@@ -89,7 +89,7 @@ enum class LocalVarImplBuiltin(
                 setVariableTypes(typeVariableName)
                 typeVariableName to referenceKClass.asIrParameterizedTypeName(typeVariableName)
             }
-            val referenceParameter = IrParameter("reference", referenceTypeName, listOf(IrModifier.PRIVATE))
+            val referenceParameter = IrParameter("reference", referenceTypeName, IrModifier.PRIVATE)
             setConstructor(referenceParameter)
             addSuperInterface(resolveBuiltin(LocalVar).parameterizedBy(genericTypeName))
             addProperty(buildKotlinProperty("value", genericTypeName) {

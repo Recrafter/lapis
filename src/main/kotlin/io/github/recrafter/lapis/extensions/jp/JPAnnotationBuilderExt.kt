@@ -4,7 +4,6 @@ import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.phases.generator.builders.toCodeBlock
 import io.github.recrafter.lapis.phases.generator.builders.toJavaCodeBlock
-import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
@@ -35,20 +34,10 @@ inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationB
 @JvmName("setStringArrayArgumentValue")
 inline fun <reified A : Annotation> JPAnnotationBuilder.setArgumentValue(
     property: KProperty1<A, Array<out String>>,
-    vararg strings: String
+    strings: Iterable<String>,
 ) {
     setArrayArgumentValue(property, strings, "%S") {
         strings.forEach(::arg)
-    }
-}
-
-@JvmName("setClassArrayArgumentValue")
-inline fun <reified A : Annotation> JPAnnotationBuilder.setArgumentValue(
-    property: KProperty1<A, Array<out KClass<*>>>,
-    vararg classNames: IrClassName
-) {
-    setArrayArgumentValue(property, classNames, "%T.class") {
-        classNames.forEach(::arg)
     }
 }
 
@@ -57,7 +46,7 @@ inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationB
     property: KProperty1<A, Array<out Embedded>>,
     crossinline builder: Builder<JPAnnotationBuilder> = {}
 ) {
-    val annotations = arrayOf(buildJavaAnnotation<Embedded>(builder))
+    val annotations = listOf(buildJavaAnnotation<Embedded>(builder))
     setArrayArgumentValue(property, annotations, "%L") {
         annotations.forEach(::arg)
     }
@@ -65,7 +54,7 @@ inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationB
 
 inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayArgumentValue(
     property: KProperty1<A, *>,
-    array: Array<*>,
+    array: Iterable<*>,
     placeholder: String,
     noinline arguments: Builder<IrJavaCodeBlock.Arguments> = {}
 ) {

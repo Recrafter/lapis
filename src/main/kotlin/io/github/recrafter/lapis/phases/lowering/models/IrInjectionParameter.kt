@@ -11,8 +11,7 @@ class IrInjectionReceiverParameter(
 ) : IrInjectionParameter
 
 class IrInjectionArgumentParameter(
-    val name: String?,
-    val index: Int,
+    val name: String,
     val typeName: IrTypeName,
 ) : IrInjectionParameter
 

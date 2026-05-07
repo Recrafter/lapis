@@ -20,8 +20,8 @@ class IrSchema(
     val mixinAccessor: IrMixinAccessor?,
 )
 
-interface IrGeneratedMixinFile : IrGeneratedSourceFile {
-    val side: Side
+abstract class IrMixinRelatedBlueprint(isInterface: Boolean) : IrJavaBlueprint(isInterface) {
+    abstract val side: Side
 }
 
 sealed interface IrAccessor
@@ -35,7 +35,7 @@ class IrMixinAccessor(
     val targetInternalName: String,
     val receiverTypeName: IrTypeName,
     val members: List<IrMixinAccessorMember>,
-) : IrGeneratedMixinFile, IrAccessor
+) : IrMixinRelatedBlueprint(isInterface = true), IrAccessor
 
 sealed class IrMixinAccessorMember(val isStatic: Boolean, val schemaReceiverClassName: IrClassName)
 
@@ -59,11 +59,11 @@ class IrMixinAccessorMethodMember(
 ) : IrMixinAccessorMember(isStatic, schemaReceiverClassName)
 
 class IrTweakAccessor(
-    override val originatingFiles: List<KSFile>,
+    val originatingFiles: List<KSFile>,
 
     val ownerJvmClassName: JvmClassName,
     val entries: List<IrTweakAccessorEntry>,
-) : IrGeneratedFile, IrAccessor
+) : IrAccessor
 
 class IrPatch(
     val isObject: Boolean,
@@ -82,18 +82,17 @@ class IrMixin(
     val targetInternalName: String,
     val injections: List<IrInjection>,
     val bridge: IrMixinBridge?,
-) : IrGeneratedMixinFile
+) : IrMixinRelatedBlueprint(isInterface = false)
 
 sealed interface IrPatchConstructorArgument
 object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
 
 class IrPatchImpl(
     override val originatingFiles: List<KSFile>,
-
     override val className: IrClassName,
     val constructorParameters: List<IrPatchImplConstructorParameter>,
     val initStrategy: InitStrategy,
-) : IrGeneratedSourceFile
+) : IrKotlinBlueprint()
 
 sealed interface IrPatchImplConstructorParameter
 object IrPatchImplConstructorInstanceParameter : IrPatchImplConstructorParameter

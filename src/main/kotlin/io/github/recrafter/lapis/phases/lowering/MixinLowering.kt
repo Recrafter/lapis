@@ -190,7 +190,7 @@ class MixinLowering(
         if (patch.hasStaticHooksOnly) null
         else IrPatchImpl(
             originatingFiles = listOfNotNull(patch.containingFile),
-            className = patch.className.derived("_Impl"),
+            className = patch.className.derived("Impl"),
             constructorParameters = buildList {
                 if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
                     add(IrPatchImplConstructorInstanceParameter)
@@ -217,10 +217,10 @@ class MixinLowering(
             originatingFiles = listOfNotNull(patch.containingFile),
 
             className = patch.className.derived("Bridge"),
-            functions = patch.bridgeSources.map(::lowerBridgeFunction),
+            entries = patch.bridgeSources.map(::lowerMixinBridgeEntry),
         )
 
-    private fun lowerBridgeFunction(source: PatchBridgeSource): IrMixinBridgeFunction =
+    private fun lowerMixinBridgeEntry(source: PatchBridgeSource): IrMixinBridgeEntry =
         when (source) {
             is PatchBridgeSourceProperty -> {
                 val (setterName, setterSourceJvmName) = if (source.isMutable) {
@@ -228,7 +228,7 @@ class MixinLowering(
                 } else {
                     null to null
                 }
-                IrMixinBridgeFunctionProperty(
+                IrMixinBridgeEntryProperty(
                     sourceName = source.name,
                     typeName = source.typeName,
                     impl = lowerPropertyBridgeFunctionImpl(source),
@@ -239,7 +239,7 @@ class MixinLowering(
                 )
             }
 
-            is PatchBridgeSourceFunction -> IrMixinBridgeFunctionFunction(
+            is PatchBridgeSourceFunction -> IrMixinBridgeEntryFunctionKind(
                 sourceName = source.name,
                 name = source.jvmName.withModIdPrefix(),
                 sourceJvmName = source.jvmName,
@@ -249,14 +249,14 @@ class MixinLowering(
             )
         }
 
-    private fun lowerPropertyBridgeFunctionImpl(property: PatchBridgeSourceProperty): IrMixinBridgeFunctionPropertyImpl =
+    private fun lowerPropertyBridgeFunctionImpl(property: PatchBridgeSourceProperty): IrMixinBridgeEntryPropertyImpl =
         when (property) {
-            is PatchExtensionProperty -> IrMixinBridgeFunctionPropertyExtensionImpl
+            is PatchExtensionProperty -> IrMixinBridgeEntryExtensionPropertyImpl
         }
 
-    private fun lowerFunctionBridgeFunctionImpl(function: PatchBridgeSourceFunction): IrMixinBridgeFunctionFunctionImpl =
+    private fun lowerFunctionBridgeFunctionImpl(function: PatchBridgeSourceFunction): IrMixinBridgeEntryFunctionImpl =
         when (function) {
-            is PatchExtensionFunction -> IrMixinBridgeFunctionFunctionExtensionImpl
+            is PatchExtensionFunction -> IrMixinBridgeEntryExtensionFunctionImpl
         }
 
     private fun lowerInjections(hook: PatchHook): List<IrInjection> {
@@ -264,7 +264,8 @@ class MixinLowering(
             when {
                 hook.isInjectBased -> {
                     addAll(hook.descriptor.parameters.mapIndexed { index, parameter ->
-                        IrInjectionArgumentParameter(parameter.name, index, parameter.typeName)
+                        val name = parameter.name ?: index.toString()
+                        IrInjectionArgumentParameter(name, parameter.typeName)
                     })
                     add(
                         IrInjectionCallbackParameter(
@@ -284,10 +285,11 @@ class MixinLowering(
                         )
                     }
                     if (hook is FieldSetHook) {
-                        add(IrInjectionArgumentParameter("value", 0, hook.typeName))
+                        add(IrInjectionArgumentParameter("value", hook.typeName))
                     }
                     addAll(hook.targetDescriptor.parameters.mapIndexed { index, parameter ->
-                        IrInjectionArgumentParameter(parameter.name, index, parameter.typeName)
+                        val name = parameter.name ?: index.toString()
+                        IrInjectionArgumentParameter(name, parameter.typeName)
                     })
                     add(
                         IrInjectionOperationParameter(
@@ -302,10 +304,10 @@ class MixinLowering(
                 }
 
                 hook is ArrayHook -> {
-                    add(IrInjectionArgumentParameter("array", 0, hook.typeName))
-                    add(IrInjectionArgumentParameter("index", 1, KPInt.asIrTypeName()))
+                    add(IrInjectionArgumentParameter("array", hook.typeName))
+                    add(IrInjectionArgumentParameter("index", KPInt.asIrTypeName()))
                     if (hook.op == Op.Set) {
-                        add(IrInjectionArgumentParameter("value", 2, hook.componentTypeName))
+                        add(IrInjectionArgumentParameter("value", hook.componentTypeName))
                     }
                 }
 
@@ -488,6 +490,7 @@ class MixinLowering(
                     componentTypeName = hook.componentTypeName,
                     isStatic = hook.descriptor.isStatic,
                     op = hook.op,
+                    atArgs = listOf("array" to hook.op.name.lowercase()),
                 )
 
                 is CallHook -> IrWrapOperationInjection(
@@ -617,8 +620,8 @@ class MixinLowering(
                                 originatingFiles = originatingFiles,
                                 descriptorClassName = descriptor.className,
                                 wrapperBuiltin = DescriptorWrapperBuiltin.ArrayGet,
-                                arrayTypeName = parameter.descriptor.fieldTypeName,
-                                arrayComponentTypeName = parameter.arrayComponentTypeName,
+                                typeName = parameter.descriptor.fieldTypeName,
+                                componentTypeName = parameter.arrayComponentTypeName,
                             )
                         )
                     }
@@ -629,8 +632,8 @@ class MixinLowering(
                                 originatingFiles = originatingFiles,
                                 descriptorClassName = descriptor.className,
                                 wrapperBuiltin = DescriptorWrapperBuiltin.ArraySet,
-                                arrayTypeName = parameter.descriptor.fieldTypeName,
-                                arrayComponentTypeName = parameter.arrayComponentTypeName,
+                                typeName = parameter.descriptor.fieldTypeName,
+                                componentTypeName = parameter.arrayComponentTypeName,
                             )
                         )
                     }
@@ -678,15 +681,15 @@ class MixinLowering(
         sourcePackageLCP: String,
         suffix: String,
     ): IrClassName {
-        val fullPackage = sourceClassName.packageName
-        val finalPackageName = buildString {
+        val sourcePackageName = sourceClassName.packageName
+        val mixinPackageName = buildString {
             append(options.generatedMixinPackageName)
-            if (fullPackage != sourcePackageLCP) {
+            if (sourcePackageName != sourcePackageLCP) {
                 append(".")
-                append(fullPackage.removePrefix("$sourcePackageLCP."))
+                append(sourcePackageName.removePrefix("$sourcePackageLCP."))
             }
         }
-        return IrClassName.of(finalPackageName, "${sourceClassName.simpleName}_$suffix")
+        return IrClassName.of(mixinPackageName, sourceClassName.simpleName).derived(suffix)
     }
 
     private inline fun <reified T : IrDescriptorWrapperImpl<T>> findOriginDescriptorWrapperImpl(

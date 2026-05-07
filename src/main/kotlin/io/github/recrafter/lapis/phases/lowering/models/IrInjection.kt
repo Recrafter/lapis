@@ -145,6 +145,7 @@ class IrArrayInjection(
     componentTypeName: IrTypeName,
     isStatic: Boolean,
     val op: Op,
+    val atArgs: List<Pair<String, String>>,
 ) : IrInjection(
     jvmName, methodMixinReference,
     returnTypeName = if (op == Op.Set) null else componentTypeName,

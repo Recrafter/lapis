@@ -28,14 +28,8 @@ class SymbolParser(
 ) {
     fun prepare(): ParserPrepareResult =
         ParserPrepareResult(
-            resolver
-                .getSymbolsAnnotatedWith<Schema>()
-                .filterIsInstance<KSClassDeclaration>()
-                .toList(),
-            resolver
-                .getSymbolsAnnotatedWith<Patch>()
-                .filterIsInstance<KSClassDeclaration>()
-                .toList(),
+            resolver.getSymbolsAnnotatedWith<Schema>().filterIsInstance<KSClassDeclaration>().toList(),
+            resolver.getSymbolsAnnotatedWith<Patch>().filterIsInstance<KSClassDeclaration>().toList(),
         )
 
     fun parse(): ParserResult =

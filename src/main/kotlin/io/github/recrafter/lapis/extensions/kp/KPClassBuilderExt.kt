@@ -15,7 +15,7 @@ fun KPClassBuilder.setConstructor(parameters: List<IrParameter>) {
         addProperties(parameters.map { parameter ->
             buildKotlinProperty(parameter.name, parameter.typeName) {
                 initializer(parameter.name)
-                setModifiers(*parameter.modifiers.toTypedArray())
+                setModifiers(*parameter.modifiers)
             }
         })
     }

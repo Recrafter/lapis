@@ -8,78 +8,75 @@ class IrMixinBridge(
     override val originatingFiles: List<KSFile>,
 
     override val className: IrClassName,
-    val functions: List<IrMixinBridgeFunction>,
-) : IrGeneratedSourceFile
+    val entries: List<IrMixinBridgeEntry>,
+) : IrKotlinBlueprint()
 
-sealed class IrMixinBridgeFunction(
+sealed class IrMixinBridgeEntry(
     val sourceName: String,
-    open val impl: IrMixinBridgeFunctionImpl,
+    open val impl: IrMixinBridgeEntryImpl,
 ) {
-    abstract val kinds: List<IrMixinBridgeFunctionKind>
+    abstract val kinds: List<IrMixinBridgeEntryKind>
 }
 
-sealed interface IrMixinBridgeFunctionKind {
+sealed interface IrMixinBridgeEntryKind {
     val name: String
     val sourceJvmName: String
     val parameters: List<IrParameter>
     val returnTypeName: IrTypeName?
 }
 
-class IrMixinBridgeFunctionPropertyGetter(
+class IrMixinBridgeEntryPropertyGetterKind(
     override val name: String,
     override val sourceJvmName: String,
     typeName: IrTypeName,
-) : IrMixinBridgeFunctionKind {
+) : IrMixinBridgeEntryKind {
     override val parameters: List<IrParameter> = emptyList()
     override val returnTypeName: IrTypeName = typeName
 }
 
-class IrMixinBridgeFunctionPropertySetter(
+class IrMixinBridgeEntryPropertySetterKind(
     override val name: String,
     override val sourceJvmName: String,
     typeName: IrTypeName,
-) : IrMixinBridgeFunctionKind {
+) : IrMixinBridgeEntryKind {
     override val parameters: List<IrParameter> = listOf(IrSetterParameter(typeName))
     override val returnTypeName: IrTypeName? = null
 }
 
-class IrMixinBridgeFunctionProperty(
+class IrMixinBridgeEntryProperty(
     sourceName: String,
     val typeName: IrTypeName,
-    override val impl: IrMixinBridgeFunctionPropertyImpl,
+    override val impl: IrMixinBridgeEntryPropertyImpl,
     val getterName: String,
     val getterSourceJvmName: String,
     setterName: String?,
     setterSourceJvmName: String?,
-) : IrMixinBridgeFunction(sourceName, impl) {
-    val getter: IrMixinBridgeFunctionPropertyGetter = IrMixinBridgeFunctionPropertyGetter(
+) : IrMixinBridgeEntry(sourceName, impl) {
+    val getter: IrMixinBridgeEntryPropertyGetterKind = IrMixinBridgeEntryPropertyGetterKind(
         getterName, getterSourceJvmName, typeName
     )
-    val setter: IrMixinBridgeFunctionPropertySetter? = if (setterName != null && setterSourceJvmName != null) {
-        IrMixinBridgeFunctionPropertySetter(setterName, setterSourceJvmName, typeName)
+    val setter: IrMixinBridgeEntryPropertySetterKind? = if (setterName != null && setterSourceJvmName != null) {
+        IrMixinBridgeEntryPropertySetterKind(setterName, setterSourceJvmName, typeName)
     } else null
 
-    override val kinds: List<IrMixinBridgeFunctionKind> = listOfNotNull(getter, setter)
+    override val kinds: List<IrMixinBridgeEntryKind> = listOfNotNull(getter, setter)
 }
 
-class IrMixinBridgeFunctionFunction(
+class IrMixinBridgeEntryFunctionKind(
     sourceName: String,
     override val name: String,
     override val sourceJvmName: String,
     override val parameters: List<IrParameter>,
     override val returnTypeName: IrTypeName?,
-    override val impl: IrMixinBridgeFunctionFunctionImpl,
-) : IrMixinBridgeFunction(sourceName, impl), IrMixinBridgeFunctionKind {
-    override val kinds: List<IrMixinBridgeFunctionKind> = listOf(this)
+    override val impl: IrMixinBridgeEntryFunctionImpl,
+) : IrMixinBridgeEntry(sourceName, impl), IrMixinBridgeEntryKind {
+    override val kinds: List<IrMixinBridgeEntryKind> = listOf(this)
 }
 
-sealed interface IrMixinBridgeFunctionImpl
-sealed interface IrMixinBridgeFunctionPropertyImpl : IrMixinBridgeFunctionImpl
-sealed interface IrMixinBridgeFunctionFunctionImpl : IrMixinBridgeFunctionImpl
+sealed interface IrMixinBridgeEntryImpl
+sealed interface IrMixinBridgeEntryPropertyImpl : IrMixinBridgeEntryImpl
+sealed interface IrMixinBridgeEntryFunctionImpl : IrMixinBridgeEntryImpl
 
-sealed interface IrMixinBridgeFunctionExtensionImpl
-object IrMixinBridgeFunctionPropertyExtensionImpl : IrMixinBridgeFunctionPropertyImpl,
-    IrMixinBridgeFunctionExtensionImpl
-
-object IrMixinBridgeFunctionFunctionExtensionImpl : IrMixinBridgeFunctionFunctionImpl,
-    IrMixinBridgeFunctionExtensionImpl
+sealed interface IrMixinBridgeEntryExtensionImpl
+object IrMixinBridgeEntryExtensionPropertyImpl : IrMixinBridgeEntryPropertyImpl, IrMixinBridgeEntryExtensionImpl
+object IrMixinBridgeEntryExtensionFunctionImpl : IrMixinBridgeEntryFunctionImpl, IrMixinBridgeEntryExtensionImpl
