@@ -11,12 +11,10 @@ fun KPClassBuilder.setConstructor(parameters: List<IrParameter>) {
     primaryConstructor(buildKotlinConstructor {
         setParameters(parameters)
     })
-    if (parameters.any { it.modifiers.isNotEmpty() }) {
-        addProperties(parameters.map { parameter ->
-            buildKotlinProperty(parameter.name, parameter.typeName) {
-                initializer(parameter.name)
-                setModifiers(*parameter.modifiers)
-            }
+    parameters.filter { it.propertyModifiers.isNotEmpty() }.forEach { parameter ->
+        addProperty(buildKotlinProperty(parameter.name, parameter.typeName) {
+            initializer(parameter.name)
+            setModifiers(*parameter.propertyModifiers)
         })
     }
 }

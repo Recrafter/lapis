@@ -66,6 +66,19 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
             arguments += buildJavaMethod(parameter.name)
         }
 
+        fun arg(memberReference: IrJavaMember) {
+            when (memberReference) {
+                is IrFieldMember -> {
+                    arg(memberReference.field)
+                }
+
+                is IrMethodMember -> {
+                    arg(memberReference.method)
+                    memberReference.parameters.forEach(::arg)
+                }
+            }
+        }
+
         fun build(): List<Any> =
             arguments
     }

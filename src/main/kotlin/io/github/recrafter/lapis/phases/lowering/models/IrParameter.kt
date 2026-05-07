@@ -6,7 +6,7 @@ import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 open class IrParameter(
     val name: String,
     val typeName: IrTypeName,
-    vararg val modifiers: IrModifier = arrayOf(),
+    vararg val propertyModifiers: IrModifier = arrayOf(),
 )
 
 class IrSetterParameter(

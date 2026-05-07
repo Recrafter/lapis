@@ -189,14 +189,6 @@ sealed class PatchBridgeSourceProperty(
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
-class PatchExtensionProperty(
-    name: String,
-    getterJvmName: String,
-    setterJvmName: String?,
-    type: KSType,
-    isMutable: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable)
-
 sealed class PatchBridgeSourceFunction(
     val name: String,
     val jvmName: String,
@@ -206,12 +198,41 @@ sealed class PatchBridgeSourceFunction(
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
+class PatchExtensionProperty(
+    name: String,
+    getterJvmName: String,
+    setterJvmName: String?,
+    type: KSType,
+    isMutable: Boolean,
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable)
+
 class PatchExtensionFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
     returnType: KSType?,
 ) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType)
+
+sealed interface PatchShadowSource
+class PatchShadowProperty(
+    name: String,
+    getterJvmName: String,
+    setterJvmName: String?,
+    type: KSType,
+    isMutable: Boolean,
+    val mappingName: String,
+    val isStatic: Boolean,
+    val isFinal: Boolean,
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchShadowSource
+
+class PatchShadowFunction(
+    name: String,
+    jvmName: String,
+    parameters: List<FunctionParameter>,
+    returnType: KSType?,
+    val mappingName: String,
+    val isStatic: Boolean,
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchShadowSource
 
 sealed class PatchHook(
     val jvmName: String,

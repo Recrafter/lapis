@@ -34,7 +34,7 @@ inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationB
 @JvmName("setStringArrayArgumentValue")
 inline fun <reified A : Annotation> JPAnnotationBuilder.setArgumentValue(
     property: KProperty1<A, Array<out String>>,
-    strings: Iterable<String>,
+    strings: List<String>,
 ) {
     setArrayArgumentValue(property, strings, "%S") {
         strings.forEach(::arg)
@@ -54,7 +54,7 @@ inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationB
 
 inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayArgumentValue(
     property: KProperty1<A, *>,
-    array: Iterable<*>,
+    array: List<*>,
     placeholder: String,
     noinline arguments: Builder<IrJavaCodeBlock.Arguments> = {}
 ) {

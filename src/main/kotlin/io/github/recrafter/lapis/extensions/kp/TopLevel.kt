@@ -172,12 +172,9 @@ fun buildKotlinObject(name: String, builder: Builder<KPClassBuilder> = {}): KPCl
 fun buildKotlinTypeAlias(name: String, typeName: IrTypeName, builder: Builder<KPTypeAliasBuilder> = {}): KPTypeAlias =
     KPTypeAlias.builder(name, typeName.kotlin).apply(builder).build()
 
-fun buildKotlinFile(packageName: String, name: String, builder: Builder<KPFileBuilder> = {}): KPFile =
-    KPFile.builder(packageName, name)
+fun buildKotlinFile(className: IrClassName, builder: Builder<KPFileBuilder> = {}): KPFile =
+    KPFile.builder(className.packageName, className.nestedName)
         .addFileComment(GeneratorConstants.GENERATED_HEADER)
         .apply(builder)
         .indent(GeneratorConstants.INDENT)
         .build()
-
-fun buildKotlinFile(className: IrClassName, builder: Builder<KPFileBuilder> = {}): KPFile =
-    buildKotlinFile(className.packageName, className.nestedName, builder)

@@ -124,6 +124,10 @@ class ParsedPatchProperty(
     val isMutable: Boolean,
 
     val hasExtensionAnnotation: Boolean,
+    val hasShadowAnnotation: Boolean,
+    val hasStaticAnnotation: Boolean,
+    val explicitShadowName: String?,
+    val isShadowFinal: Boolean,
 ) : SymbolSource(symbol)
 
 class ParsedPatchFunction(
@@ -141,6 +145,10 @@ class ParsedPatchFunction(
     val isExtension: Boolean,
 
     val hasExtensionAnnotation: Boolean,
+    val hasShadowAnnotation: Boolean,
+    val hasStaticAnnotation: Boolean,
+    val explicitShadowName: String?,
+    val isShadowFinal: Boolean,
 
     val hasHookAnnotation: Boolean,
     val hookDescriptorClassDeclaration: KSClassDeclaration?,

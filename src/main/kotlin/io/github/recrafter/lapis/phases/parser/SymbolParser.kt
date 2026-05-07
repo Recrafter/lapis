@@ -250,8 +250,9 @@ class SymbolParser(
         )
 
     @OptIn(KspExperimental::class)
-    private fun parsePatchProperty(propertyDeclaration: KSPropertyDeclaration): ParsedPatchProperty =
-        ParsedPatchProperty(
+    private fun parsePatchProperty(propertyDeclaration: KSPropertyDeclaration): ParsedPatchProperty {
+        val shadowAnnotation = propertyDeclaration.findAnnotation<Shadow>()
+        return ParsedPatchProperty(
             symbol = propertyDeclaration,
 
             name = propertyDeclaration.name,
@@ -266,10 +267,16 @@ class SymbolParser(
             isMutable = propertyDeclaration.isMutable && propertyDeclaration.setter?.isPublic == true,
 
             hasExtensionAnnotation = propertyDeclaration.hasAnnotation<Extension>(),
+            hasShadowAnnotation = shadowAnnotation != null,
+            hasStaticAnnotation = propertyDeclaration.hasAnnotation<Static>(),
+            explicitShadowName = shadowAnnotation?.getArgumentValue(Shadow::name),
+            isShadowFinal = shadowAnnotation?.getArgumentValue(Shadow::final) == true,
         )
+    }
 
     @OptIn(KspExperimental::class)
     private fun parsePatchFunction(functionDeclaration: KSFunctionDeclaration): ParsedPatchFunction {
+        val shadowAnnotation = functionDeclaration.findAnnotation<Shadow>()
         val hookAnnotation = functionDeclaration.findAnnotation<Hook>()
 
         val atConstructorHeadAnnotation = functionDeclaration.findAnnotation<AtConstructorHead>()
@@ -305,6 +312,10 @@ class SymbolParser(
             isExtension = functionDeclaration.isExtension,
 
             hasExtensionAnnotation = functionDeclaration.hasAnnotation<Extension>(),
+            hasShadowAnnotation = shadowAnnotation != null,
+            hasStaticAnnotation = functionDeclaration.hasAnnotation<Static>(),
+            explicitShadowName = shadowAnnotation?.getArgumentValue(Shadow::name, explicit = true),
+            isShadowFinal = shadowAnnotation?.getArgumentValue(Shadow::final) == true,
 
             hasHookAnnotation = hookAnnotation != null,
             hookDescriptorClassDeclaration = hookAnnotation?.getArgumentValue(Hook::desc)?.toClassDeclaration(),

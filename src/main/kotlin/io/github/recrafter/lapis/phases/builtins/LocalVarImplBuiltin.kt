@@ -103,13 +103,13 @@ enum class LocalVarImplBuiltin(
                     }
                 }
                 setSetter {
-                    val newValueParameter = IrSetterParameter(genericTypeName)
-                    setParameters(listOf(newValueParameter))
+                    val setterParameter = IrSetterParameter(genericTypeName)
+                    setParameters(listOf(setterParameter))
                     setBody {
                         code_("%N.%L(%N)") {
                             arg(referenceParameter)
                             arg(setterCallable)
-                            arg(newValueParameter)
+                            arg(setterParameter)
                         }
                     }
                 }

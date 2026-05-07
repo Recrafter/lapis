@@ -76,3 +76,4 @@ fun String.toKotlinCodeBlock(asValue: Boolean = false): KPCodeBlock =
     buildKotlinCodeBlock(if (asValue) "%S" else "%L") { arg(this@toKotlinCodeBlock) }
 
 fun KPParameter.toCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%N") { arg(this@toCodeBlock) }
+fun IrParameter.toKotlinCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%N") { arg(this@toKotlinCodeBlock) }

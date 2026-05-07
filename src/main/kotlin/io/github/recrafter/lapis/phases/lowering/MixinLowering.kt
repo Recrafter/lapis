@@ -195,6 +195,9 @@ class MixinLowering(
                 if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
                     add(IrPatchImplConstructorInstanceParameter)
                 }
+                if (patch.bridgeSources.any { it is PatchShadowSource }) {
+                    add(IrPatchImplConstructorBridgeParameter)
+                }
             },
             initStrategy = patch.initStrategy,
         )
@@ -208,10 +211,10 @@ class MixinLowering(
             targetInternalName = patch.schema.originJvmClassName.internalName,
             side = patch.side,
             injections = patch.hooks.flatMap(::lowerInjections),
-            bridge = lowerBridge(patch),
+            bridge = lowerMixinBridge(patch),
         )
 
-    private fun lowerBridge(patch: Patch): IrMixinBridge? =
+    private fun lowerMixinBridge(patch: Patch): IrMixinBridge? =
         if (patch.bridgeSources.isEmpty()) null
         else IrMixinBridge(
             originatingFiles = listOfNotNull(patch.containingFile),
@@ -239,7 +242,7 @@ class MixinLowering(
                 )
             }
 
-            is PatchBridgeSourceFunction -> IrMixinBridgeEntryFunctionKind(
+            is PatchBridgeSourceFunction -> IrMixinBridgeEntryFunction(
                 sourceName = source.name,
                 name = source.jvmName.withModIdPrefix(),
                 sourceJvmName = source.jvmName,
@@ -252,11 +255,17 @@ class MixinLowering(
     private fun lowerPropertyBridgeFunctionImpl(property: PatchBridgeSourceProperty): IrMixinBridgeEntryPropertyImpl =
         when (property) {
             is PatchExtensionProperty -> IrMixinBridgeEntryExtensionPropertyImpl
+            is PatchShadowProperty -> IrMixinBridgeEntryShadowPropertyImpl(
+                property.mappingName,
+                property.isStatic,
+                property.isFinal,
+            )
         }
 
     private fun lowerFunctionBridgeFunctionImpl(function: PatchBridgeSourceFunction): IrMixinBridgeEntryFunctionImpl =
         when (function) {
             is PatchExtensionFunction -> IrMixinBridgeEntryExtensionFunctionImpl
+            is PatchShadowFunction -> IrMixinBridgeEntryShadowFunctionImpl(function.mappingName, function.isStatic)
         }
 
     private fun lowerInjections(hook: PatchHook): List<IrInjection> {

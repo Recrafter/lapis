@@ -6,7 +6,6 @@ import com.squareup.kotlinpoet.ksp.writeTo
 import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.phases.generator.KSuppressWarning
 import io.github.recrafter.lapis.phases.lowering.models.IrDescriptorWrapperImpl
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrParameterizedTypeName
@@ -33,9 +32,6 @@ class Builtins(
             lapisError("External builtins already generated")
         }
         buildKotlinFile(externalClassName) {
-            suppressWarnings(
-                KSuppressWarning.RedundantVisibilityModifier,
-            )
             val externalBuiltins = Builtin.entries.filter { !it.isInternal }.map { it.generate(::get) }
             externalBuiltins.filterIsInstance<KPTypeAlias>().forEach {
                 addTypeAlias(it)
@@ -55,11 +51,6 @@ class Builtins(
             return
         }
         buildKotlinFile(internalClassName) {
-            suppressWarnings(
-                KSuppressWarning.RedundantVisibilityModifier,
-                KSuppressWarning.ObjectInheritsException,
-                KSuppressWarning.JavaIoSerializableObjectMustHaveReadResolve,
-            )
             val builtins = requestedInternalBuiltins.values.map { it.generate(::get) }
             builtins.filterIsInstance<KPTypeAlias>().forEach {
                 addTypeAlias(it)

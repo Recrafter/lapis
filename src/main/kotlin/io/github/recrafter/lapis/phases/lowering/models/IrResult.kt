@@ -96,3 +96,4 @@ class IrPatchImpl(
 
 sealed interface IrPatchImplConstructorParameter
 object IrPatchImplConstructorInstanceParameter : IrPatchImplConstructorParameter
+object IrPatchImplConstructorBridgeParameter : IrPatchImplConstructorParameter

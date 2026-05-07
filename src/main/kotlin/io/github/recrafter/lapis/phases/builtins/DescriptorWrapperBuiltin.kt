@@ -411,7 +411,8 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
-                Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid())
+                Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
+                IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(listOfNotNull(receiverParameter) + argumentParameters + operationParameter)

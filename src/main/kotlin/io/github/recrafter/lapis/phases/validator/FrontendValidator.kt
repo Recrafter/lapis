@@ -238,12 +238,16 @@ class FrontendValidator(
         val constructorParameters = constructor.parameters.mapNotNull {
             runOrNullOnSkip { validatePatchConstructorParameter(it, schema) }
         }
-        val bridgeSourceProperties = properties.filter { it.hasExtensionAnnotation }.mapNotNull {
-            runOrNullOnSkip { validatePatchExtensionProperty(it, schema) }
-        }
-        val bridgeSourceFunctions = parsedRegularFunctions.filter { it.hasExtensionAnnotation }.mapNotNull {
-            runOrNullOnSkip { validatePatchExtensionFunction(it, schema) }
-        }
+        val bridgeSourceProperties = properties
+            .filter { it.hasExtensionAnnotation || it.hasShadowAnnotation }
+            .mapNotNull {
+                runOrNullOnSkip { validatePatchBridgeSourceProperty(it, schema) }
+            }
+        val bridgeSourceFunctions = parsedRegularFunctions
+            .filter { it.hasExtensionAnnotation || it.hasShadowAnnotation }
+            .mapNotNull {
+                runOrNullOnSkip { validatePatchBridgeSourceFunction(it, schema.isAccessible) }
+            }
         val hooks = parsedHookFunctions.mapNotNull {
             runOrNullOnSkip { validatePatchHook(it, isObject, isInCompanionObject = false) }
         }
@@ -293,41 +297,89 @@ class FrontendValidator(
         }
     }
 
-    private fun validatePatchExtensionProperty(
+    private fun validatePatchBridgeSourceProperty(
         property: ParsedPatchProperty,
         schema: Schema,
-    ): PatchExtensionProperty = with(property) {
-        kspRequire(schema.isAccessible) { "274" }
-        kspRequire(property.isPublic) { "275" }
-        kspRequire(!property.isOpen && !property.isAbstract) { "276" }
-        kspRequire(!property.isExtension) { "277" }
+    ): PatchBridgeSourceProperty = with(property) {
+        val hasSingleAnnotation = listOf(
+            hasExtensionAnnotation,
+            hasShadowAnnotation,
+        ).count { it } == 1
+        kspRequire(hasSingleAnnotation) { "62" }
         kspRequireNotNull(getterJvmName) { "278" }
-        PatchExtensionProperty(
+        kspRequire(property.isPublic) { "275" }
+        kspRequire(!property.isExtension) { "277" }
+        if (hasExtensionAnnotation) {
+            kspRequire(schema.isAccessible) { "274" }
+            kspRequire(!property.isOpen && !property.isAbstract) { "276" }
+            return PatchExtensionProperty(
+                name = name,
+                getterJvmName = getterJvmName,
+                setterJvmName = setterJvmName,
+                type = type,
+                isMutable = isMutable,
+            )
+        }
+        kspRequire(property.isAbstract) { "294" }
+        val mappingName = if (explicitShadowName != null) {
+            kspRequire(explicitShadowName.isNotEmpty()) { "542" }
+            explicitShadowName
+        } else {
+            name
+        }
+        PatchShadowProperty(
             name = name,
             getterJvmName = getterJvmName,
             setterJvmName = setterJvmName,
+            mappingName = mappingName,
+            isStatic = property.hasStaticAnnotation,
             type = type,
             isMutable = isMutable,
+            isFinal = isShadowFinal,
         )
     }
 
-    private fun validatePatchExtensionFunction(
+    private fun validatePatchBridgeSourceFunction(
         function: ParsedPatchFunction,
-        schema: Schema,
-    ): PatchExtensionFunction = with(function) {
-        kspRequire(schema.isAccessible) { "292" }
+        isResolvable: Boolean,
+    ): PatchBridgeSourceFunction = with(function) {
+        val hasSingleAnnotation = listOf(
+            hasExtensionAnnotation,
+            hasShadowAnnotation,
+        ).count { it } == 1
+        kspRequire(hasSingleAnnotation) { "62" }
         kspRequire(function.isPublic) { "293" }
-        kspRequire(!function.isOpen && !function.isAbstract) { "294" }
         kspRequire(!function.isExtension) { "295" }
-        PatchExtensionFunction(
+        val parameters = function.parameters.map {
+            FunctionParameter(
+                name = kspRequireNotNull(it.name) { "301" },
+                type = kspRequireNotNull(it.type) { "302" },
+            )
+        }
+        if (hasExtensionAnnotation) {
+            kspRequire(isResolvable) { "292" }
+            kspRequire(!function.isOpen && !function.isAbstract) { "294" }
+            return PatchExtensionFunction(
+                name = name,
+                jvmName = jvmName,
+                parameters = parameters,
+                returnType = function.returnType,
+            )
+        }
+        kspRequire(function.isAbstract) { "294" }
+        kspRequire(!function.isShadowFinal) { "344" }
+        val mappingName = if (explicitShadowName != null) {
+            kspRequire(explicitShadowName.isNotEmpty()) { "542" }
+            explicitShadowName
+        } else {
+            name
+        }
+        PatchShadowFunction(
             name = name,
             jvmName = jvmName,
-            parameters = function.parameters.map {
-                FunctionParameter(
-                    name = kspRequireNotNull(it.name) { "301" },
-                    type = kspRequireNotNull(it.type) { "302" },
-                )
-            },
+            mappingName = mappingName,
+            isStatic = function.hasStaticAnnotation,
+            parameters = parameters,
             returnType = function.returnType,
         )
     }
