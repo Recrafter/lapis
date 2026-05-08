@@ -24,43 +24,14 @@ class IrMixinShadowBridge(
 
 sealed interface IrMixinBridgeEntry {
     val sourceName: String
-    val impl: IrMixinBridgeEntryImpl
     val kinds: List<IrMixinBridgeEntryKind>
 }
 
-sealed interface IrMixinExtensionBridgeEntry : IrMixinBridgeEntry {
-    override val sourceName: String
-    override val impl: IrMixinBridgeEntryExtensionImpl
-}
-
-sealed interface IrMixinShadowBridgeEntry : IrMixinBridgeEntry {
-    override val sourceName: String
-    override val impl: IrMixinBridgeEntryShadowImpl
-}
-
-sealed interface IrMixinBridgeEntryKind {
+sealed interface IrMixinBridgeEntryKind : IrReturnable {
     val name: String
     val sourceJvmName: String
     val parameters: List<IrParameter>
-    val returnTypeName: IrTypeName?
-}
-
-class IrMixinBridgeEntryPropertyGetter(
-    override val name: String,
-    override val sourceJvmName: String,
-    typeName: IrTypeName,
-) : IrMixinBridgeEntryKind {
-    override val parameters: List<IrParameter> = emptyList()
-    override val returnTypeName: IrTypeName = typeName
-}
-
-class IrMixinBridgeEntryPropertySetter(
-    override val name: String,
-    override val sourceJvmName: String,
-    val typeName: IrTypeName,
-) : IrMixinBridgeEntryKind {
-    override val parameters: List<IrParameter> = listOf(IrSetterParameter(typeName))
-    override val returnTypeName: IrTypeName? = null
+    override val returnTypeName: IrTypeName?
 }
 
 sealed class IrMixinBridgeEntryProperty(
@@ -70,7 +41,6 @@ sealed class IrMixinBridgeEntryProperty(
     getterSourceJvmName: String,
     setterName: String?,
     setterSourceJvmName: String?,
-    override val impl: IrMixinBridgeEntryPropertyImpl,
 ) : IrMixinBridgeEntry {
     val getter: IrMixinBridgeEntryPropertyGetter = IrMixinBridgeEntryPropertyGetter(
         getterName, getterSourceJvmName, typeName
@@ -80,7 +50,38 @@ sealed class IrMixinBridgeEntryProperty(
     } else null
 
     override val kinds: List<IrMixinBridgeEntryKind> = listOfNotNull(getter, setter)
+
+    class IrMixinBridgeEntryPropertyGetter(
+        override val name: String,
+        override val sourceJvmName: String,
+        typeName: IrTypeName,
+    ) : IrMixinBridgeEntryKind {
+        override val parameters: List<IrParameter> = emptyList()
+        override val returnTypeName: IrTypeName = typeName
+    }
+
+    class IrMixinBridgeEntryPropertySetter(
+        override val name: String,
+        override val sourceJvmName: String,
+        val typeName: IrTypeName,
+    ) : IrMixinBridgeEntryKind {
+        val parameter: IrParameter = IrSetterParameter(typeName)
+        override val parameters: List<IrParameter> = listOf(parameter)
+        override val returnTypeName: IrTypeName? = null
+    }
 }
+
+sealed class IrMixinBridgeEntryFunction(
+    override val sourceName: String,
+    override val name: String,
+    override val sourceJvmName: String,
+    override val parameters: List<IrParameter>,
+    override val returnTypeName: IrTypeName?,
+) : IrMixinBridgeEntry, IrMixinBridgeEntryKind {
+    override val kinds: List<IrMixinBridgeEntryKind> = listOf(this)
+}
+
+sealed interface IrMixinExtensionBridgeEntry : IrMixinBridgeEntry
 
 class IrMixinExtensionBridgeEntryProperty(
     sourceName: String,
@@ -89,7 +90,6 @@ class IrMixinExtensionBridgeEntryProperty(
     getterSourceJvmName: String,
     setterName: String?,
     setterSourceJvmName: String?,
-    override val impl: IrMixinBridgeEntryExtensionPropertyImpl,
 ) : IrMixinBridgeEntryProperty(
     sourceName,
     typeName,
@@ -97,8 +97,18 @@ class IrMixinExtensionBridgeEntryProperty(
     getterSourceJvmName,
     setterName,
     setterSourceJvmName,
-    impl,
 ), IrMixinExtensionBridgeEntry
+
+class IrMixinExtensionBridgeEntryFunction(
+    sourceName: String,
+    name: String,
+    sourceJvmName: String,
+    parameters: List<IrParameter>,
+    returnTypeName: IrTypeName?,
+) : IrMixinBridgeEntryFunction(sourceName, name, sourceJvmName, parameters, returnTypeName),
+    IrMixinExtensionBridgeEntry
+
+sealed interface IrMixinShadowBridgeEntry : IrMixinBridgeEntry
 
 class IrMixinShadowBridgeEntryProperty(
     sourceName: String,
@@ -107,7 +117,9 @@ class IrMixinShadowBridgeEntryProperty(
     getterSourceJvmName: String,
     setterName: String?,
     setterSourceJvmName: String?,
-    override val impl: IrMixinBridgeEntryShadowPropertyImpl,
+    val mappingName: String,
+    val isStatic: Boolean,
+    val isFinal: Boolean,
 ) : IrMixinBridgeEntryProperty(
     sourceName,
     typeName,
@@ -115,29 +127,7 @@ class IrMixinShadowBridgeEntryProperty(
     getterSourceJvmName,
     setterName,
     setterSourceJvmName,
-    impl,
 ), IrMixinShadowBridgeEntry
-
-sealed class IrMixinBridgeEntryFunction(
-    override val sourceName: String,
-    override val name: String,
-    override val sourceJvmName: String,
-    override val parameters: List<IrParameter>,
-    override val returnTypeName: IrTypeName?,
-    override val impl: IrMixinBridgeEntryFunctionImpl,
-) : IrMixinBridgeEntry, IrMixinBridgeEntryKind {
-    override val kinds: List<IrMixinBridgeEntryKind> = listOf(this)
-}
-
-class IrMixinExtensionBridgeEntryFunction(
-    sourceName: String,
-    name: String,
-    sourceJvmName: String,
-    parameters: List<IrParameter>,
-    returnTypeName: IrTypeName?,
-    override val impl: IrMixinBridgeEntryExtensionFunctionImpl,
-) : IrMixinBridgeEntryFunction(sourceName, name, sourceJvmName, parameters, returnTypeName, impl),
-    IrMixinExtensionBridgeEntry
 
 class IrMixinShadowBridgeEntryFunction(
     sourceName: String,
@@ -145,26 +135,7 @@ class IrMixinShadowBridgeEntryFunction(
     sourceJvmName: String,
     parameters: List<IrParameter>,
     returnTypeName: IrTypeName?,
-    override val impl: IrMixinBridgeEntryShadowFunctionImpl,
-) : IrMixinBridgeEntryFunction(sourceName, name, sourceJvmName, parameters, returnTypeName, impl),
+    val mappingName: String,
+    val isStatic: Boolean,
+) : IrMixinBridgeEntryFunction(sourceName, name, sourceJvmName, parameters, returnTypeName),
     IrMixinShadowBridgeEntry
-
-sealed interface IrMixinBridgeEntryImpl
-sealed interface IrMixinBridgeEntryPropertyImpl : IrMixinBridgeEntryImpl
-sealed interface IrMixinBridgeEntryFunctionImpl : IrMixinBridgeEntryImpl
-
-sealed interface IrMixinBridgeEntryExtensionImpl : IrMixinBridgeEntryImpl
-object IrMixinBridgeEntryExtensionPropertyImpl : IrMixinBridgeEntryPropertyImpl, IrMixinBridgeEntryExtensionImpl
-object IrMixinBridgeEntryExtensionFunctionImpl : IrMixinBridgeEntryFunctionImpl, IrMixinBridgeEntryExtensionImpl
-
-sealed interface IrMixinBridgeEntryShadowImpl : IrMixinBridgeEntryImpl
-class IrMixinBridgeEntryShadowPropertyImpl(
-    val mappingName: String,
-    val isStatic: Boolean,
-    val isFinal: Boolean,
-) : IrMixinBridgeEntryPropertyImpl, IrMixinBridgeEntryShadowImpl
-
-class IrMixinBridgeEntryShadowFunctionImpl(
-    val mappingName: String,
-    val isStatic: Boolean,
-) : IrMixinBridgeEntryFunctionImpl, IrMixinBridgeEntryShadowImpl

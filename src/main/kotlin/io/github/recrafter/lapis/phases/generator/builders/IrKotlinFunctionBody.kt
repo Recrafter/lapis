@@ -8,34 +8,34 @@ value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
     fun IrKotlinFunctionBody.code_(
         format: String,
         isReturn: Boolean = false,
-        arguments: Builder<IrKotlinCodeBlock.Arguments> = {}
+        argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {
         if (isReturn) {
-            return_(format, arguments)
+            return_(format, argumentsBuilder)
         } else {
-            builder.addStatement(buildKotlinCodeBlock(format, arguments))
+            builder.addStatement(buildKotlinCodeBlock(format, argumentsBuilder = argumentsBuilder))
         }
     }
 
     fun IrKotlinFunctionBody.return_(
         format: String? = null,
-        arguments: Builder<IrKotlinCodeBlock.Arguments> = {}
+        argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {
-        builder.addReturnStatement(format?.let { buildKotlinCodeBlock(it, arguments) })
+        builder.addReturnStatement(format?.let { buildKotlinCodeBlock(it, argumentsBuilder = argumentsBuilder) })
     }
 
     fun IrKotlinFunctionBody.with_(
         receiver: KPCodeBlock,
         block: Builder<IrKotlinCodeBlock>
     ) {
-        withControlFlow(buildKotlinCodeBlock("with(%L)") { arg(receiver) }, block)
+        withControlFlow(buildKotlinCodeBlock("with(%L)") { +receiver }, block)
     }
 
     fun IrKotlinFunctionBody.throw_(
         format: String,
-        arguments: Builder<IrKotlinCodeBlock.Arguments> = {}
+        argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {
-        builder.addStatement(buildKotlinCodeBlock("throw $format", arguments))
+        builder.addStatement(buildKotlinCodeBlock("throw $format", argumentsBuilder = argumentsBuilder))
     }
 
     private fun IrKotlinFunctionBody.withControlFlow(controlFlow: KPCodeBlock, body: Builder<IrKotlinCodeBlock>) {

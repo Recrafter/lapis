@@ -9,88 +9,79 @@ import kotlin.reflect.KClass
 @JvmInline
 value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
 
-    fun add(format: String, arguments: Builder<Arguments> = {}) {
+    fun add(format: String, argumentsBuilder: Builder<Arguments> = {}) {
         builder.add(
             format.replace('%', '$'),
-            *Arguments().apply(arguments).build().toTypedArray()
+            *Arguments().apply(argumentsBuilder).build().toTypedArray()
         )
     }
 
-    fun add(codeBlock: JPCodeBlock) {
-        builder.add(codeBlock)
-    }
-
-    fun build(): JPCodeBlock =
-        builder.build()
+    fun build(): JPCodeBlock = builder.build()
 
     @JvmInline
     value class Arguments(private val arguments: MutableList<Any> = mutableListOf()) {
 
-        fun arg(string: String) {
-            arguments += string
+        operator fun String.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(int: Int) {
-            arguments += int
+        operator fun Int.invoke() {
+            arguments += this
         }
 
-        fun arg(boolean: Boolean) {
-            arguments += boolean
+        operator fun Boolean.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(codeBlock: JPCodeBlock) {
-            arguments += codeBlock
+        operator fun JPCodeBlock.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(annotation: JPAnnotation) {
-            arguments += annotation
+        operator fun JPAnnotation.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(field: JPField) {
-            arguments += field
+        operator fun JPField.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(method: JPMethod) {
-            arguments += method
+        operator fun JPMethod.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(kClass: KClass<*>) {
-            arg(kClass.asIrTypeName())
+        operator fun KClass<*>.unaryPlus() {
+            +this.asIrTypeName()
         }
 
-        fun arg(typeName: IrTypeName) {
-            arguments += typeName.java
+        operator fun IrTypeName.unaryPlus() {
+            arguments += this.java
         }
 
-        fun arg(parameter: IrParameter) {
-            arguments += buildJavaMethod(parameter.name)
+        operator fun IrParameter.unaryPlus() {
+            arguments += buildJavaMethod(this.name)
         }
 
-        fun arg(memberReference: IrJavaMember) {
-            when (memberReference) {
-                is IrFieldMember -> {
-                    arg(memberReference.field)
-                }
+        operator fun IrJavaMember.unaryPlus() {
+            when (this) {
+                is IrFieldMember -> +field
 
                 is IrMethodMember -> {
-                    arg(memberReference.method)
-                    memberReference.parameters.forEach(::arg)
+                    +method; parameters.forEach { +it }
                 }
             }
         }
 
-        fun build(): List<Any> =
-            arguments
+        fun build(): List<Any> = arguments
     }
 }
 
-fun Boolean.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { arg(this@toJavaCodeBlock) }
-fun Int.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { arg(this@toJavaCodeBlock) }
+fun Boolean.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { +this@toJavaCodeBlock }
+fun Int.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { this@toJavaCodeBlock() }
 fun String.toJavaCodeBlock(asValue: Boolean = false): JPCodeBlock =
-    buildJavaCodeBlock(if (asValue) "%S" else "%L") { arg(this@toJavaCodeBlock) }
+    buildJavaCodeBlock(if (asValue) "%S" else "%L") { +this@toJavaCodeBlock }
 
-fun IrTypeName.toJavaCodeBlock(asValue: Boolean = false): JPCodeBlock =
-    buildJavaCodeBlock(if (asValue) "%T.class" else "%T") { arg(this@toJavaCodeBlock) }
+fun IrTypeName.toJavaCodeBlock(asClass: Boolean = false): JPCodeBlock =
+    buildJavaCodeBlock(if (asClass) "%T.class" else "%T") { +this@toJavaCodeBlock }
 
-fun JPField.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%N") { arg(this@toCodeBlock) }
-fun JPAnnotation.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { arg(this@toCodeBlock) }
+fun JPField.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%N") { +this@toCodeBlock }
+fun JPAnnotation.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { +this@toCodeBlock }

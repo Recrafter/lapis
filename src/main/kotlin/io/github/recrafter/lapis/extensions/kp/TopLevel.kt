@@ -88,10 +88,10 @@ fun buildKotlinCodeBlock(builder: Builder<IrKotlinCodeBlock> = {}): KPCodeBlock 
 
 fun buildKotlinCodeBlock(
     format: String,
-    arguments: Builder<IrKotlinCodeBlock.Arguments> = {}
+    argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
 ): KPCodeBlock =
     buildKotlinCodeBlock {
-        add(format, arguments)
+        add(format, argumentsBuilder)
     }
 
 fun buildKotlinProperty(

@@ -96,21 +96,14 @@ enum class LocalVarImplBuiltin(
                 setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                 setGetter {
                     setBody {
-                        return_("%N.%L()") {
-                            arg(referenceParameter)
-                            arg(getterCallable)
-                        }
+                        return_("%N.%L()") { +referenceParameter; +getterCallable }
                     }
                 }
                 setSetter {
                     val setterParameter = IrSetterParameter(genericTypeName)
                     setParameters(listOf(setterParameter))
                     setBody {
-                        code_("%N.%L(%N)") {
-                            arg(referenceParameter)
-                            arg(setterCallable)
-                            arg(setterParameter)
-                        }
+                        code_("%N.%L(%N)") { +referenceParameter; +setterCallable; +setterParameter }
                     }
                 }
             })

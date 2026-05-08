@@ -9,71 +9,61 @@ import kotlin.reflect.KCallable
 @JvmInline
 value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
 
-    fun add(format: String, arguments: Builder<Arguments> = {}) {
+    fun add(format: String, argumentsBuilder: Builder<Arguments> = {}) {
         builder.add(
             format,
-            *Arguments().apply(arguments).build().toTypedArray()
+            *Arguments().apply(argumentsBuilder).build().toTypedArray()
         )
     }
 
-    fun add(codeBlock: KPCodeBlock) {
-        builder.add(codeBlock)
-    }
-
-    fun build(): KPCodeBlock =
-        builder.build()
+    fun build(): KPCodeBlock = builder.build()
 
     @JvmInline
     value class Arguments(private val arguments: MutableList<Any> = mutableListOf()) {
 
-        fun arg(boolean: Boolean) {
-            arguments += boolean
+        operator fun Boolean.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(string: String) {
-            arguments += string
+        operator fun String.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(callable: KCallable<*>) {
-            arguments += callable.name
+        operator fun KCallable<*>.unaryPlus() {
+            arguments += this.name
         }
 
-        fun arg(codeBlock: KPCodeBlock) {
-            arguments += codeBlock
+        operator fun KPCodeBlock.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(parameter: KPParameter) {
-            arguments += parameter
+        operator fun KPParameter.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(property: KPProperty) {
-            arguments += property
+        operator fun KPProperty.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(function: KPFunction) {
-            arguments += function
+        operator fun KPFunction.unaryPlus() {
+            arguments += this
         }
 
-        fun arg(method: JPMethod) {
-            arguments += buildKotlinFunction(method.name())
+        operator fun JPMethod.unaryPlus() {
+            arguments += buildKotlinFunction(this.name())
         }
 
-        fun arg(typeName: IrTypeName) {
-            arguments += typeName.kotlin
+        operator fun IrTypeName.unaryPlus() {
+            arguments += this.kotlin
         }
 
-        fun arg(parameter: IrParameter) {
-            arguments += buildKotlinFunction(parameter.name)
+        operator fun IrParameter.unaryPlus() {
+            arguments += buildKotlinFunction(this.name)
         }
 
-        fun build(): List<Any> =
-            arguments
+        fun build(): List<Any> = arguments
     }
 }
 
-fun Boolean.toKotlinCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%L") { arg(this@toKotlinCodeBlock) }
-fun String.toKotlinCodeBlock(asValue: Boolean = false): KPCodeBlock =
-    buildKotlinCodeBlock(if (asValue) "%S" else "%L") { arg(this@toKotlinCodeBlock) }
-
-fun KPParameter.toCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%N") { arg(this@toCodeBlock) }
-fun IrParameter.toKotlinCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%N") { arg(this@toKotlinCodeBlock) }
+fun Boolean.toKotlinCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%L") { +this@toKotlinCodeBlock }
+fun IrParameter.toKotlinCodeBlock(): KPCodeBlock = buildKotlinCodeBlock("%N") { +this@toKotlinCodeBlock }

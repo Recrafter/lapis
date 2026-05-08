@@ -9,12 +9,12 @@ import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 sealed class IrInjection(
     val jvmName: String,
     val methodMixinReference: String,
-    val returnTypeName: IrTypeName?,
+    override val returnTypeName: IrTypeName?,
     val parameters: List<IrInjectionParameter>,
     val hookArguments: List<IrHookArgument>,
     val isStatic: Boolean,
     val ordinal: Int?,
-)
+) : IrReturnable
 
 sealed interface IrTargetInjection {
     val targetMixinReference: String

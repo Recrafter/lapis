@@ -100,7 +100,7 @@ class MixinGenerator(
                 setArgumentValue(Mixin::targets, listOf(patch.mixin.targetInternalName))
             }
             setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
-            val patchImplReferenceMember = patch.impl?.let { generatePatchInitializer(this, it, patch.mixin) }
+            val patchImplMember = patch.impl?.let { generatePatchInitializer(this, it, patch.mixin) }
             patch.mixin.extensionBridge?.let { bridge ->
                 addSuperInterface(bridge.className)
                 addMethods(bridge.entries.flatMap { it.kinds }.map { kind ->
@@ -109,16 +109,10 @@ class MixinGenerator(
                         setParameters(kind.parameters)
                         setReturnType(kind.returnTypeName)
                         setBody {
-                            val patchImplReferenceFormat = patchImplReferenceMember?.format
-                                ?: lapisError("Patch impl reference member cannot be null")
-                            val parametersFormat = kind.parameters.joinToString { "%N" }
-                            code_(
-                                format = "$patchImplReferenceFormat.%L($parametersFormat)",
-                                isReturn = kind.returnTypeName != null,
-                            ) {
-                                arg(patchImplReferenceMember)
-                                arg(kind.sourceJvmName)
-                                kind.parameters.forEach(::arg)
+                            val patchImplFormat = patchImplMember?.format
+                                ?: lapisError("Patch impl member cannot be null")
+                            code_("$patchImplFormat.%L(${kind.parameters.format})", isReturn = kind.isReturnable) {
+                                +patchImplMember; +kind.sourceJvmName; kind.parameters.forEach { +it }
                             }
                         }
                     }
@@ -129,37 +123,35 @@ class MixinGenerator(
                 addMethods(bridge.entries.flatMap { entry ->
                     val shadowMemberReference = when (entry) {
                         is IrMixinShadowBridgeEntryProperty -> {
-                            buildJavaField(entry.impl.mappingName, entry.typeName) {
+                            buildJavaField(entry.mappingName, entry.typeName) {
                                 if (entry.setter != null) {
                                     addAnnotation<Mutable>()
                                 }
-                                if (entry.impl.isFinal) {
+                                if (entry.isFinal) {
                                     addAnnotation<Final>()
                                 }
                                 addAnnotation<Shadow>()
                                 setModifiers(
                                     listOfNotNull(
                                         IrModifier.PRIVATE,
-                                        if (entry.impl.isStatic) IrModifier.STATIC else null,
+                                        if (entry.isStatic) IrModifier.STATIC else null,
                                     )
                                 )
                             }.also(::addField).let(::IrFieldMember)
                         }
 
                         is IrMixinShadowBridgeEntryFunction -> {
-                            buildJavaMethod(entry.impl.mappingName) {
+                            buildJavaMethod(entry.mappingName) {
                                 addAnnotation<Shadow>()
                                 setModifiers(
                                     listOfNotNull(
-                                        if (entry.impl.isStatic) IrModifier.PRIVATE else IrModifier.PUBLIC,
-                                        if (entry.impl.isStatic) IrModifier.STATIC else IrModifier.ABSTRACT,
+                                        if (entry.isStatic) IrModifier.PRIVATE else IrModifier.PUBLIC,
+                                        if (entry.isStatic) IrModifier.STATIC else IrModifier.ABSTRACT,
                                     )
                                 )
                                 setParameters(entry.parameters)
                                 setReturnType(entry.returnTypeName)
-                                if (entry.impl.isStatic) {
-                                    setStubBody()
-                                }
+                                if (entry.isStatic) setStubBody()
                             }.also(::addMethod).let { IrMethodMember(it, entry.parameters) }
                         }
                     }
@@ -170,23 +162,19 @@ class MixinGenerator(
                             setReturnType(kind.returnTypeName)
                             setBody {
                                 when (kind) {
-                                    is IrMixinBridgeEntryPropertyGetter -> {
-                                        return_(shadowMemberReference.format) { arg(shadowMemberReference) }
+                                    is IrMixinBridgeEntryProperty.IrMixinBridgeEntryPropertyGetter -> {
+                                        return_(shadowMemberReference.format) { +shadowMemberReference }
                                     }
 
-                                    is IrMixinBridgeEntryPropertySetter -> {
+                                    is IrMixinBridgeEntryProperty.IrMixinBridgeEntryPropertySetter -> {
                                         code_("this.${shadowMemberReference.format} = %N") {
-                                            arg(shadowMemberReference)
-                                            arg(IrSetterParameter(kind.typeName))
+                                            +shadowMemberReference; +kind.parameter
                                         }
                                     }
 
                                     is IrMixinBridgeEntryFunction -> {
-                                        code_(
-                                            format = "this.${shadowMemberReference.format}",
-                                            isReturn = kind.returnTypeName != null,
-                                        ) {
-                                            arg(shadowMemberReference)
+                                        code_("this.${shadowMemberReference.format}", isReturn = kind.isReturnable) {
+                                            +shadowMemberReference
                                         }
                                     }
                                 }
@@ -196,7 +184,7 @@ class MixinGenerator(
                 })
             }
             addMethods(patch.mixin.injections.map {
-                buildMixinInjectionMethod(it, patch, patchImplReferenceMember)
+                buildMixinInjectionMethod(it, patch, patchImplMember)
             })
         }
     }
@@ -242,18 +230,17 @@ class MixinGenerator(
                                     setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                                     setGetter {
                                         setBody {
-                                            return_("%N.%L()") { arg(bridgeParameter); arg(entry.getter.name) }
+                                            return_("%N.%L()") { +bridgeParameter; +entry.getter.name }
                                         }
                                     }
                                     entry.setter?.let { setter ->
                                         setSetter {
                                             setParameters(setter.parameters)
                                             setBody {
-                                                val parametersFormat = setter.parameters.joinToString { "%N" }
-                                                code_("%N.%L($parametersFormat)") {
-                                                    arg(bridgeParameter)
-                                                    arg(setter.name)
-                                                    setter.parameters.forEach(::arg)
+                                                code_("%N.%L(%N)") {
+                                                    +bridgeParameter
+                                                    +setter.name
+                                                    +setter.parameter
                                                 }
                                             }
                                         }
@@ -267,9 +254,8 @@ class MixinGenerator(
                                     setParameters(entry.parameters)
                                     setReturnType(entry.returnTypeName)
                                     setBody {
-                                        val parametersFormat = entry.parameters.joinToString { "%N" }
-                                        code_("%N.%L($parametersFormat)", isReturn = entry.returnTypeName != null) {
-                                            arg(bridgeParameter); arg(entry.name); entry.parameters.forEach(::arg)
+                                        code_("%N.%L(${entry.parameters.format})", entry.isReturnable) {
+                                            +bridgeParameter; +entry.name; entry.parameters.forEach { +it }
                                         }
                                     }
                                 })
@@ -281,37 +267,26 @@ class MixinGenerator(
         }
     }
 
-    private fun generatePatchInitializer(
-        destination: JPClassBuilder,
-        impl: IrPatchImpl,
-        mixin: IrMixin,
-    ): IrJavaMember {
+    private fun generatePatchInitializer(destination: JPClassBuilder, impl: IrPatchImpl, mixin: IrMixin): IrJavaMember {
         val constructorArgumentCodeBlocks = impl.constructorParameters.map { parameter ->
             when (parameter) {
                 is IrPatchImplConstructorInstanceParameter -> {
                     if (mixin.targetInstanceTypeName != KPAny.asIrClassName()) {
                         if (!mixin.isInterfaceTarget) {
-                            buildJavaCodeBlock("(%T) (%T) this") {
-                                arg(mixin.targetInstanceTypeName)
-                                arg(Object::class)
-                            }
+                            buildJavaCodeBlock("(%T) (%T) this") { +mixin.targetInstanceTypeName; +Object::class }
                         } else {
-                            buildJavaCodeBlock("(%T) this") { arg(mixin.targetInstanceTypeName) }
+                            buildJavaCodeBlock("(%T) this") { +mixin.targetInstanceTypeName }
                         }
                     } else {
                         buildJavaCodeBlock("this")
                     }
                 }
 
-                is IrPatchImplConstructorShadowBridgeParameter -> {
-                    buildJavaCodeBlock("this")
-                }
+                is IrPatchImplConstructorShadowBridgeParameter -> buildJavaCodeBlock("this")
             }
         }
-        val codeBlocksFormat = constructorArgumentCodeBlocks.joinToString { "%L" }
-        val initializerCodeBlock = buildJavaCodeBlock("new %T($codeBlocksFormat)") {
-            arg(impl.className)
-            constructorArgumentCodeBlocks.forEach(::arg)
+        val initializerCodeBlock = buildJavaCodeBlock("new %T(${constructorArgumentCodeBlocks.format})") {
+            +impl.className; constructorArgumentCodeBlocks.forEach { +it }
         }
         val isEagerStrategy = impl.initStrategy == InitStrategy.Eager
         val isSynchronizedStrategy = impl.initStrategy == InitStrategy.Synchronized
@@ -336,7 +311,7 @@ class MixinGenerator(
             buildJavaField("patchLock".withInternalPrefix(), Object::class.asIrTypeName()) {
                 addAnnotation<Unique>()
                 setModifiers(IrModifier.PRIVATE, IrModifier.FINAL)
-                initializer(buildJavaCodeBlock("new %T()") { arg(Object::class) })
+                initializer(buildJavaCodeBlock("new %T()") { +Object::class })
             }.also(destination::addField)
         } else null
         val getOrInitPatchMethod = buildJavaMethod("getOrInitPatch".withInternalPrefix()) {
@@ -345,22 +320,22 @@ class MixinGenerator(
             setReturnType(impl.className)
             setBody {
                 fun IrJavaMethodBody.ifFieldNull_(body: Builder<IrJavaCodeBlock>) {
-                    if_(buildJavaCodeBlock("%N == null") { arg(patchField) }, body)
+                    if_(buildJavaCodeBlock("%N == null") { +patchField }, body)
                 }
 
                 fun IrJavaMethodBody.initField_(value: JPCodeBlock) {
-                    code_("%N = %L") { arg(patchField); arg(value) }
+                    code_("%N = %L") { +patchField; +value }
                 }
                 if (isThreadSafeStrategy) {
                     val localName = "local"
-                    code_("%T %L = %N") { arg(impl.className); arg(localName); arg(patchField) }
+                    code_("%T %L = %N") { +impl.className; +localName; +patchField }
 
                     fun IrJavaMethodBody.ifLocalNull_(body: Builder<IrJavaCodeBlock>) {
-                        if_(buildJavaCodeBlock("%L == null") { arg(localName) }, body)
+                        if_(buildJavaCodeBlock("%L == null") { +localName }, body)
                     }
 
                     fun IrJavaMethodBody.initLocal_(value: JPCodeBlock) {
-                        code_(buildJavaCodeBlock("%L = %L") { arg(localName); arg(value) })
+                        code_(buildJavaCodeBlock("%L = %L") { +localName; +value })
                     }
 
                     ifLocalNull_ {
@@ -392,7 +367,7 @@ class MixinGenerator(
     private fun buildMixinInjectionMethod(
         injection: IrInjection,
         patch: IrPatch,
-        patchImplReferenceMember: IrJavaMember?,
+        patchImplMember: IrJavaMember?,
     ): JPMethod =
         buildJavaMethod(buildString {
             append(injection.jvmName)
@@ -609,7 +584,7 @@ class MixinGenerator(
                 when (argument) {
                     is IrHookOriginValueArgument -> valueParameterName.toJavaCodeBlock()
                     is IrHookOriginDescriptorWrapperImplArgument<*> -> {
-                        val descriptorWrapperConstructorArgumentCodeBlocks = buildList {
+                        val argumentCodeBlocks = buildList {
                             val impl = argument.wrapperImpl
                             if (
                                 injection is IrTargetInjection &&
@@ -640,26 +615,19 @@ class MixinGenerator(
                                 add(originalParameterName.toJavaCodeBlock())
                             }
                         }
-                        val codeBlocksFormat = descriptorWrapperConstructorArgumentCodeBlocks.joinToString { "%L" }
-                        buildJavaCodeBlock("new %T($codeBlocksFormat)") {
-                            arg(argument.wrapperImpl.className)
-                            descriptorWrapperConstructorArgumentCodeBlocks.forEach(::arg)
+                        buildJavaCodeBlock("new %T(${argumentCodeBlocks.format})") {
+                            +argument.wrapperImpl.className; argumentCodeBlocks.forEach { +it }
                         }
                     }
 
                     is IrHookOriginInstanceofWrapperImplArgument -> {
                         buildJavaCodeBlock("new %T(%L, %L)") {
-                            arg(builtins[SimpleBuiltin.Instanceof])
-                            arg(valueParameterName)
-                            arg(originalParameterName)
+                            +builtins[SimpleBuiltin.Instanceof]; +valueParameterName; +originalParameterName
                         }
                     }
 
                     is IrHookCancelDescriptorWrapperImplArgument -> {
-                        buildJavaCodeBlock("new %T(%L)") {
-                            arg(argument.wrapperImpl.className)
-                            arg(callbackParameterName)
-                        }
+                        buildJavaCodeBlock("new %T(%L)") { +argument.wrapperImpl.className; +callbackParameterName }
                     }
 
                     is IrHookOrdinalArgument -> injection.ordinal?.toJavaCodeBlock()
@@ -683,9 +651,9 @@ class MixinGenerator(
                                     }
                                     append("(%L)")
                                 }
-                            ) { arg(builtins[argument.varBuiltin]); arg(localName) }
+                            ) { +builtins[argument.varBuiltin]; +localName }
                         } else {
-                            buildJavaCodeBlock("%L") { arg(localName) }
+                            buildJavaCodeBlock("%L") { +localName }
                         }
                     }
                 }
@@ -695,20 +663,15 @@ class MixinGenerator(
                     val patchInstanceFormat = if (injection.isStatic) {
                         "%T." + if (patch.isObject) "INSTANCE" else "Companion"
                     } else {
-                        patchImplReferenceMember?.format ?: lapisError("Patch impl reference member cannot be null")
+                        patchImplMember?.format ?: lapisError("Patch impl reference member cannot be null")
                     }
-                    val codeBlocksFormat = hookArgumentCodeBlocks.joinToString { "%L" }
-                    code_(
-                        format = "$patchInstanceFormat.%L($codeBlocksFormat)",
-                        isReturn = injection.returnTypeName != null,
-                    ) {
+                    code_("$patchInstanceFormat.%L(${hookArgumentCodeBlocks.format})", injection.isReturnable) {
                         if (injection.isStatic) {
-                            arg(patch.className)
+                            +patch.className
                         } else {
-                            arg(patchImplReferenceMember ?: lapisError("Patch impl reference member cannot be null"))
+                            +(patchImplMember ?: lapisError("Patch impl reference member cannot be null"))
                         }
-                        arg(injection.jvmName)
-                        hookArgumentCodeBlocks.forEach(::arg)
+                        +injection.jvmName; hookArgumentCodeBlocks.forEach { +it }
                     }
                 }
                 if (hasCancelArgument) {
@@ -733,7 +696,7 @@ class MixinGenerator(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_("(this as %T).%L()") { arg(bridge.className); arg(entry.getter.name) }
+                        return_("(this as %T).%L()") { +bridge.className; +entry.getter.name }
                     }
                 }
                 entry.setter?.let { setter ->
@@ -741,12 +704,7 @@ class MixinGenerator(
                         setModifiers(IrModifier.INLINE)
                         setParameters(setter.parameters)
                         setBody {
-                            val parametersFormat = setter.parameters.joinToString { "%N" }
-                            code_("(this as %T).%L($parametersFormat)") {
-                                arg(bridge.className)
-                                arg(setter.name)
-                                setter.parameters.forEach(::arg)
-                            }
+                            code_("(this as %T).%L(%N)") { +bridge.className; +setter.name; +setter.parameter }
                         }
                     }
                 }
@@ -759,14 +717,8 @@ class MixinGenerator(
                 setParameters(entry.parameters)
                 setReturnType(entry.returnTypeName)
                 setBody {
-                    val parametersFormat = entry.parameters.joinToString { "%N" }
-                    code_(
-                        format = "(this as %T).%L($parametersFormat)",
-                        isReturn = entry.returnTypeName != null,
-                    ) {
-                        arg(bridge.className)
-                        arg(entry.name)
-                        entry.parameters.forEach(::arg)
+                    code_("(this as %T).%L(${entry.parameters.format})", isReturn = entry.isReturnable) {
+                        +bridge.className; +entry.name; entry.parameters.forEach { +it }
                     }
                 }
             }
@@ -827,7 +779,7 @@ class MixinGenerator(
                         member.isStatic -> "%T"
                         else -> "(this as %T)"
                     }
-                ) { delegateParameter?.let(::arg); arg(accessor.className) }
+                ) { delegateParameter?.let { +it }; +accessor.className }
                 when (member) {
                     is IrMixinAccessorFieldMember -> {
                         val methods = member.ops.associateWith { op ->
@@ -848,9 +800,7 @@ class MixinGenerator(
                                 addAnnotation<Accessor> {
                                     setArgumentValue(Accessor::value, member.mappingName)
                                 }
-                                if (member.isStatic) {
-                                    setStubBody()
-                                }
+                                if (member.isStatic) setStubBody()
                             }.also(::addMethod)
                         }
                         extensionProperties += buildKotlinProperty(
@@ -864,7 +814,7 @@ class MixinGenerator(
                                 setModifiers(IrModifier.INLINE)
                                 methods[Op.Get]?.let { getterMethod ->
                                     setBody {
-                                        return_("%L.%N()") { arg(interfaceCodeBlock); arg(getterMethod) }
+                                        return_("%L.%N()") { +interfaceCodeBlock; +getterMethod }
                                     }
                                 } ?: setStubBody()
                             }
@@ -874,11 +824,7 @@ class MixinGenerator(
                                     setModifiers(IrModifier.INLINE)
                                     setParameters(listOf(setterParameter))
                                     setBody {
-                                        code_("%L.%N(%N)") {
-                                            arg(interfaceCodeBlock)
-                                            arg(setterMethod)
-                                            arg(setterParameter)
-                                        }
+                                        code_("%L.%N(%N)") { +interfaceCodeBlock; +setterMethod; +setterParameter }
                                     }
                                 }
                             }
@@ -896,9 +842,7 @@ class MixinGenerator(
                             }
                             setParameters(member.parameters)
                             setReturnType(member.returnTypeName)
-                            if (member.isStatic) {
-                                setStubBody()
-                            }
+                            if (member.isStatic) setStubBody()
                         }.also(::addMethod)
                         extensionFunctions += buildKotlinFunction(member.name, jvmNamespace = jvmNamespace) {
                             setModifiers(IrModifier.INLINE)
@@ -907,14 +851,8 @@ class MixinGenerator(
                             setParameters(member.parameters)
                             setReturnType(member.returnTypeName)
                             setBody {
-                                val parametersFormat = member.parameters.joinToString { "%N" }
-                                code_(
-                                    format = "%L.%N($parametersFormat)",
-                                    isReturn = member.returnTypeName != null,
-                                ) {
-                                    arg(interfaceCodeBlock)
-                                    arg(invokerMethod)
-                                    member.parameters.forEach(::arg)
+                                code_("%L.%N(${member.parameters.format})", isReturn = member.isReturnable) {
+                                    +interfaceCodeBlock; +invokerMethod; member.parameters.forEach { +it }
                                 }
                             }
                         }

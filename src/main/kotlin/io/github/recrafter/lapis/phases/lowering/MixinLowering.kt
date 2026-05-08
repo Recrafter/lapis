@@ -246,7 +246,6 @@ class MixinLowering(
                     getterSourceJvmName = source.getterJvmName,
                     setterName = setterName,
                     setterSourceJvmName = setterSourceJvmName,
-                    impl = IrMixinBridgeEntryExtensionPropertyImpl,
                 )
             }
 
@@ -256,7 +255,6 @@ class MixinLowering(
                 sourceJvmName = source.jvmName,
                 parameters = source.parameters.map { it.asIrParameter() },
                 returnTypeName = source.returnTypeName,
-                impl = IrMixinBridgeEntryExtensionFunctionImpl,
             )
         }
 
@@ -275,11 +273,9 @@ class MixinLowering(
                     getterSourceJvmName = source.getterJvmName,
                     setterName = setterName,
                     setterSourceJvmName = setterSourceJvmName,
-                    impl = IrMixinBridgeEntryShadowPropertyImpl(
-                        source.mappingName,
-                        source.isStatic,
-                        source.isFinal,
-                    ),
+                    mappingName = source.mappingName,
+                    isStatic = source.isStatic,
+                    isFinal = source.isFinal,
                 )
             }
 
@@ -289,10 +285,8 @@ class MixinLowering(
                 sourceJvmName = source.jvmName,
                 parameters = source.parameters.map { it.asIrParameter() },
                 returnTypeName = source.returnTypeName,
-                impl = IrMixinBridgeEntryShadowFunctionImpl(
-                    source.mappingName,
-                    source.isStatic,
-                ),
+                mappingName = source.mappingName,
+                isStatic = source.isStatic,
             )
         }
 

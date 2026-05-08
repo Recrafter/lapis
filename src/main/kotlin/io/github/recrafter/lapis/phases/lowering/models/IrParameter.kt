@@ -13,3 +13,6 @@ class IrSetterParameter(
     typeName: IrTypeName,
     vararg modifiers: IrModifier = arrayOf(),
 ) : IrParameter("newValue", typeName, *modifiers)
+
+val List<IrParameter>.format: String
+    get() = joinToString { "%N" }

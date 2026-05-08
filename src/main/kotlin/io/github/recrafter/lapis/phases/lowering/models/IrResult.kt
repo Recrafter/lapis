@@ -53,10 +53,10 @@ class IrMixinAccessorMethodMember(
     val name: String,
     val mappingName: String,
     val parameters: List<IrParameter>,
-    val returnTypeName: IrTypeName?,
+    override val returnTypeName: IrTypeName?,
     isStatic: Boolean,
     schemaReceiverClassName: IrClassName,
-) : IrMixinAccessorMember(isStatic, schemaReceiverClassName)
+) : IrMixinAccessorMember(isStatic, schemaReceiverClassName), IrReturnable
 
 class IrTweakAccessor(
     val originatingFiles: List<KSFile>,

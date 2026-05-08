@@ -9,8 +9,8 @@ sealed class IrInvokableDescriptor(
     val callWrapperImpl: IrCallDescriptorWrapperImpl?,
     val cancelWrapperImpl: IrCancelDescriptorWrapperImpl?,
     val parameters: List<IrFunctionTypeParameter>,
-    val returnTypeName: IrTypeName?,
-) : IrDescriptor
+    override val returnTypeName: IrTypeName?,
+) : IrDescriptor, IrReturnable
 
 class IrConstructorDescriptor(
     callWrapperImpl: IrCallDescriptorWrapperImpl?,

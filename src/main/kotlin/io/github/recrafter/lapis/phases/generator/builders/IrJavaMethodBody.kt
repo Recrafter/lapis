@@ -15,18 +15,18 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
     fun IrJavaMethodBody.code_(
         format: String,
         isReturn: Boolean = false,
-        arguments: Builder<IrJavaCodeBlock.Arguments> = {}
+        argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
     ) {
         if (isReturn) {
-            return_(format, arguments)
+            return_(format, argumentsBuilder)
         } else {
-            code_(buildJavaCodeBlock(format, arguments))
+            code_(buildJavaCodeBlock(format, argumentsBuilder = argumentsBuilder))
         }
     }
 
     fun IrJavaMethodBody.return_(
         format: String? = null,
-        arguments: Builder<IrJavaCodeBlock.Arguments> = {}
+        argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
     ) {
         code_(
             buildJavaCodeBlock(
@@ -34,24 +34,24 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
                     append("return")
                     format?.let { append(" $it") }
                 },
-                arguments
+                argumentsBuilder = argumentsBuilder
             )
         )
     }
 
     fun IrJavaMethodBody.return_(codeBlock: JPCodeBlock) {
-        code_(buildJavaCodeBlock("return %L") { arg(codeBlock) })
+        code_(buildJavaCodeBlock("return %L") { +codeBlock })
     }
 
     fun IrJavaMethodBody.if_(condition: JPCodeBlock, body: Builder<IrJavaCodeBlock>) {
-        withControlFlow(buildJavaCodeBlock("if (%L)") { arg(condition) }, body)
+        withControlFlow(buildJavaCodeBlock("if (%L)") { +condition }, body)
     }
 
     fun IrJavaMethodBody.throw_(
         format: String,
-        arguments: Builder<IrJavaCodeBlock.Arguments> = {}
+        argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
     ) {
-        builder.addStatement(buildJavaCodeBlock("throw $format", arguments))
+        builder.addStatement(buildJavaCodeBlock("throw $format", argumentsBuilder = argumentsBuilder))
     }
 
     @Suppress("LocalVariableName")
@@ -64,8 +64,7 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
         builder.beginControlFlow(buildJavaCodeBlock("try"))
         buildJavaCodeBlock(block)
         builder.nextControlFlow(buildJavaCodeBlock("catch (%T %L)") {
-            arg(catchingClassName)
-            arg(if (catch_ == null) "ignored" else "e")
+            +catchingClassName; +(if (catch_ == null) "ignored" else "e")
         })
         catch_?.let(::buildJavaCodeBlock)
         finally_?.let {
@@ -76,7 +75,7 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
     }
 
     fun IrJavaMethodBody.synchronized_(lock: JPCodeBlock, body: Builder<IrJavaCodeBlock>) {
-        builder.beginControlFlow(buildJavaCodeBlock("synchronized (%L)") { arg(lock) })
+        builder.beginControlFlow(buildJavaCodeBlock("synchronized (%L)") { +lock })
         buildJavaCodeBlock(body)
         builder.endControlFlow()
     }

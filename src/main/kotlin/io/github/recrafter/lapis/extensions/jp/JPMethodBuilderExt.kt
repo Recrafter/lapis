@@ -18,7 +18,7 @@ fun JPMethodBuilder.setBody(builder: Builder<IrJavaMethodBody> = {}) {
 }
 
 fun JPMethodBuilder.setStubBody(message: String = "Stub!") {
-    setBody { throw_("new %T(%S)") { arg(AssertionError::class.asIrTypeName()); arg(message) } }
+    setBody { throw_("new %T(%S)") { +AssertionError::class.asIrTypeName(); +message } }
 }
 
 fun JPMethodBuilder.setReturnType(typeName: IrTypeName?) {

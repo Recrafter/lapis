@@ -762,9 +762,7 @@ class FrontendValidator(
 
             hasParamAnnotation -> {
                 kspRequire(at != At.Body) { "764" }
-                if (explicitParamName != null) {
-                    kspRequire(explicitParamName.trim().isNotEmpty()) { "766" }
-                }
+                explicitParamName?.let { kspRequire(it.trim().isNotEmpty()) { "766" } }
                 val parameterName = explicitParamName ?: name
                 val parameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == parameterName }
                 kspRequireNotNull(parameterIndex) { "770" }
@@ -787,9 +785,7 @@ class FrontendValidator(
             hasShareAnnotation -> {
                 kspRequire(type.declaration.isBuiltin(SimpleBuiltin.LocalVar)) { "788" }
                 val type = kspRequireNotNull(type.findGenericType()) { "789" }
-                if (explicitShareKey != null) {
-                    kspRequire(explicitShareKey.trim().isNotEmpty()) { "791" }
-                }
+                explicitShareKey?.let { kspRequire(it.trim().isNotEmpty()) { "791" } }
                 HookShareLocalParameter(name, type, explicitShareKey ?: name, isShareExported)
             }
 

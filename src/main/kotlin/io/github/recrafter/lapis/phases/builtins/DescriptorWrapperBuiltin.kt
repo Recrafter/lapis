@@ -47,10 +47,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     setReceiverType(superClassTypeName)
                     setReturnType(receiverParameter.typeName)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(receiverParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +receiverParameter }
                     }
                 }
             }?.also(destination::addFunction)
@@ -59,9 +56,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setReceiverType(superClassTypeName)
                 val receiverParameter = getReceiverFunction?.let {
                     buildKotlinParameter("receiver", impl.receiverTypeName) {
-                        defaultValue(buildKotlinCodeBlock("%N()") {
-                            arg(getReceiverFunction)
-                        })
+                        setDefaultValue("%N()") { +getReceiverFunction }
                     }
                 }
                 receiverParameter?.let(::addParameter)
@@ -74,10 +69,8 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                             append(")")
                         }
                     ) {
-                        arg(impl.className)
-                        arg(operationParameter)
-                        arg(Operation<*>::call)
-                        receiverParameter?.let(::arg)
+                        +impl.className; +operationParameter; +Operation<*>::call
+                        receiverParameter?.let { +it }
                     }
                 }
             })
@@ -109,10 +102,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(valueParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +valueParameter }
                     }
                 }
             }.also(destination::addProperty)
@@ -122,10 +112,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     setReceiverType(superClassTypeName)
                     setReturnType(receiverParameter.typeName)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(receiverParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +receiverParameter }
                     }
                 }
             }?.also(destination::addFunction)
@@ -133,15 +120,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 val valueParameter = buildKotlinParameter("value", impl.fieldTypeName) {
-                    defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(valueProperty)
-                    })
+                    setDefaultValue("this.%N") { +valueProperty }
                 }.also(::addParameter)
                 val receiverParameter = getReceiverFunction?.let {
                     buildKotlinParameter("receiver", impl.receiverTypeName) {
-                        defaultValue(buildKotlinCodeBlock("%N()") {
-                            arg(getReceiverFunction)
-                        })
+                        setDefaultValue("%N()") { +getReceiverFunction }
                     }
                 }?.also(::addParameter)
                 setBody {
@@ -150,11 +133,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         receiverParameter?.let { append("%N, ") }
                         append("%N)")
                     }) {
-                        arg(impl.className)
-                        arg(operationParameter)
-                        arg(Operation<*>::call)
-                        receiverParameter?.let(::arg)
-                        arg(valueParameter)
+                        +impl.className; +operationParameter; +Operation<*>::call
+                        receiverParameter?.let { +it }
+                        +valueParameter
                     }
                 }
             })
@@ -179,10 +160,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(arrayParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +arrayParameter }
                     }
                 }
             }.also(destination::addProperty)
@@ -191,10 +169,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(indexParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +indexParameter }
                     }
                 }
             }.also(destination::addProperty)
@@ -202,22 +177,15 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 val arrayParameter = buildKotlinParameter("array", arrayParameter.typeName) {
-                    defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(arrayProperty)
-                    })
+                    setDefaultValue("this.%N") { +arrayProperty }
                 }
                 val indexParameter = buildKotlinParameter("index", indexParameter.typeName) {
-                    defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(indexProperty)
-                    })
+                    setDefaultValue("this.%N") { +indexProperty }
                 }
                 addParameters(listOf(arrayParameter, indexParameter))
                 setReturnType(impl.componentTypeName)
                 setBody {
-                    return_("%N[%N]") {
-                        arg(arrayParameter)
-                        arg(indexParameter)
-                    }
+                    return_("%N[%N]") { +arrayParameter; +indexParameter }
                 }
             })
         }
@@ -242,10 +210,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(arrayParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +arrayParameter }
                     }
                 }
             }.also(destination::addProperty)
@@ -254,10 +219,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(indexParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +indexParameter }
                     }
                 }
             }.also(destination::addProperty)
@@ -266,10 +228,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(valueParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +valueParameter }
                     }
                 }
             }.also(destination::addProperty)
@@ -277,27 +236,17 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 val arrayParameter = buildKotlinParameter(arrayProperty.name, arrayParameter.typeName) {
-                    defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(arrayProperty)
-                    })
+                    setDefaultValue("this.%N") { +arrayProperty }
                 }
                 val indexParameter = buildKotlinParameter(indexProperty.name, indexParameter.typeName) {
-                    defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(indexProperty)
-                    })
+                    setDefaultValue("this.%N") { +indexProperty }
                 }
                 val valueParameter = buildKotlinParameter(valueProperty.name, valueParameter.typeName) {
-                    defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(valueProperty)
-                    })
+                    setDefaultValue("this.%N") { +valueProperty }
                 }
                 addParameters(listOf(arrayParameter, indexParameter, valueParameter))
                 setBody {
-                    code_("%N[%N] = %N") {
-                        arg(arrayParameter)
-                        arg(indexParameter)
-                        arg(valueParameter)
-                    }
+                    code_("%N[%N] = %N") { +arrayParameter; +indexParameter; +valueParameter }
                 }
             })
         }
@@ -310,30 +259,23 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             superClassTypeName: IrParameterizedTypeName,
             resolveBuiltin: BuiltinResolver,
         ) {
-            val suites = impl.parameters.resolveInvokableDescriptorSuites()
-            val constructorParameters = suites.map { it.constructorParameter }
-            val namedProperties = suites.mapNotNull { it.property }
-            val invokeParameters = suites.mapNotNull { it.invokeParameter }
-            val callArgumentsReferences = suites.map { it.callArgumentReference }
+            val suites = impl.resolveParameterSuites()
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
                 IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
-                setConstructor(constructorParameters + operationParameter)
+                setConstructor(suites.map { it.constructorParameter } + operationParameter)
                 addSuperInterface(superClassTypeName)
             })
-            destination.addProperties(namedProperties.map { parameter ->
-                buildKotlinProperty(parameter.name, parameter.typeName, jvmNamespace = impl.className) {
+            destination.addProperties(suites.mapNotNull { it.property }.map { property ->
+                buildKotlinProperty(property.name, property.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
                         setModifiers(IrModifier.INLINE)
                         setBody {
-                            return_("(this as %T).%L") {
-                                arg(impl.className)
-                                arg(parameter.name.withInternalPrefix(ARGUMENT))
-                            }
+                            return_("(this as %T).%L") { +impl.className; +property.name.withInternalPrefix(ARGUMENT) }
                         }
                     }
                 }
@@ -341,23 +283,13 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
-                addParameters(invokeParameters)
+                addParameters(suites.mapNotNull { it.invokeParameter })
                 setReturnType(impl.returnTypeName)
                 setBody {
-                    code_(
-                        format = buildString {
-                            append("(this as %T).%N.%L(")
-                            if (callArgumentsReferences.isNotEmpty()) {
-                                append(callArgumentsReferences.joinToString { "%N" })
-                            }
-                            append(")")
-                        },
-                        isReturn = impl.returnTypeName != null
-                    ) {
-                        arg(impl.className)
-                        arg(operationParameter)
-                        arg(Operation<*>::call)
-                        callArgumentsReferences.forEach(::arg)
+                    val callArgumentReferences = suites.map { it.callArgumentReference }
+                    code_("(this as %T).%N.%L(${callArgumentReferences.format})", impl.isReturnable) {
+                        +impl.className; +operationParameter; +Operation<*>::call
+                        callArgumentReferences.forEach { +it }
                     }
                 }
             })
@@ -374,30 +306,24 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             val receiverParameter = impl.receiverTypeName?.let {
                 IrParameter("receiver".withInternalPrefix(), it, IrModifier.PUBLIC)
             }
-            val suites = impl.parameters.resolveInvokableDescriptorSuites()
-            val constructorParameters = suites.map { it.constructorParameter }
-            val namedProperties = suites.mapNotNull { it.property }
-            val invokeParameters = suites.mapNotNull { it.invokeParameter }
-            val callArgumentsReferences = suites.map { it.callArgumentReference }
+            val suites = impl.resolveParameterSuites()
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
                 IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
+                val constructorParameters = suites.map { it.constructorParameter }
                 setConstructor(listOfNotNull(receiverParameter) + constructorParameters + operationParameter)
                 addSuperInterface(superClassTypeName)
             })
-            destination.addProperties(namedProperties.map { parameter ->
-                buildKotlinProperty(parameter.name, parameter.typeName, jvmNamespace = impl.className) {
+            destination.addProperties(suites.mapNotNull { it.property }.map { property ->
+                buildKotlinProperty(property.name, property.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
                         setModifiers(IrModifier.INLINE)
                         setBody {
-                            return_("(this as %T).%L") {
-                                arg(impl.className)
-                                arg(parameter.name.withInternalPrefix(ARGUMENT))
-                            }
+                            return_("(this as %T).%L") { +impl.className; +property.name.withInternalPrefix(ARGUMENT) }
                         }
                     }
                 }
@@ -408,13 +334,12 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     setReceiverType(superClassTypeName)
                     setReturnType(receiverParameter.typeName)
                     setBody {
-                        return_("(this as %T).%N") {
-                            arg(impl.className)
-                            arg(receiverParameter)
-                        }
+                        return_("(this as %T).%N") { +impl.className; +receiverParameter }
                     }
                 }
             }?.also(destination::addFunction)
+            val invokeParameters = suites.mapNotNull { it.invokeParameter }
+            val callArgumentReferences = suites.map { it.callArgumentReference }
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
@@ -425,18 +350,16 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         format = buildString {
                             append("(this as %T).%N.%L(")
                             getReceiverFunction?.let { append("%N()") }
-                            if (callArgumentsReferences.isNotEmpty()) {
-                                append(callArgumentsReferences.joinToString(prefix = ", ") { "%N" })
+                            if (callArgumentReferences.isNotEmpty()) {
+                                append(callArgumentReferences.joinToString(prefix = ", ") { "%N" })
                             }
                             append(")")
                         },
-                        isReturn = impl.returnTypeName != null
+                        isReturn = impl.isReturnable
                     ) {
-                        arg(impl.className)
-                        arg(operationParameter)
-                        arg(Operation<*>::call)
-                        getReceiverFunction?.let(::arg)
-                        callArgumentsReferences.forEach(::arg)
+                        +impl.className; +operationParameter; +Operation<*>::call
+                        getReceiverFunction?.let { +it }
+                        callArgumentReferences.forEach { +it }
                     }
                 }
             })
@@ -452,18 +375,15 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         code_(
                             format = buildString {
                                 append("(this as %T).%N.%L(%N")
-                                if (callArgumentsReferences.isNotEmpty()) {
-                                    append(callArgumentsReferences.joinToString(prefix = ", ") { "%N" })
+                                if (callArgumentReferences.isNotEmpty()) {
+                                    append(callArgumentReferences.joinToString(prefix = ", ") { "%N" })
                                 }
                                 append(")")
                             },
-                            isReturn = impl.returnTypeName != null
+                            isReturn = impl.isReturnable
                         ) {
-                            arg(impl.className)
-                            arg(operationParameter)
-                            arg(Operation<*>::call)
-                            arg(receiverParameter)
-                            callArgumentsReferences.forEach(::arg)
+                            +impl.className; +operationParameter; +Operation<*>::call; +receiverParameter
+                            callArgumentReferences.forEach { +it }
                         }
                     }
                 })
@@ -478,13 +398,20 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             superClassTypeName: IrParameterizedTypeName,
             resolveBuiltin: BuiltinResolver,
         ) {
-            val callbackParameter = IrParameter(
-                "callback".withInternalPrefix(),
-                impl.returnTypeName
-                    ?.let { CallbackInfoReturnable::class.asIrParameterizedTypeName(it) }
-                    ?: CallbackInfo::class.asIrTypeName(),
-                IrModifier.PUBLIC
-            )
+            val (callbackType, callbackCheck, callbackCancel) = if (impl.returnTypeName != null) {
+                Triple(
+                    CallbackInfoReturnable::class.asIrParameterizedTypeName(impl.returnTypeName),
+                    CallbackInfoReturnable<*>::getReturnValue,
+                    CallbackInfoReturnable<*>::setReturnValue,
+                )
+            } else {
+                Triple(
+                    CallbackInfo::class.asIrTypeName(),
+                    CallbackInfo::isCancelled,
+                    CallbackInfo::cancel,
+                )
+            }
+            val callbackParameter = IrParameter("callback".withInternalPrefix(), callbackType, IrModifier.PUBLIC)
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(callbackParameter)
                 addSuperInterface(superClassTypeName)
@@ -497,21 +424,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         return_(
                             buildString {
                                 append("(this as %T).%N.%L()")
-                                if (impl.returnTypeName != null) {
-                                    append(" != null")
-                                }
+                                if (impl.isReturnable) append(" != null")
                             }
-                        ) {
-                            arg(impl.className)
-                            arg(callbackParameter)
-                            arg(
-                                if (impl.returnTypeName != null) {
-                                    CallbackInfoReturnable<*>::getReturnValue
-                                } else {
-                                    CallbackInfo::isCancelled
-                                }
-                            )
-                        }
+                        ) { +impl.className; +callbackParameter; +callbackCheck }
                     }
                 }
             }.also(destination::addProperty)
@@ -523,12 +438,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     setGetter {
                         setModifiers(IrModifier.INLINE)
                         setBody {
+                            val callableName = primitiveJvmName?.let { callbackCheck.name + it } ?: callbackCheck.name
                             return_("(this as %T).%N.%L()") {
-                                arg(impl.className)
-                                arg(callbackParameter)
-                                primitiveJvmName
-                                    ?.let { arg(CallbackInfoReturnable<*>::getReturnValue.name + it) }
-                                    ?: arg(CallbackInfoReturnable<*>::getReturnValue)
+                                +impl.className; +callbackParameter; +callableName
                             }
                         }
                     }
@@ -538,28 +450,19 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 setReturnType(KPNothing.asIrClassName())
-                val returnValueParameter = impl.returnTypeName
-                    ?.let { IrParameter("returnValue", it) }
+                val returnValueParameter = impl.returnTypeName?.let { IrParameter("returnValue", it) }
                     ?.also(::addParameter)
                 setBody {
-                    code_("(this as %T)") {
-                        arg(impl.className)
-                    }
+                    code_("(this as %T)") { +impl.className }
                     code_(buildString {
                         append("%N.%L(")
                         returnValueParameter?.let { append("%N") }
                         append(")")
                     }) {
-                        arg(callbackParameter)
-                        arg(
-                            if (returnValueParameter != null) CallbackInfoReturnable<*>::setReturnValue
-                            else CallbackInfo::cancel
-                        )
-                        returnValueParameter?.let(::arg)
+                        +callbackParameter; +callbackCancel
+                        returnValueParameter?.let { +it }
                     }
-                    throw_("%T") {
-                        arg(resolveBuiltin(SimpleBuiltin.CancelSignal))
-                    }
+                    throw_("%T") { +resolveBuiltin(SimpleBuiltin.CancelSignal) }
                 }
             })
         }
@@ -586,21 +489,21 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
     }
 }
 
-private data class InvokableDescriptorParameterSuite(
+private data class InvokableDescriptorWrapperParameterSuite(
     val constructorParameter: IrParameter,
     val property: IrParameter?,
 ) {
     val invokeParameter: KPParameter? = property?.let {
         buildKotlinParameter(property) {
-            defaultValue(buildKotlinCodeBlock("this.%N") { arg(property) })
+            setDefaultValue("this.%N") { +property }
         }
     }
     val callArgumentReference: IrParameter = property ?: constructorParameter
 }
 
-private fun List<IrFunctionTypeParameter>.resolveInvokableDescriptorSuites(): List<InvokableDescriptorParameterSuite> =
-    mapIndexed { index, parameter ->
-        InvokableDescriptorParameterSuite(
+private fun IrInvokableDescriptorWrapperImpl.resolveParameterSuites(): List<InvokableDescriptorWrapperParameterSuite> =
+    parameters.mapIndexed { index, parameter ->
+        InvokableDescriptorWrapperParameterSuite(
             constructorParameter = IrParameter(
                 (parameter.name ?: index.toString()).withInternalPrefix(ARGUMENT),
                 parameter.typeName,

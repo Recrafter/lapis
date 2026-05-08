@@ -25,7 +25,7 @@ fun KPFunctionBuilder.setBody(builder: Builder<IrKotlinFunctionBody> = {}) {
 }
 
 fun KPFunctionBuilder.setStubBody(message: String = "Stub!") {
-    setBody { throw_("%T(%S)") { arg(AssertionError::class.asIrTypeName()); arg(message) } }
+    setBody { throw_("%T(%S)") { +AssertionError::class.asIrTypeName(); +message } }
 }
 
 fun KPFunctionBuilder.addStatement(codeBlock: KPCodeBlock) {

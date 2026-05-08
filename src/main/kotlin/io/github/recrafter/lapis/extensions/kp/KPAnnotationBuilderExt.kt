@@ -5,10 +5,7 @@ import io.github.recrafter.lapis.phases.generator.builders.IrKotlinCodeBlock
 import kotlin.reflect.KProperty1
 
 fun <A : Annotation> KPAnnotationBuilder.setArgumentValue(property: KProperty1<A, String>, string: String) {
-    addMember(buildKotlinCodeBlock("%L = %S") {
-        arg(property.name)
-        arg(string)
-    })
+    addMember(buildKotlinCodeBlock("%L = %S") { +property.name; +string })
 }
 
 @JvmName("setStringArrayArgumentValue")
@@ -17,7 +14,7 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
     vararg strings: String,
 ) {
     setArrayArgumentValue<A>(property, strings, "%S", false) {
-        strings.forEach(::arg)
+        strings.forEach { +it }
     }
 }
 
@@ -27,7 +24,7 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
     vararg strings: String,
 ) {
     setArrayArgumentValue<A>(property, strings, "%S", true) {
-        strings.forEach(::arg)
+        strings.forEach { +it }
     }
 }
 
@@ -36,7 +33,7 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArrayArgumentValue(
     array: Array<*>,
     placeholder: String,
     isVararg: Boolean = false,
-    noinline arguments: Builder<IrKotlinCodeBlock.Arguments> = {}
+    noinline argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
 ) {
     addMember(buildKotlinCodeBlock(buildString {
         if (isVararg) {
@@ -46,9 +43,7 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArrayArgumentValue(
             append(array.joinToString(prefix = "[", postfix = "]") { placeholder })
         }
     }) {
-        if (!isVararg) {
-            arg(property.name)
-        }
-        arguments()
+        if (!isVararg) +property.name
+        argumentsBuilder()
     })
 }

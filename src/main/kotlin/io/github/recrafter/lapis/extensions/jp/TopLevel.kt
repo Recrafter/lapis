@@ -58,9 +58,12 @@ inline fun <reified A : Annotation> buildJavaAnnotation(builder: Builder<JPAnnot
 fun buildJavaCodeBlock(builder: Builder<IrJavaCodeBlock> = {}): JPCodeBlock =
     IrJavaCodeBlock(JPCodeBlock.builder()).apply(builder).build()
 
-fun buildJavaCodeBlock(format: String, arguments: Builder<IrJavaCodeBlock.Arguments> = {}): JPCodeBlock =
+fun buildJavaCodeBlock(
+    format: String,
+    argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
+): JPCodeBlock =
     buildJavaCodeBlock {
-        add(format, arguments)
+        add(format, argumentsBuilder)
     }
 
 fun buildJavaField(name: String, typeName: IrTypeName, builder: Builder<JPFieldBuilder> = {}): JPField =

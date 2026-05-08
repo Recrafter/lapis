@@ -21,7 +21,7 @@ fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A
 }
 
 fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A, KClass<*>>, className: IrTypeName) {
-    addMember(property.name, className.toJavaCodeBlock(asValue = true))
+    addMember(property.name, className.toJavaCodeBlock(asClass = true))
 }
 
 inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationBuilder.setArgumentValue(
@@ -37,7 +37,7 @@ inline fun <reified A : Annotation> JPAnnotationBuilder.setArgumentValue(
     strings: List<String>,
 ) {
     setArrayArgumentValue(property, strings, "%S") {
-        strings.forEach(::arg)
+        strings.forEach { +it }
     }
 }
 
@@ -48,7 +48,7 @@ inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationB
 ) {
     val annotations = listOf(buildJavaAnnotation<Embedded>(builder))
     setArrayArgumentValue(property, annotations, "%L") {
-        annotations.forEach(::arg)
+        annotations.forEach { +it }
     }
 }
 
@@ -56,10 +56,13 @@ inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayArgumentValue(
     property: KProperty1<A, *>,
     array: List<*>,
     placeholder: String,
-    noinline arguments: Builder<IrJavaCodeBlock.Arguments> = {}
+    noinline argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
 ) {
     addMember(
         property.name,
-        buildJavaCodeBlock(array.joinToString(prefix = "{", postfix = "}") { placeholder }, arguments)
+        buildJavaCodeBlock(
+            format = array.joinToString(prefix = "{", postfix = "}") { placeholder },
+            argumentsBuilder = argumentsBuilder
+        )
     )
 }

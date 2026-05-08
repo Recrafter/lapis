@@ -75,18 +75,12 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 addFunction(buildKotlinFunction("invoke") {
                     setModifiers(IrModifier.PUBLIC, IrModifier.OPERATOR)
                     val valueParameter = buildKotlinParameter("value", valueParameter.typeName) {
-                        defaultValue(buildKotlinCodeBlock("this.%N") {
-                            arg(valueParameter)
-                        })
+                        setDefaultValue("this.%N") { +valueParameter }
                     }
                     addParameter(valueParameter)
                     setReturnType(KPBoolean.asIrClassName())
                     setBody {
-                        return_("%N.%L(%N)") {
-                            arg(operationParameter)
-                            arg(Operation<*>::call)
-                            arg(valueParameter)
-                        }
+                        return_("%N.%L(%N)") { +operationParameter; +Operation<*>::call; +valueParameter }
                     }
                 })
             }
