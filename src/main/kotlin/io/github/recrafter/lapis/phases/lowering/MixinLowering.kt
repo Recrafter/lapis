@@ -26,7 +26,7 @@ class MixinLowering(
     private val patches: MutableList<IrPatch> = mutableListOf()
 
     fun lower(result: ValidatorResult): IrResult {
-        val mixinSourcePackageLCP = findMixinSourcePackageLCP(result.schemas, result.patches)
+        val mixinSourcePackageLCP = findMixinSourcePackageLCP(result.schemas + result.patches)
         patches += result.patches.map { lowerPatch(it, mixinSourcePackageLCP) }
         return IrResult(
             schemas = result.schemas.map { schema ->
@@ -720,19 +720,14 @@ class MixinLowering(
             .map { it.wrapperImpl }
             .find { it.descriptorClassName == descriptorClassName }
 
-    private fun findMixinSourcePackageLCP(schemas: List<Schema>, patches: List<Patch>): String {
-        val classNames = (schemas + patches).map { it.className }
-        return when {
-            classNames.isEmpty() -> ""
-            classNames.size == 1 -> classNames.first().packageName
-            else -> {
-                val packageNames = classNames.map { it.packageName }.sorted()
-                val first = packageNames.first().split('.')
-                val last = packageNames.last().split('.')
-                first.zip(last).takeWhile { (previous, next) -> previous == next }.joinToString(".") { it.first }
-            }
-        }
-    }
+    private fun findMixinSourcePackageLCP(sources: List<SourceFile>): String =
+        sources.map { it.className.packageName }.reduceOrNull { lcp, next ->
+            val currentParts = lcp.split('.')
+            val nextParts = next.split('.')
+            currentParts.zip(nextParts)
+                .takeWhile { (current, next) -> current == next }
+                .joinToString(".") { it.first }
+        }.orEmpty()
 
     private fun String.withModIdPrefix(): String =
         withInternalPrefix(options.modId)
