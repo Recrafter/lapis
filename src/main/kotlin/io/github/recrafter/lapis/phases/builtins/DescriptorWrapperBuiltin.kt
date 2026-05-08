@@ -5,13 +5,15 @@ import io.github.recrafter.lapis.extensions.InternalPrefix.ARGUMENT
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.phases.common.jvmDescriptor
-import io.github.recrafter.lapis.phases.generator.builders.toCodeBlock
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
-import io.github.recrafter.lapis.phases.lowering.types.*
+import io.github.recrafter.lapis.phases.lowering.types.IrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
+import io.github.recrafter.lapis.phases.lowering.types.orVoid
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
@@ -52,7 +54,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }?.also(destination::addFunction)
-
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
@@ -69,9 +70,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     return_(
                         buildString {
                             append("(this as %T).%N.%L(")
-                            if (receiverParameter != null) {
-                                append("%N")
-                            }
+                            receiverParameter?.let { append("%N") }
                             append(")")
                         }
                     ) {
@@ -117,7 +116,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }.also(destination::addProperty)
-
             val getReceiverFunction = receiverParameter?.let {
                 buildKotlinFunction("getReceiver", jvmNamespace = impl.className) {
                     setModifiers(IrModifier.INLINE)
@@ -131,7 +129,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }?.also(destination::addFunction)
-
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
@@ -140,7 +137,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         arg(valueProperty)
                     })
                 }.also(::addParameter)
-
                 val receiverParameter = getReceiverFunction?.let {
                     buildKotlinParameter("receiver", impl.receiverTypeName) {
                         defaultValue(buildKotlinCodeBlock("%N()") {
@@ -151,9 +147,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setBody {
                     code_(buildString {
                         append("(this as %T).%N.%L(")
-                        if (receiverParameter != null) {
-                            append("%N, ")
-                        }
+                        receiverParameter?.let { append("%N, ") }
                         append("%N)")
                     }) {
                         arg(impl.className)
@@ -192,7 +186,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }.also(destination::addProperty)
-
             val indexProperty = buildKotlinProperty("index", indexParameter.typeName, jvmNamespace = impl.className) {
                 setReceiverType(superClassTypeName)
                 setGetter {
@@ -205,7 +198,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }.also(destination::addProperty)
-
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
@@ -257,7 +249,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }.also(destination::addProperty)
-
             val indexProperty = buildKotlinProperty("index", indexParameter.typeName, jvmNamespace = impl.className) {
                 setReceiverType(superClassTypeName)
                 setGetter {
@@ -270,7 +261,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }.also(destination::addProperty)
-
             val valueProperty = buildKotlinProperty("value", valueParameter.typeName, jvmNamespace = impl.className) {
                 setReceiverType(superClassTypeName)
                 setGetter {
@@ -283,7 +273,6 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }.also(destination::addProperty)
-
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
@@ -321,23 +310,21 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             superClassTypeName: IrParameterizedTypeName,
             resolveBuiltin: BuiltinResolver,
         ) {
-            val namedParameters = impl.parameters.mapNotNull { parameter ->
-                parameter.name?.let { IrParameter(parameter.name, parameter.typeName) }
-            }
-            val argumentParameters = impl.parameters.mapIndexed { index, parameter ->
-                val name = parameter.name ?: index.toString()
-                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName, IrModifier.PUBLIC)
-            }
+            val suites = impl.parameters.resolveInvokableDescriptorSuites()
+            val constructorParameters = suites.map { it.constructorParameter }
+            val namedProperties = suites.mapNotNull { it.property }
+            val invokeParameters = suites.mapNotNull { it.invokeParameter }
+            val callArgumentsReferences = suites.map { it.callArgumentReference }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
                 IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
-                setConstructor(argumentParameters + operationParameter)
+                setConstructor(constructorParameters + operationParameter)
                 addSuperInterface(superClassTypeName)
             })
-            destination.addProperties(namedParameters.map { parameter ->
+            destination.addProperties(namedProperties.map { parameter ->
                 buildKotlinProperty(parameter.name, parameter.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
@@ -351,30 +338,17 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             })
-            val operationArguments = impl.parameters.mapIndexed { index, parameter ->
-                if (parameter.name != null) {
-                    namedParameters.first { it.name == parameter.name }
-                } else {
-                    argumentParameters[index]
-                }
-            }
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
-                addParameters(namedParameters.map { parameter ->
-                    buildKotlinParameter(parameter.name, parameter.typeName) {
-                        defaultValue(buildKotlinCodeBlock("this.%N") {
-                            arg(parameter)
-                        })
-                    }
-                })
+                addParameters(invokeParameters)
                 setReturnType(impl.returnTypeName)
                 setBody {
                     code_(
                         format = buildString {
                             append("(this as %T).%N.%L(")
-                            if (operationArguments.isNotEmpty()) {
-                                append(operationArguments.joinToString { "%N" })
+                            if (callArgumentsReferences.isNotEmpty()) {
+                                append(callArgumentsReferences.joinToString { "%N" })
                             }
                             append(")")
                         },
@@ -383,7 +357,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         arg(impl.className)
                         arg(operationParameter)
                         arg(Operation<*>::call)
-                        operationArguments.forEach(::arg)
+                        callArgumentsReferences.forEach(::arg)
                     }
                 }
             })
@@ -400,25 +374,21 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             val receiverParameter = impl.receiverTypeName?.let {
                 IrParameter("receiver".withInternalPrefix(), it, IrModifier.PUBLIC)
             }
-            val namedParameters = impl.parameters.mapNotNull { parameter ->
-                parameter.name?.let {
-                    IrParameter(parameter.name, parameter.typeName, IrModifier.PUBLIC)
-                }
-            }
-            val argumentParameters = impl.parameters.mapIndexed { index, parameter ->
-                val name = parameter.name ?: index.toString()
-                IrParameter(name.withInternalPrefix(ARGUMENT), parameter.typeName, IrModifier.PUBLIC)
-            }
+            val suites = impl.parameters.resolveInvokableDescriptorSuites()
+            val constructorParameters = suites.map { it.constructorParameter }
+            val namedProperties = suites.mapNotNull { it.property }
+            val invokeParameters = suites.mapNotNull { it.invokeParameter }
+            val callArgumentsReferences = suites.map { it.callArgumentReference }
             val operationParameter = IrParameter(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
                 IrModifier.PUBLIC
             )
             destination.addType(buildKotlinClass(impl.className.simpleName) {
-                setConstructor(listOfNotNull(receiverParameter) + argumentParameters + operationParameter)
+                setConstructor(listOfNotNull(receiverParameter) + constructorParameters + operationParameter)
                 addSuperInterface(superClassTypeName)
             })
-            destination.addProperties(namedParameters.map { parameter ->
+            destination.addProperties(namedProperties.map { parameter ->
                 buildKotlinProperty(parameter.name, parameter.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
@@ -445,32 +415,18 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }?.also(destination::addFunction)
-            val namedArgumentParameters = namedParameters.map { parameter ->
-                buildKotlinParameter(parameter) {
-                    defaultValue(buildKotlinCodeBlock("this.%N") {
-                        arg(parameter)
-                    })
-                }
-            }
-            val operationArguments = impl.parameters.mapIndexed { index, parameter ->
-                if (parameter.name != null) {
-                    namedParameters.first { it.name == parameter.name }
-                } else {
-                    argumentParameters[index]
-                }
-            }
             destination.addFunction(buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
-                addParameters(namedArgumentParameters)
+                addParameters(invokeParameters)
                 setReturnType(impl.returnTypeName)
                 setBody {
                     code_(
                         format = buildString {
                             append("(this as %T).%N.%L(")
                             getReceiverFunction?.let { append("%N()") }
-                            if (operationArguments.isNotEmpty()) {
-                                append(operationArguments.joinToString(prefix = ", ") { "%N" })
+                            if (callArgumentsReferences.isNotEmpty()) {
+                                append(callArgumentsReferences.joinToString(prefix = ", ") { "%N" })
                             }
                             append(")")
                         },
@@ -480,61 +436,38 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         arg(operationParameter)
                         arg(Operation<*>::call)
                         getReceiverFunction?.let(::arg)
-                        operationArguments.forEach(::arg)
+                        callArgumentsReferences.forEach(::arg)
                     }
                 }
             })
-            val receiverTypeName = impl.receiverTypeName ?: return
-            destination.addFunction(buildKotlinFunction("call", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE)
-                val receiverParameter = IrParameter("_receiver", receiverTypeName)
-                setContextParameters(listOf(receiverParameter))
-                setReceiverType(superClassTypeName)
-                addParameters(namedArgumentParameters)
-                setReturnType(impl.returnTypeName)
-                setBody {
-                    code_(
-                        format = buildString {
-                            append("(this as %T).%N.%L(")
-                            append("%N")
-                            if (operationArguments.isNotEmpty()) {
-                                append(operationArguments.joinToString(prefix = ", ") { "%N" })
-                            }
-                            append(")")
-                        },
-                        isReturn = impl.returnTypeName != null
-                    ) {
-                        arg(impl.className)
-                        arg(operationParameter)
-                        arg(Operation<*>::call)
-                        arg(receiverParameter)
-                        operationArguments.forEach(::arg)
-                    }
-                }
-            })
-            destination.addFunction(buildKotlinFunction("withReceiver", jvmNamespace = impl.className) { functionName ->
-                setModifiers(IrModifier.INLINE)
-                setReceiverType(superClassTypeName)
-                val receiverParameter = buildKotlinParameter("receiver", receiverTypeName).also(::addParameter)
-                val blockType = IrLambdaTypeName.of(
-                    receiverTypeName = superClassTypeName,
-                    returnTypeName = impl.returnTypeName,
-                    contextParameters = listOf(receiverTypeName),
-                )
-                val blockParameter = buildKotlinParameter("block", blockType).also(::addParameter)
-                setReturnType(impl.returnTypeName)
-                setBody {
-                    with_(receiverParameter.toCodeBlock()) {
+            if (impl.receiverTypeName != null) {
+                destination.addFunction(buildKotlinFunction("call", jvmNamespace = impl.className) {
+                    setModifiers(IrModifier.INLINE)
+                    val receiverParameter = IrParameter("_receiver", impl.receiverTypeName)
+                    setContextParameters(listOf(receiverParameter))
+                    setReceiverType(superClassTypeName)
+                    addParameters(invokeParameters)
+                    setReturnType(impl.returnTypeName)
+                    setBody {
                         code_(
-                            format = "%N(this@%L)",
+                            format = buildString {
+                                append("(this as %T).%N.%L(%N")
+                                if (callArgumentsReferences.isNotEmpty()) {
+                                    append(callArgumentsReferences.joinToString(prefix = ", ") { "%N" })
+                                }
+                                append(")")
+                            },
                             isReturn = impl.returnTypeName != null
                         ) {
-                            arg(blockParameter)
-                            arg(functionName)
+                            arg(impl.className)
+                            arg(operationParameter)
+                            arg(Operation<*>::call)
+                            arg(receiverParameter)
+                            callArgumentsReferences.forEach(::arg)
                         }
                     }
-                }
-            })
+                })
+            }
         }
     }
 
@@ -571,11 +504,13 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                         ) {
                             arg(impl.className)
                             arg(callbackParameter)
-                            if (impl.returnTypeName != null) {
-                                arg(CallbackInfoReturnable<*>::getReturnValue)
-                            } else {
-                                arg(CallbackInfo::isCancelled)
-                            }
+                            arg(
+                                if (impl.returnTypeName != null) {
+                                    CallbackInfoReturnable<*>::getReturnValue
+                                } else {
+                                    CallbackInfo::isCancelled
+                                }
+                            )
                         }
                     }
                 }
@@ -650,3 +585,27 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             listOf(FieldGet, FieldSet, ArrayGet, ArraySet, Body, Call, Cancel)
     }
 }
+
+private data class InvokableDescriptorParameterSuite(
+    val constructorParameter: IrParameter,
+    val property: IrParameter?,
+) {
+    val invokeParameter: KPParameter? = property?.let {
+        buildKotlinParameter(property) {
+            defaultValue(buildKotlinCodeBlock("this.%N") { arg(property) })
+        }
+    }
+    val callArgumentReference: IrParameter = property ?: constructorParameter
+}
+
+private fun List<IrFunctionTypeParameter>.resolveInvokableDescriptorSuites(): List<InvokableDescriptorParameterSuite> =
+    mapIndexed { index, parameter ->
+        InvokableDescriptorParameterSuite(
+            constructorParameter = IrParameter(
+                (parameter.name ?: index.toString()).withInternalPrefix(ARGUMENT),
+                parameter.typeName,
+                IrModifier.PUBLIC
+            ),
+            property = parameter.name?.let { IrParameter(it, parameter.typeName, IrModifier.PUBLIC) },
+        )
+    }
