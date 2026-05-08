@@ -195,8 +195,8 @@ class MixinLowering(
                 if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
                     add(IrPatchImplConstructorInstanceParameter)
                 }
-                if (patch.bridgeSources.any { it is PatchShadowSource }) {
-                    add(IrPatchImplConstructorBridgeParameter)
+                if (patch.shadowSources.isNotEmpty()) {
+                    add(IrPatchImplConstructorShadowBridgeParameter)
                 }
             },
             initStrategy = patch.initStrategy,
@@ -211,61 +211,89 @@ class MixinLowering(
             targetInternalName = patch.schema.originJvmClassName.internalName,
             side = patch.side,
             injections = patch.hooks.flatMap(::lowerInjections),
-            bridge = lowerMixinBridge(patch),
+            extensionBridge = lowerMixinExtensionBridge(patch),
+            shadowBridge = lowerMixinShadowBridge(patch),
         )
 
-    private fun lowerMixinBridge(patch: Patch): IrMixinBridge? =
-        if (patch.bridgeSources.isEmpty()) null
-        else IrMixinBridge(
+    private fun lowerMixinExtensionBridge(patch: Patch): IrMixinExtensionBridge? =
+        if (patch.extensionSources.isEmpty()) null
+        else IrMixinExtensionBridge(
             originatingFiles = listOfNotNull(patch.containingFile),
-
-            className = patch.className.derived("Bridge"),
-            entries = patch.bridgeSources.map(::lowerMixinBridgeEntry),
+            className = patch.className.derived("ExtensionBridge"),
+            entries = patch.extensionSources.map(::lowerMixinExtensionBridgeEntry),
         )
 
-    private fun lowerMixinBridgeEntry(source: PatchBridgeSource): IrMixinBridgeEntry =
+    private fun lowerMixinShadowBridge(patch: Patch): IrMixinShadowBridge? =
+        if (patch.shadowSources.isEmpty()) null
+        else IrMixinShadowBridge(
+            originatingFiles = listOfNotNull(patch.containingFile),
+            className = patch.className.derived("ShadowBridge"),
+            entries = patch.shadowSources.map(::lowerMixinShadowBridgeEntry),
+        )
+
+    private fun lowerMixinExtensionBridgeEntry(source: PatchExtensionSource): IrMixinExtensionBridgeEntry =
         when (source) {
-            is PatchBridgeSourceProperty -> {
+            is PatchExtensionProperty -> {
                 val (setterName, setterSourceJvmName) = if (source.isMutable) {
                     source.setterJvmName.let { it?.withModIdPrefix() to it }
                 } else {
                     null to null
                 }
-                IrMixinBridgeEntryProperty(
+                IrMixinExtensionBridgeEntryProperty(
                     sourceName = source.name,
                     typeName = source.typeName,
-                    impl = lowerPropertyBridgeFunctionImpl(source),
                     getterName = source.getterJvmName.withModIdPrefix(),
                     getterSourceJvmName = source.getterJvmName,
                     setterName = setterName,
                     setterSourceJvmName = setterSourceJvmName,
+                    impl = IrMixinBridgeEntryExtensionPropertyImpl,
                 )
             }
 
-            is PatchBridgeSourceFunction -> IrMixinBridgeEntryFunction(
+            is PatchExtensionFunction -> IrMixinExtensionBridgeEntryFunction(
                 sourceName = source.name,
                 name = source.jvmName.withModIdPrefix(),
                 sourceJvmName = source.jvmName,
                 parameters = source.parameters.map { it.asIrParameter() },
                 returnTypeName = source.returnTypeName,
-                impl = lowerFunctionBridgeFunctionImpl(source),
+                impl = IrMixinBridgeEntryExtensionFunctionImpl,
             )
         }
 
-    private fun lowerPropertyBridgeFunctionImpl(property: PatchBridgeSourceProperty): IrMixinBridgeEntryPropertyImpl =
-        when (property) {
-            is PatchExtensionProperty -> IrMixinBridgeEntryExtensionPropertyImpl
-            is PatchShadowProperty -> IrMixinBridgeEntryShadowPropertyImpl(
-                property.mappingName,
-                property.isStatic,
-                property.isFinal,
-            )
-        }
+    private fun lowerMixinShadowBridgeEntry(source: PatchShadowSource): IrMixinShadowBridgeEntry =
+        when (source) {
+            is PatchShadowProperty -> {
+                val (setterName, setterSourceJvmName) = if (source.isMutable) {
+                    source.setterJvmName.let { it?.withModIdPrefix() to it }
+                } else {
+                    null to null
+                }
+                IrMixinShadowBridgeEntryProperty(
+                    sourceName = source.name,
+                    typeName = source.typeName,
+                    getterName = source.getterJvmName.withModIdPrefix(),
+                    getterSourceJvmName = source.getterJvmName,
+                    setterName = setterName,
+                    setterSourceJvmName = setterSourceJvmName,
+                    impl = IrMixinBridgeEntryShadowPropertyImpl(
+                        source.mappingName,
+                        source.isStatic,
+                        source.isFinal,
+                    ),
+                )
+            }
 
-    private fun lowerFunctionBridgeFunctionImpl(function: PatchBridgeSourceFunction): IrMixinBridgeEntryFunctionImpl =
-        when (function) {
-            is PatchExtensionFunction -> IrMixinBridgeEntryExtensionFunctionImpl
-            is PatchShadowFunction -> IrMixinBridgeEntryShadowFunctionImpl(function.mappingName, function.isStatic)
+            is PatchShadowFunction -> IrMixinShadowBridgeEntryFunction(
+                sourceName = source.name,
+                name = source.jvmName.withModIdPrefix(),
+                sourceJvmName = source.jvmName,
+                parameters = source.parameters.map { it.asIrParameter() },
+                returnTypeName = source.returnTypeName,
+                impl = IrMixinBridgeEntryShadowFunctionImpl(
+                    source.mappingName,
+                    source.isStatic,
+                ),
+            )
         }
 
     private fun lowerInjections(hook: PatchHook): List<IrInjection> {

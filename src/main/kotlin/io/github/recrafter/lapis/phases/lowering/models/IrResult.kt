@@ -81,7 +81,8 @@ class IrMixin(
     val isInterfaceTarget: Boolean,
     val targetInternalName: String,
     val injections: List<IrInjection>,
-    val bridge: IrMixinBridge?,
+    val extensionBridge: IrMixinExtensionBridge?,
+    val shadowBridge: IrMixinShadowBridge?,
 ) : IrMixinRelatedBlueprint(isInterface = false)
 
 sealed interface IrPatchConstructorArgument
@@ -96,4 +97,4 @@ class IrPatchImpl(
 
 sealed interface IrPatchImplConstructorParameter
 object IrPatchImplConstructorInstanceParameter : IrPatchImplConstructorParameter
-object IrPatchImplConstructorBridgeParameter : IrPatchImplConstructorParameter
+object IrPatchImplConstructorShadowBridgeParameter : IrPatchImplConstructorParameter

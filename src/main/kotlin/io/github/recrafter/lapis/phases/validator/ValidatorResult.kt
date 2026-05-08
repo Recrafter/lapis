@@ -170,7 +170,8 @@ class Patch(
     val schema: Schema,
 
     val constructorParameters: List<PatchConstructorParameter>,
-    val bridgeSources: List<PatchBridgeSource>,
+    val extensionSources: List<PatchExtensionSource>,
+    val shadowSources: List<PatchShadowSource>,
 
     val hooks: List<PatchHook>,
 ) : SourceFile(symbol, classDeclaration)
@@ -198,20 +199,21 @@ sealed class PatchBridgeSourceFunction(
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
+sealed interface PatchExtensionSource
 class PatchExtensionProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
     isMutable: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable)
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchExtensionSource
 
 class PatchExtensionFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
     returnType: KSType?,
-) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType)
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchExtensionSource
 
 sealed interface PatchShadowSource
 class PatchShadowProperty(
