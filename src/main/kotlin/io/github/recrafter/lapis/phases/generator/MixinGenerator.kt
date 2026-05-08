@@ -41,7 +41,6 @@ import org.spongepowered.asm.mixin.gen.Invoker
 import org.spongepowered.asm.mixin.injection.*
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
-import java.io.File
 
 class MixinGenerator(
     private val options: LapisOptions,
@@ -959,25 +958,25 @@ class MixinGenerator(
         path: String,
     ) : IrResourceBlueprint(path)
 
-    private fun generateTweakAccessorConfigs(accessors: List<IrTweakAccessor>) {
-        val originatingFiles = accessors.flatMap { it.originatingFiles }
+    private fun generateTweakAccessorConfigs(tweakAccessors: List<IrTweakAccessor>) {
+        val originatingFiles = tweakAccessors.flatMap { it.originatingFiles }
         options.accessWidenerConfig?.let { configPath ->
             val configBlueprint = IrTweakAccessorConfig(originatingFiles, configPath)
             generateResourceFile(configBlueprint, aggregating = true) {
                 val header = if (options.isUnobfuscated) "classTweaker v1 official" else "accessWidener v2 named"
-                buildTweakAccessorConfig(accessors, header, buildTweak = IrTweakAccessorEntry::buildWidenerTweak)
+                buildTweakAccessorConfig(tweakAccessors, header, buildTweak = IrTweakAccessorEntry::buildWidenerTweak)
             }
         }
         options.accessTransformerConfig?.let { configPath ->
             val configBlueprint = IrTweakAccessorConfig(originatingFiles, configPath)
             generateResourceFile(configBlueprint, aggregating = true) {
-                buildTweakAccessorConfig(accessors, buildTweak = IrTweakAccessorEntry::buildTransformerTweak)
+                buildTweakAccessorConfig(tweakAccessors, buildTweak = IrTweakAccessorEntry::buildTransformerTweak)
             }
         }
     }
 
     private fun buildTweakAccessorConfig(
-        accessors: List<IrTweakAccessor>,
+        tweakAccessors: List<IrTweakAccessor>,
         header: String? = null,
         buildTweak: (IrTweakAccessorEntry, JvmClassName) -> String
     ): String = buildString {
@@ -985,10 +984,10 @@ class MixinGenerator(
             appendLine(it)
             appendLine()
         }
-        accessors.forEach {
-            appendLine("# ${it.ownerJvmClassName.nestedName}")
-            it.entries.forEach { entry ->
-                appendLine(buildTweak(entry, it.ownerJvmClassName))
+        tweakAccessors.forEach { tweakAccessor ->
+            appendLine("# ${tweakAccessor.ownerJvmClassName.nestedName}")
+            tweakAccessor.entries.forEach { entry ->
+                appendLine(buildTweak(entry, tweakAccessor.ownerJvmClassName))
             }
             appendLine()
         }
@@ -1007,20 +1006,30 @@ class MixinGenerator(
         aggregating: Boolean,
         builder: Builder<JPClassBuilder> = {}
     ) {
-        buildJavaFile(blueprint.className) {
-            if (blueprint.isInterface) buildJavaInterface(blueprint.className.simpleName, builder)
-            else buildJavaClass(blueprint.className.simpleName, builder)
-        }.writeTo(codeGenerator, aggregating, blueprint.originatingFiles)
-    }
-
-    private fun generateResourceFile(blueprint: IrResourceBlueprint, aggregating: Boolean, builder: () -> String) {
-        val file = File(blueprint.path)
+        val fileName = blueprint.className.simpleName
+        val file = buildJavaFile(blueprint.className) {
+            if (blueprint.isInterface) {
+                buildJavaInterface(fileName, builder)
+            } else {
+                buildJavaClass(fileName, builder)
+            }
+        }
         codeGenerator.createNewFile(
             dependencies = Dependencies(aggregating, *blueprint.originatingFiles.toTypedArray()),
-            packageName = file.parent?.replace(File.separatorChar, '.').orEmpty(),
-            fileName = file.nameWithoutExtension,
-            extensionName = file.extension,
-        ).bufferedWriter().use { it.write(builder().trimEnd() + "\n") }
+            packageName = blueprint.className.packageName,
+            fileName = fileName,
+            extensionName = "java",
+        ).writer().use { file.writeTo(it) }
+    }
+
+    private fun generateResourceFile(blueprint: IrResourceBlueprint, aggregating: Boolean, buildText: () -> String) {
+        val text = buildText().trimEnd() + "\n"
+        codeGenerator.createNewFile(
+            dependencies = Dependencies(aggregating, *blueprint.originatingFiles.toTypedArray()),
+            packageName = "",
+            fileName = blueprint.path,
+            extensionName = "",
+        ).writer().use { it.write(text) }
     }
 }
 

@@ -40,8 +40,7 @@ open class IrTypeName(
     }
 
     val is64bit: Boolean by lazy {
-        if (boxed) false
-        else javaPrimitiveType == JPLong || javaPrimitiveType == JPDouble
+        !boxed && (javaPrimitiveType == JPLong || javaPrimitiveType == JPDouble)
     }
 
     private val javaArrayType: JPArrayTypeName? by lazy {
