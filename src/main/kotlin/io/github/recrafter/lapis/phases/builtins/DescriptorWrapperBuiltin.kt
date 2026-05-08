@@ -339,7 +339,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setBody {
                     val receiverFunctionFormat = getReceiverFunction?.let { "%N()" }
                     val callArgumentsFormat = if (callArgumentReferences.isNotEmpty()) {
-                        callArgumentReferences.joinToString(prefix = ", ") { "%N" }
+                        ", " + callArgumentReferences.format
                     } else ""
                     code_("(this as %T).%N.%L($receiverFunctionFormat$callArgumentsFormat)", isReturn = impl.isReturn) {
                         +impl.className; +operationParameter; +Operation<*>::call
@@ -358,7 +358,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     setReturnType(impl.returnTypeName)
                     setBody {
                         val callArgumentsFormat = if (callArgumentReferences.isNotEmpty()) {
-                            callArgumentReferences.joinToString(prefix = ", ") { "%N" }
+                            ", " + callArgumentReferences.format
                         } else ""
                         code_("(this as %T).%N.%L(%N$callArgumentsFormat)", isReturn = impl.isReturn) {
                             +impl.className; +operationParameter; +Operation<*>::call; +receiverParameter
@@ -377,7 +377,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             superClassTypeName: IrParameterizedTypeName,
             resolveBuiltin: BuiltinResolver,
         ) {
-            val (callbackType, callbackCheck, callbackCancel) = if (impl.returnTypeName != null) {
+            val (callbackTypeName, callbackCheck, callbackCancel) = if (impl.returnTypeName != null) {
                 Triple(
                     CallbackInfoReturnable::class.asIrParameterizedTypeName(impl.returnTypeName),
                     CallbackInfoReturnable<*>::getReturnValue,
@@ -390,7 +390,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     CallbackInfo::cancel,
                 )
             }
-            val callbackParameter = IrParameter("callback".withInternalPrefix(), callbackType, IrModifier.PUBLIC)
+            val callbackParameter = IrParameter("callback".withInternalPrefix(), callbackTypeName, IrModifier.PUBLIC)
             destination.addType(buildKotlinClass(impl.className.simpleName) {
                 setConstructor(callbackParameter)
                 addSuperInterface(superClassTypeName)
@@ -430,10 +430,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 val returnValueParameter = impl.returnTypeName?.let { IrParameter("returnValue", it) }
                     ?.also(::addParameter)
                 setBody {
-                    code_("(this as %T)") { +impl.className }
                     val returnValueFormat = returnValueParameter?.let { "%N" }.orEmpty()
-                    code_("%N.%L($returnValueFormat)") {
-                        +callbackParameter; +callbackCancel
+                    code_("(this as %T).%N.%L($returnValueFormat)") {
+                        +impl.className; +callbackParameter; +callbackCancel
                         returnValueParameter?.let { +it }
                     }
                     throw_("%T") { +resolveBuiltin(SimpleBuiltin.CancelSignal) }

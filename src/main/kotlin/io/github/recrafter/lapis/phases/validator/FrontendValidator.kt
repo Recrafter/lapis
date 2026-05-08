@@ -304,22 +304,43 @@ class FrontendValidator(
     private fun validatePatchExtensionProperty(
         property: ParsedPatchProperty,
         schema: Schema,
-    ): PatchExternalBridgeProperty = with(property) {
+    ): PatchExternalBridgeExtensionProperty = with(property) {
         kspRequireNotNull(getterJvmName) { "308" }
         kspRequire(property.isPublic) { "309" }
         kspRequire(!property.isExtension) { "310" }
         kspRequire(schema.isAccessible) { "311" }
         kspRequire(!property.isOpen && !property.isAbstract) { "312" }
-        return PatchExternalBridgeProperty(
+        return PatchExternalBridgeExtensionProperty(
             name = name,
             getterJvmName = getterJvmName,
-            setterJvmName = setterJvmName,
+            setterJvmName = if (isMutable) kspRequireNotNull(setterJvmName) { "316" } else null,
             type = type,
-            isMutable = isMutable,
         )
     }
 
-    private fun validatePatchShadowProperty(property: ParsedPatchProperty): PatchInternalBridgeProperty =
+    private fun validatePatchExtensionFunction(
+        function: ParsedPatchFunction,
+        isResolvable: Boolean,
+    ): PatchExternalBridgeExtensionFunction = with(function) {
+        kspRequire(function.isPublic) { "348" }
+        kspRequire(!function.isExtension) { "349" }
+        val parameters = function.parameters.map {
+            FunctionParameter(
+                name = kspRequireNotNull(it.name) { "352" },
+                type = kspRequireNotNull(it.type) { "353" },
+            )
+        }
+        kspRequire(isResolvable) { "356" }
+        kspRequire(!function.isOpen && !function.isAbstract) { "357" }
+        return PatchExternalBridgeExtensionFunction(
+            name = name,
+            jvmName = jvmName,
+            parameters = parameters,
+            returnType = function.returnType,
+        )
+    }
+
+    private fun validatePatchShadowProperty(property: ParsedPatchProperty): PatchInternalBridgeShadowProperty =
         with(property) {
             kspRequireNotNull(getterJvmName) { "323" }
             kspRequire(property.isPublic) { "324" }
@@ -331,41 +352,18 @@ class FrontendValidator(
             } else {
                 name
             }
-            PatchInternalBridgeProperty(
+            PatchInternalBridgeShadowProperty(
                 name = name,
                 getterJvmName = getterJvmName,
-                setterJvmName = setterJvmName,
+                setterJvmName = if (isMutable) kspRequireNotNull(setterJvmName) { "336" } else null,
                 mappingName = mappingName,
                 isStatic = property.hasStaticAnnotation,
                 type = type,
-                isMutable = isMutable,
                 isFinal = isShadowFinal,
             )
         }
 
-    private fun validatePatchExtensionFunction(
-        function: ParsedPatchFunction,
-        isResolvable: Boolean,
-    ): PatchExternalBridgeFunction = with(function) {
-        kspRequire(function.isPublic) { "349" }
-        kspRequire(!function.isExtension) { "350" }
-        val parameters = function.parameters.map {
-            FunctionParameter(
-                name = kspRequireNotNull(it.name) { "353" },
-                type = kspRequireNotNull(it.type) { "354" },
-            )
-        }
-        kspRequire(isResolvable) { "357" }
-        kspRequire(!function.isOpen && !function.isAbstract) { "358" }
-        return PatchExternalBridgeFunction(
-            name = name,
-            jvmName = jvmName,
-            parameters = parameters,
-            returnType = function.returnType,
-        )
-    }
-
-    private fun validatePatchShadowFunction(function: ParsedPatchFunction): PatchInternalBridgeFunction =
+    private fun validatePatchShadowFunction(function: ParsedPatchFunction): PatchInternalBridgeShadowFunction =
         with(function) {
             kspRequire(function.isPublic) { "368" }
             kspRequire(!function.isExtension) { "369" }
@@ -383,7 +381,7 @@ class FrontendValidator(
             } else {
                 name
             }
-            PatchInternalBridgeFunction(
+            PatchInternalBridgeShadowFunction(
                 name = name,
                 jvmName = jvmName,
                 mappingName = mappingName,

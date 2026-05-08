@@ -38,15 +38,15 @@ sealed class IrMixinBridgePropertyEntry(
     override val sourceName: String,
     val typeName: IrTypeName,
     getterName: String,
-    getterSourceJvmName: String,
+    sourceGetterJvmName: String,
     setterName: String?,
-    setterSourceJvmName: String?,
+    sourceSetterJvmName: String?,
 ) : IrMixinBridgeEntry {
     val getter: IrMixinBridgeEntryPropertyGetter = IrMixinBridgeEntryPropertyGetter(
-        getterName, getterSourceJvmName, typeName
+        getterName, sourceGetterJvmName, typeName
     )
-    val setter: IrMixinBridgeEntryPropertySetter? = if (setterName != null && setterSourceJvmName != null) {
-        IrMixinBridgeEntryPropertySetter(setterName, setterSourceJvmName, typeName)
+    val setter: IrMixinBridgeEntryPropertySetter? = if (setterName != null && sourceSetterJvmName != null) {
+        IrMixinBridgeEntryPropertySetter(setterName, sourceSetterJvmName, typeName)
     } else null
 
     override val kinds: List<IrMixinBridgeEntryKind> = listOfNotNull(getter, setter)
@@ -86,17 +86,17 @@ sealed interface IrMixinExternalBridgeEntry : IrMixinBridgeEntry
 class IrMixinExternalBridgePropertyEntry(
     sourceName: String,
     typeName: IrTypeName,
+    sourceGetterJvmName: String,
+    sourceSetterJvmName: String?,
     getterName: String,
-    getterSourceJvmName: String,
     setterName: String?,
-    setterSourceJvmName: String?,
 ) : IrMixinBridgePropertyEntry(
     sourceName,
     typeName,
     getterName,
-    getterSourceJvmName,
+    sourceGetterJvmName,
     setterName,
-    setterSourceJvmName,
+    sourceSetterJvmName,
 ), IrMixinExternalBridgeEntry
 
 class IrMixinExternalBridgeFunctionEntry(
@@ -110,13 +110,13 @@ class IrMixinExternalBridgeFunctionEntry(
 
 sealed interface IrMixinInternalBridgeEntry : IrMixinBridgeEntry
 
-class IrMixinInternalBridgePropertyEntry(
+class IrMixinInternalBridgeShadowPropertyEntry(
     sourceName: String,
     typeName: IrTypeName,
     getterName: String,
-    getterSourceJvmName: String,
+    sourceGetterJvmName: String,
     setterName: String?,
-    setterSourceJvmName: String?,
+    sourceSetterJvmName: String?,
     val mappingName: String,
     val isStatic: Boolean,
     val isFinal: Boolean,
@@ -124,12 +124,12 @@ class IrMixinInternalBridgePropertyEntry(
     sourceName,
     typeName,
     getterName,
-    getterSourceJvmName,
+    sourceGetterJvmName,
     setterName,
-    setterSourceJvmName,
+    sourceSetterJvmName,
 ), IrMixinInternalBridgeEntry
 
-class IrMixinInternalBridgeFunctionEntry(
+class IrMixinInternalBridgeShadowFunctionEntry(
     sourceName: String,
     name: String,
     sourceJvmName: String,

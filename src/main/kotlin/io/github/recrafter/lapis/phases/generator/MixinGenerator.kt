@@ -122,7 +122,7 @@ class MixinGenerator(
                 addSuperInterface(bridge.className)
                 addMethods(bridge.entries.flatMap { entry ->
                     val shadowMemberReference = when (entry) {
-                        is IrMixinInternalBridgePropertyEntry -> {
+                        is IrMixinInternalBridgeShadowPropertyEntry -> {
                             buildJavaField(entry.mappingName, entry.typeName) {
                                 if (entry.setter != null) {
                                     addAnnotation<Mutable>()
@@ -140,7 +140,7 @@ class MixinGenerator(
                             }.also(::addField).let(::IrFieldMember)
                         }
 
-                        is IrMixinInternalBridgeFunctionEntry -> {
+                        is IrMixinInternalBridgeShadowFunctionEntry -> {
                             buildJavaMethod(entry.mappingName) {
                                 addAnnotation<Shadow>()
                                 setModifiers(
@@ -577,25 +577,19 @@ class MixinGenerator(
                 when (argument) {
                     is IrHookOriginValueArgument -> valueParameterName.toJavaCodeBlock()
                     is IrHookOriginDescriptorWrapperImplArgument<*> -> {
-                        val argumentCodeBlocks = buildList {
+                        val constructorArgumentCodeBlocks = buildList {
                             val impl = argument.wrapperImpl
+                            val isCancel = impl is IrCancelDescriptorWrapperImpl
                             if (
                                 injection is IrTargetInjection &&
                                 injection !is IrWrapMethodInjection &&
                                 injection !is IrArrayInjection &&
-                                !injection.isStaticTarget
+                                !injection.isStaticTarget &&
+                                !isCancel
                             ) {
                                 add(receiverParameterName.toJavaCodeBlock())
                             }
                             if (injection is IrFieldSetInjection) {
-                                add("value".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
-                            }
-                            if (impl is IrInvokableDescriptorWrapperImpl) {
-                                addAll(impl.parameters.mapIndexed { index, parameter ->
-                                    (parameter.name ?: index.toString()).withInternalPrefix(ARGUMENT).toJavaCodeBlock()
-                                })
-                            }
-                            if (injection is IrInstanceofInjection) {
                                 add("value".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
                             }
                             if (injection is IrArrayInjection) {
@@ -604,12 +598,21 @@ class MixinGenerator(
                                 if (injection.op == Op.Set) {
                                     add("value".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
                                 }
-                            } else {
+                            }
+                            if (impl is IrInvokableDescriptorWrapperImpl && !isCancel) {
+                                addAll(impl.parameters.mapIndexed { index, parameter ->
+                                    (parameter.name ?: index.toString()).withInternalPrefix(ARGUMENT).toJavaCodeBlock()
+                                })
+                            }
+                            if (isCancel) {
+                                add(callbackParameterName.toJavaCodeBlock())
+                            }
+                            if (injection !is IrArrayInjection && !isCancel) {
                                 add(originalParameterName.toJavaCodeBlock())
                             }
                         }
-                        buildJavaCodeBlock("new %T(${argumentCodeBlocks.format})") {
-                            +argument.wrapperImpl.className; argumentCodeBlocks.forEach { +it }
+                        buildJavaCodeBlock("new %T(${constructorArgumentCodeBlocks.format})") {
+                            +argument.wrapperImpl.className; constructorArgumentCodeBlocks.forEach { +it }
                         }
                     }
 
@@ -617,10 +620,6 @@ class MixinGenerator(
                         buildJavaCodeBlock("new %T(%L, %L)") {
                             +builtins[SimpleBuiltin.Instanceof]; +valueParameterName; +originalParameterName
                         }
-                    }
-
-                    is IrHookCancelDescriptorWrapperImplArgument -> {
-                        buildJavaCodeBlock("new %T(%L)") { +argument.wrapperImpl.className; +callbackParameterName }
                     }
 
                     is IrHookOrdinalArgument -> injection.ordinal?.toJavaCodeBlock()

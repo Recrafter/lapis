@@ -9,7 +9,6 @@ import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ks.isInterface
 import io.github.recrafter.lapis.extensions.withInternalPrefix
-import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.common.binaryName
 import io.github.recrafter.lapis.phases.common.getMixinReference
@@ -55,7 +54,7 @@ class MixinLowering(
                         name = descriptor.name,
                         bodyWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         callWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
-                        cancelWrapperImpl = findCancelDescriptorWrapperImpl(descriptor.className),
+                        cancelWrapperImpl = findOriginDescriptorWrapperImpl(descriptor.className),
                         parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
                         returnTypeName = descriptor.returnTypeName,
                     )
@@ -236,23 +235,22 @@ class MixinLowering(
 
     private fun lowerMixinExternalBridgeEntry(source: PatchExternalBridgeSource): IrMixinExternalBridgeEntry =
         when (source) {
-            is PatchExternalBridgeProperty -> with(source) {
-                val (setterName, setterSourceJvmName) = lowerMixinBridgePropertySetterNames(source)
+            is PatchExternalBridgeExtensionProperty -> with(source) {
                 IrMixinExternalBridgePropertyEntry(
-                    sourceName = name,
                     typeName = typeName,
+                    sourceName = name,
+                    sourceGetterJvmName = getterJvmName,
+                    sourceSetterJvmName = setterJvmName,
                     getterName = getterJvmName.withModIdPrefix(),
-                    getterSourceJvmName = getterJvmName,
-                    setterName = setterName,
-                    setterSourceJvmName = setterSourceJvmName,
+                    setterName = source.setterJvmName?.withModIdPrefix(),
                 )
             }
 
-            is PatchExternalBridgeFunction -> with(source) {
+            is PatchExternalBridgeExtensionFunction -> with(source) {
                 IrMixinExternalBridgeFunctionEntry(
                     sourceName = name,
-                    name = lowerMixinBridgeFunctionName(source),
                     sourceJvmName = jvmName,
+                    name = source.jvmName.withModIdPrefix(),
                     parameters = parameters.map { it.asIrParameter() },
                     returnTypeName = returnTypeName,
                 )
@@ -261,26 +259,25 @@ class MixinLowering(
 
     private fun lowerMixinInternalBridgeEntry(source: PatchInternalBridgeSource): IrMixinInternalBridgeEntry =
         when (source) {
-            is PatchInternalBridgeProperty -> with(source) {
-                val (setterName, setterSourceJvmName) = lowerMixinBridgePropertySetterNames(source)
-                IrMixinInternalBridgePropertyEntry(
-                    sourceName = name,
+            is PatchInternalBridgeShadowProperty -> with(source) {
+                IrMixinInternalBridgeShadowPropertyEntry(
                     typeName = typeName,
+                    sourceName = name,
+                    sourceGetterJvmName = getterJvmName,
+                    sourceSetterJvmName = setterJvmName,
                     getterName = getterJvmName.withModIdPrefix(),
-                    getterSourceJvmName = getterJvmName,
-                    setterName = setterName,
-                    setterSourceJvmName = setterSourceJvmName,
+                    setterName = source.setterJvmName?.withModIdPrefix(),
                     mappingName = mappingName,
                     isStatic = isStatic,
                     isFinal = isFinal,
                 )
             }
 
-            is PatchInternalBridgeFunction -> with(source) {
-                IrMixinInternalBridgeFunctionEntry(
+            is PatchInternalBridgeShadowFunction -> with(source) {
+                IrMixinInternalBridgeShadowFunctionEntry(
                     sourceName = name,
-                    name = lowerMixinBridgeFunctionName(source),
                     sourceJvmName = jvmName,
+                    name = source.jvmName.withModIdPrefix(),
                     parameters = parameters.map { it.asIrParameter() },
                     returnTypeName = returnTypeName,
                     mappingName = mappingName,
@@ -288,16 +285,6 @@ class MixinLowering(
                 )
             }
         }
-
-    private fun lowerMixinBridgePropertySetterNames(source: PatchBridgeSourceProperty): Pair<String?, String?> =
-        if (source.isMutable) {
-            source.setterJvmName.let { it?.withModIdPrefix() to it }
-        } else {
-            null to null
-        }
-
-    private fun lowerMixinBridgeFunctionName(source: PatchBridgeSourceFunction): String =
-        source.jvmName.withModIdPrefix()
 
     private fun lowerInjections(hook: PatchHook): List<IrInjection> {
         val parameters = buildList {
@@ -319,7 +306,7 @@ class MixinLowering(
                     if (hook !is BodyHook && !hook.targetDescriptor.isStatic) {
                         add(
                             IrInjectionReceiverParameter(
-                                hook.targetDescriptor.receiverTypeName,
+                                typeName = hook.targetDescriptor.receiverTypeName,
                                 isCoerce = hook.targetDescriptor.inaccessibleReceiverJvmClassName != null,
                             )
                         )
@@ -564,7 +551,7 @@ class MixinLowering(
                 IrInjectionParamLocalParameter(
                     name = descriptorParameter.name ?: parameter.index.toString(),
                     typeName = descriptorParameter.typeName,
-                    varImplBuiltin = lowerHookLocalVarBuiltin(parameter),
+                    varImplBuiltin = lowerLocalVarBuiltin(parameter),
                     localIndex = initialSlot + slotOffset,
                 )
             }
@@ -572,7 +559,7 @@ class MixinLowering(
             is HookBodyLocalParameter -> IrInjectionBodyLocalParameter(
                 name = parameter.name,
                 typeName = parameter.typeName,
-                varImplBuiltin = lowerHookLocalVarBuiltin(parameter),
+                varImplBuiltin = lowerLocalVarBuiltin(parameter),
                 local = when (val local = parameter.local) {
                     is NamedLocal -> IrNamedLocal(local.name)
                     is PositionalLocal -> {
@@ -598,7 +585,7 @@ class MixinLowering(
             else -> null
         }
 
-    private fun lowerLocal(local: DomainLocal, descriptor: Descriptor, typeName: IrTypeName) =
+    private fun lowerLocal(local: DomainLocal, descriptor: Descriptor, typeName: IrTypeName): IrLocal =
         when (local) {
             is NamedLocal -> IrNamedLocal(local.name)
             is PositionalLocal -> {
@@ -620,22 +607,22 @@ class MixinLowering(
                 val descriptor = parameter.descriptor
                 val originatingFiles = listOfNotNull(descriptor.containingFile)
                 when (parameter) {
-                    is HookOriginBodyDescriptorWrapperParameter -> IrHookOriginBodyDescriptorWrapperImplArgument(
-                        IrBodyDescriptorWrapperImpl(
-                            originatingFiles = originatingFiles,
-                            descriptorClassName = descriptor.className,
-                            wrapperBuiltin = DescriptorWrapperBuiltin.Body,
-                            parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                            returnTypeName = descriptor.returnTypeName,
+                    is HookOriginBodyDescriptorWrapperParameter -> {
+                        IrHookOriginBodyDescriptorWrapperImplArgument(
+                            IrBodyDescriptorWrapperImpl(
+                                originatingFiles = originatingFiles,
+                                descriptorClassName = descriptor.className,
+                                parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                                returnTypeName = descriptor.returnTypeName,
+                            )
                         )
-                    )
+                    }
 
                     is HookOriginFieldGetDescriptorWrapperParameter -> {
                         IrHookOriginFieldGetDescriptorWrapperImplArgument(
                             IrFieldGetDescriptorWrapperImpl(
                                 originatingFiles = originatingFiles,
                                 descriptorClassName = descriptor.className,
-                                wrapperBuiltin = DescriptorWrapperBuiltin.FieldGet,
                                 receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                                 fieldTypeName = parameter.descriptor.fieldTypeName,
                             )
@@ -647,7 +634,6 @@ class MixinLowering(
                             IrFieldSetDescriptorWrapperImpl(
                                 originatingFiles = originatingFiles,
                                 descriptorClassName = descriptor.className,
-                                wrapperBuiltin = DescriptorWrapperBuiltin.FieldSet,
                                 receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
                                 fieldTypeName = parameter.descriptor.fieldTypeName,
                             )
@@ -659,7 +645,6 @@ class MixinLowering(
                             IrArrayGetDescriptorWrapperImpl(
                                 originatingFiles = originatingFiles,
                                 descriptorClassName = descriptor.className,
-                                wrapperBuiltin = DescriptorWrapperBuiltin.ArrayGet,
                                 typeName = parameter.descriptor.fieldTypeName,
                                 componentTypeName = parameter.arrayComponentTypeName,
                             )
@@ -671,33 +656,34 @@ class MixinLowering(
                             IrArraySetDescriptorWrapperImpl(
                                 originatingFiles = originatingFiles,
                                 descriptorClassName = descriptor.className,
-                                wrapperBuiltin = DescriptorWrapperBuiltin.ArraySet,
                                 typeName = parameter.descriptor.fieldTypeName,
                                 componentTypeName = parameter.arrayComponentTypeName,
                             )
                         )
                     }
 
-                    is HookOriginCallDescriptorWrapperParameter -> IrHookOriginCallDescriptorWrapperImplArgument(
-                        IrCallDescriptorWrapperImpl(
-                            originatingFiles = originatingFiles,
-                            descriptorClassName = descriptor.className,
-                            wrapperBuiltin = DescriptorWrapperBuiltin.Call,
-                            receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
-                            parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                            returnTypeName = descriptor.returnTypeName,
+                    is HookOriginCallDescriptorWrapperParameter -> {
+                        IrHookOriginCallDescriptorWrapperImplArgument(
+                            IrCallDescriptorWrapperImpl(
+                                originatingFiles = originatingFiles,
+                                descriptorClassName = descriptor.className,
+                                receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
+                                parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                                returnTypeName = descriptor.returnTypeName,
+                            )
                         )
-                    )
+                    }
 
-                    is HookCancelDescriptorWrapperParameter -> IrHookCancelDescriptorWrapperImplArgument(
-                        IrCancelDescriptorWrapperImpl(
-                            originatingFiles = originatingFiles,
-                            descriptorClassName = descriptor.className,
-                            wrapperBuiltin = DescriptorWrapperBuiltin.Cancel,
-                            parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
-                            returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
+                    is HookCancelDescriptorWrapperParameter -> {
+                        IrHookCancelDescriptorWrapperImplArgument(
+                            IrCancelDescriptorWrapperImpl(
+                                originatingFiles = originatingFiles,
+                                descriptorClassName = descriptor.className,
+                                parameters = descriptor.parameters.map { it.asIrFunctionTypeParameter() },
+                                returnTypeName = if (descriptor is MethodDescriptor) descriptor.returnTypeName else null
+                            )
                         )
-                    )
+                    }
                 }
             }
 
@@ -708,11 +694,11 @@ class MixinLowering(
                 name = parameter.name,
                 isBody = parameter is HookBodyLocalParameter,
                 isShare = parameter is HookShareLocalParameter,
-                varBuiltin = lowerHookLocalVarBuiltin(parameter),
+                varBuiltin = lowerLocalVarBuiltin(parameter),
             )
         }
 
-    private fun lowerHookLocalVarBuiltin(parameter: HookLocalParameter): LocalVarImplBuiltin? =
+    private fun lowerLocalVarBuiltin(parameter: HookLocalParameter): LocalVarImplBuiltin? =
         if (parameter.isVar) LocalVarImplBuiltin.of(parameter.typeName)
         else null
 
@@ -741,14 +727,6 @@ class MixinLowering(
             .filterIsInstance<IrHookOriginDescriptorWrapperImplArgument<*>>()
             .map { it.wrapperImpl }
             .filterIsInstance<T>()
-            .find { it.descriptorClassName == descriptorClassName }
-
-    private fun findCancelDescriptorWrapperImpl(descriptorClassName: IrClassName): IrCancelDescriptorWrapperImpl? =
-        patches.asSequence()
-            .flatMap { it.mixin.injections }
-            .flatMap { it.hookArguments }
-            .filterIsInstance<IrHookCancelDescriptorWrapperImplArgument>()
-            .map { it.wrapperImpl }
             .find { it.descriptorClassName == descriptorClassName }
 
     private fun findMixinSourcePackageLCP(sources: List<SourceFile>): String =

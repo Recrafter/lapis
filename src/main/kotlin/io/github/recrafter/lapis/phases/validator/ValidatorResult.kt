@@ -182,7 +182,6 @@ sealed class PatchBridgeSourceProperty(
     val getterJvmName: String,
     val setterJvmName: String?,
     type: KSType,
-    val isMutable: Boolean,
 ) : PatchBridgeSource {
     val typeName: IrTypeName = type.asIrTypeName()
 }
@@ -197,15 +196,14 @@ sealed class PatchBridgeSourceFunction(
 }
 
 sealed interface PatchExternalBridgeSource
-class PatchExternalBridgeProperty(
+class PatchExternalBridgeExtensionProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
-    isMutable: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchExternalBridgeSource
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchExternalBridgeSource
 
-class PatchExternalBridgeFunction(
+class PatchExternalBridgeExtensionFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
@@ -213,18 +211,17 @@ class PatchExternalBridgeFunction(
 ) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchExternalBridgeSource
 
 sealed interface PatchInternalBridgeSource
-class PatchInternalBridgeProperty(
+class PatchInternalBridgeShadowProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
-    isMutable: Boolean,
     val mappingName: String,
     val isStatic: Boolean,
     val isFinal: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchInternalBridgeSource
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchInternalBridgeSource
 
-class PatchInternalBridgeFunction(
+class PatchInternalBridgeShadowFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
@@ -410,13 +407,9 @@ class PositionalLocal(val ordinal: Int) : DomainLocal
 sealed interface HookParameter
 
 sealed interface HookOriginParameter : HookParameter
-object HookOriginValueParameter : HookOriginParameter
-
-sealed class HookOriginDescriptorWrapperParameter(open val descriptor: Descriptor) : HookOriginParameter
-
-class HookOriginBodyDescriptorWrapperParameter(
-    override val descriptor: InvokableDescriptor
-) : HookOriginDescriptorWrapperParameter(descriptor)
+sealed class HookOriginDescriptorWrapperParameter(
+    open val descriptor: Descriptor
+) : HookOriginParameter
 
 class HookOriginFieldGetDescriptorWrapperParameter(
     override val descriptor: FieldDescriptor
@@ -433,8 +426,6 @@ class HookOriginArrayGetDescriptorWrapperParameter(
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
-object HookOriginInstanceofWrapperParameter : HookOriginParameter
-
 class HookOriginArraySetDescriptorWrapperParameter(
     override val descriptor: FieldDescriptor,
     arrayComponentType: KSType,
@@ -442,12 +433,21 @@ class HookOriginArraySetDescriptorWrapperParameter(
     val arrayComponentTypeName: IrTypeName = arrayComponentType.asIrTypeName()
 }
 
-class HookOriginCallDescriptorWrapperParameter(override val descriptor: InvokableDescriptor) :
-    HookOriginDescriptorWrapperParameter(descriptor)
+class HookOriginBodyDescriptorWrapperParameter(
+    override val descriptor: InvokableDescriptor
+) : HookOriginDescriptorWrapperParameter(descriptor)
+
+class HookOriginCallDescriptorWrapperParameter(
+    override val descriptor: InvokableDescriptor
+) : HookOriginDescriptorWrapperParameter(descriptor)
 
 class HookCancelDescriptorWrapperParameter(
     override val descriptor: InvokableDescriptor
 ) : HookOriginDescriptorWrapperParameter(descriptor)
+
+object HookOriginInstanceofWrapperParameter : HookOriginParameter
+
+object HookOriginValueParameter : HookOriginParameter
 
 object HookOrdinalParameter : HookParameter
 
