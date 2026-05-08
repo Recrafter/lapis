@@ -268,12 +268,12 @@ class FrontendValidator(
             side = side,
             initStrategy = initStrategy,
             isObject = isObject,
-            hasStaticHooksOnly = hasStaticHooksOnly,
+            isImplRequired = !hasStaticHooksOnly,
             schema = schema,
 
             constructorParameters = constructorParameters,
-            extensionSources = extensionProperties + extensionFunctions,
-            shadowSources = shadowProperties + shadowFunctions,
+            externalBridgeSources = extensionProperties + extensionFunctions,
+            internalBridgeSources = shadowProperties + shadowFunctions,
             hooks = hooks + companionObjectHooks,
         )
     }
@@ -304,13 +304,13 @@ class FrontendValidator(
     private fun validatePatchExtensionProperty(
         property: ParsedPatchProperty,
         schema: Schema,
-    ): PatchExtensionProperty = with(property) {
+    ): PatchExternalBridgeProperty = with(property) {
         kspRequireNotNull(getterJvmName) { "308" }
         kspRequire(property.isPublic) { "309" }
         kspRequire(!property.isExtension) { "310" }
         kspRequire(schema.isAccessible) { "311" }
         kspRequire(!property.isOpen && !property.isAbstract) { "312" }
-        return PatchExtensionProperty(
+        return PatchExternalBridgeProperty(
             name = name,
             getterJvmName = getterJvmName,
             setterJvmName = setterJvmName,
@@ -319,33 +319,34 @@ class FrontendValidator(
         )
     }
 
-    private fun validatePatchShadowProperty(property: ParsedPatchProperty): PatchShadowProperty = with(property) {
-        kspRequireNotNull(getterJvmName) { "323" }
-        kspRequire(property.isPublic) { "324" }
-        kspRequire(!property.isExtension) { "325" }
-        kspRequire(property.isAbstract) { "326" }
-        val mappingName = if (explicitShadowName != null) {
-            kspRequire(explicitShadowName.isNotEmpty()) { "328" }
-            explicitShadowName
-        } else {
-            name
+    private fun validatePatchShadowProperty(property: ParsedPatchProperty): PatchInternalBridgeProperty =
+        with(property) {
+            kspRequireNotNull(getterJvmName) { "323" }
+            kspRequire(property.isPublic) { "324" }
+            kspRequire(!property.isExtension) { "325" }
+            kspRequire(property.isAbstract) { "326" }
+            val mappingName = if (explicitShadowName != null) {
+                kspRequire(explicitShadowName.isNotEmpty()) { "328" }
+                explicitShadowName
+            } else {
+                name
+            }
+            PatchInternalBridgeProperty(
+                name = name,
+                getterJvmName = getterJvmName,
+                setterJvmName = setterJvmName,
+                mappingName = mappingName,
+                isStatic = property.hasStaticAnnotation,
+                type = type,
+                isMutable = isMutable,
+                isFinal = isShadowFinal,
+            )
         }
-        PatchShadowProperty(
-            name = name,
-            getterJvmName = getterJvmName,
-            setterJvmName = setterJvmName,
-            mappingName = mappingName,
-            isStatic = property.hasStaticAnnotation,
-            type = type,
-            isMutable = isMutable,
-            isFinal = isShadowFinal,
-        )
-    }
 
     private fun validatePatchExtensionFunction(
         function: ParsedPatchFunction,
         isResolvable: Boolean,
-    ): PatchExtensionFunction = with(function) {
+    ): PatchExternalBridgeFunction = with(function) {
         kspRequire(function.isPublic) { "349" }
         kspRequire(!function.isExtension) { "350" }
         val parameters = function.parameters.map {
@@ -356,7 +357,7 @@ class FrontendValidator(
         }
         kspRequire(isResolvable) { "357" }
         kspRequire(!function.isOpen && !function.isAbstract) { "358" }
-        return PatchExtensionFunction(
+        return PatchExternalBridgeFunction(
             name = name,
             jvmName = jvmName,
             parameters = parameters,
@@ -364,32 +365,33 @@ class FrontendValidator(
         )
     }
 
-    private fun validatePatchShadowFunction(function: ParsedPatchFunction): PatchShadowFunction = with(function) {
-        kspRequire(function.isPublic) { "368" }
-        kspRequire(!function.isExtension) { "369" }
-        val parameters = function.parameters.map {
-            FunctionParameter(
-                name = kspRequireNotNull(it.name) { "372" },
-                type = kspRequireNotNull(it.type) { "373" },
+    private fun validatePatchShadowFunction(function: ParsedPatchFunction): PatchInternalBridgeFunction =
+        with(function) {
+            kspRequire(function.isPublic) { "368" }
+            kspRequire(!function.isExtension) { "369" }
+            val parameters = function.parameters.map {
+                FunctionParameter(
+                    name = kspRequireNotNull(it.name) { "372" },
+                    type = kspRequireNotNull(it.type) { "373" },
+                )
+            }
+            kspRequire(function.isAbstract) { "376" }
+            kspRequire(!function.isShadowFinal) { "377" }
+            val mappingName = if (explicitShadowName != null) {
+                kspRequire(explicitShadowName.isNotEmpty()) { "379" }
+                explicitShadowName
+            } else {
+                name
+            }
+            PatchInternalBridgeFunction(
+                name = name,
+                jvmName = jvmName,
+                mappingName = mappingName,
+                isStatic = function.hasStaticAnnotation,
+                parameters = parameters,
+                returnType = function.returnType,
             )
         }
-        kspRequire(function.isAbstract) { "376" }
-        kspRequire(!function.isShadowFinal) { "377" }
-        val mappingName = if (explicitShadowName != null) {
-            kspRequire(explicitShadowName.isNotEmpty()) { "379" }
-            explicitShadowName
-        } else {
-            name
-        }
-        PatchShadowFunction(
-            name = name,
-            jvmName = jvmName,
-            mappingName = mappingName,
-            isStatic = function.hasStaticAnnotation,
-            parameters = parameters,
-            returnType = function.returnType,
-        )
-    }
 
     private fun validatePatchHook(
         function: ParsedPatchFunction,
@@ -762,17 +764,17 @@ class FrontendValidator(
 
             hasParamAnnotation -> {
                 kspRequire(at != At.Body) { "764" }
-                explicitParamName?.let { kspRequire(it.trim().isNotEmpty()) { "766" } }
+                explicitParamName?.let { kspRequire(it.trim().isNotEmpty()) { "765" } }
                 val parameterName = explicitParamName ?: name
                 val parameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == parameterName }
-                kspRequireNotNull(parameterIndex) { "770" }
+                kspRequireNotNull(parameterIndex) { "768" }
                 val (paramLocalType, isVar) = validateLocalType(type)
-                kspRequire(hookDescriptor.parameters[parameterIndex].type == paramLocalType) { "772" }
+                kspRequire(hookDescriptor.parameters[parameterIndex].type == paramLocalType) { "770" }
                 HookParamLocalParameter(parameterName, paramLocalType, parameterIndex, isVar)
             }
 
             hasLocalAnnotation -> {
-                kspRequire(at != At.Body) { "777" }
+                kspRequire(at != At.Body) { "775" }
                 val (bodyLocalType, isVar) = validateLocalType(type)
                 HookBodyLocalParameter(
                     name,
@@ -783,22 +785,22 @@ class FrontendValidator(
             }
 
             hasShareAnnotation -> {
-                kspRequire(type.declaration.isBuiltin(SimpleBuiltin.LocalVar)) { "788" }
-                val type = kspRequireNotNull(type.findGenericType()) { "789" }
-                explicitShareKey?.let { kspRequire(it.trim().isNotEmpty()) { "791" } }
+                kspRequire(type.declaration.isBuiltin(SimpleBuiltin.LocalVar)) { "786" }
+                val type = kspRequireNotNull(type.findGenericType()) { "787" }
+                explicitShareKey?.let { kspRequire(it.trim().isNotEmpty()) { "788" } }
                 HookShareLocalParameter(name, type, explicitShareKey ?: name, isShareExported)
             }
 
-            else -> skipWithError { "796" }
+            else -> skipWithError { "792" }
         }
     }
 
     private fun ParsedPatchFunctionParameter.validateLocalType(type: KSType): Pair<KSType, Boolean> {
         val isVar = type.declaration.isBuiltin(SimpleBuiltin.LocalVar)
         val localType = if (isVar) {
-            kspRequireNotNull(type.findGenericType()) { "803" }
+            kspRequireNotNull(type.findGenericType()) { "799" }
         } else {
-            kspRequireNotNull(type) { "805" }
+            kspRequireNotNull(type) { "801" }
         }
         return localType to isVar
     }

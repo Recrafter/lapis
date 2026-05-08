@@ -187,20 +187,21 @@ class MixinLowering(
         }
 
     private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl? =
-        if (patch.hasStaticHooksOnly) null
-        else IrPatchImpl(
-            originatingFiles = listOfNotNull(patch.containingFile),
-            className = patch.className.derived("Impl"),
-            constructorParameters = buildList {
-                if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
-                    add(IrPatchImplConstructorInstanceParameter)
-                }
-                if (patch.shadowSources.isNotEmpty()) {
-                    add(IrPatchImplConstructorShadowBridgeParameter)
-                }
-            },
-            initStrategy = patch.initStrategy,
-        )
+        if (patch.isImplRequired) {
+            IrPatchImpl(
+                originatingFiles = listOfNotNull(patch.containingFile),
+                className = patch.className.derived("Impl"),
+                constructorParameters = buildList {
+                    if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
+                        add(IrPatchImplConstructorInstanceParameter)
+                    }
+                    if (patch.internalBridgeSources.isNotEmpty()) {
+                        add(IrPatchImplConstructorInternalBridgeParameter)
+                    }
+                },
+                initStrategy = patch.initStrategy,
+            )
+        } else null
 
     private fun lowerMixin(patch: Patch, sourcePackageLCP: String): IrMixin =
         IrMixin(
@@ -211,84 +212,92 @@ class MixinLowering(
             targetInternalName = patch.schema.originJvmClassName.internalName,
             side = patch.side,
             injections = patch.hooks.flatMap(::lowerInjections),
-            extensionBridge = lowerMixinExtensionBridge(patch),
-            shadowBridge = lowerMixinShadowBridge(patch),
+            externalBridge = lowerMixinExternalBridge(patch),
+            internalBridge = lowerMixinInternalBridge(patch),
         )
 
-    private fun lowerMixinExtensionBridge(patch: Patch): IrMixinExtensionBridge? =
-        if (patch.extensionSources.isEmpty()) null
-        else IrMixinExtensionBridge(
-            originatingFiles = listOfNotNull(patch.containingFile),
-            className = patch.className.derived("ExtensionBridge"),
-            entries = patch.extensionSources.map(::lowerMixinExtensionBridgeEntry),
-        )
+    private fun lowerMixinExternalBridge(patch: Patch): IrMixinExternalBridge? =
+        if (patch.externalBridgeSources.isNotEmpty()) {
+            IrMixinExternalBridge(
+                originatingFiles = listOfNotNull(patch.containingFile),
+                className = patch.className.derived("ExternalBridge"),
+                entries = patch.externalBridgeSources.map(::lowerMixinExternalBridgeEntry),
+            )
+        } else null
 
-    private fun lowerMixinShadowBridge(patch: Patch): IrMixinShadowBridge? =
-        if (patch.shadowSources.isEmpty()) null
-        else IrMixinShadowBridge(
-            originatingFiles = listOfNotNull(patch.containingFile),
-            className = patch.className.derived("ShadowBridge"),
-            entries = patch.shadowSources.map(::lowerMixinShadowBridgeEntry),
-        )
+    private fun lowerMixinInternalBridge(patch: Patch): IrMixinInternalBridge? =
+        if (patch.internalBridgeSources.isNotEmpty()) {
+            IrMixinInternalBridge(
+                originatingFiles = listOfNotNull(patch.containingFile),
+                className = patch.className.derived("InternalBridge"),
+                entries = patch.internalBridgeSources.map(::lowerMixinInternalBridgeEntry),
+            )
+        } else null
 
-    private fun lowerMixinExtensionBridgeEntry(source: PatchExtensionSource): IrMixinExtensionBridgeEntry =
+    private fun lowerMixinExternalBridgeEntry(source: PatchExternalBridgeSource): IrMixinExternalBridgeEntry =
         when (source) {
-            is PatchExtensionProperty -> {
-                val (setterName, setterSourceJvmName) = if (source.isMutable) {
-                    source.setterJvmName.let { it?.withModIdPrefix() to it }
-                } else {
-                    null to null
-                }
-                IrMixinExtensionBridgeEntryProperty(
-                    sourceName = source.name,
-                    typeName = source.typeName,
-                    getterName = source.getterJvmName.withModIdPrefix(),
-                    getterSourceJvmName = source.getterJvmName,
+            is PatchExternalBridgeProperty -> with(source) {
+                val (setterName, setterSourceJvmName) = lowerMixinBridgePropertySetterNames(source)
+                IrMixinExternalBridgePropertyEntry(
+                    sourceName = name,
+                    typeName = typeName,
+                    getterName = getterJvmName.withModIdPrefix(),
+                    getterSourceJvmName = getterJvmName,
                     setterName = setterName,
                     setterSourceJvmName = setterSourceJvmName,
                 )
             }
 
-            is PatchExtensionFunction -> IrMixinExtensionBridgeEntryFunction(
-                sourceName = source.name,
-                name = source.jvmName.withModIdPrefix(),
-                sourceJvmName = source.jvmName,
-                parameters = source.parameters.map { it.asIrParameter() },
-                returnTypeName = source.returnTypeName,
-            )
+            is PatchExternalBridgeFunction -> with(source) {
+                IrMixinExternalBridgeFunctionEntry(
+                    sourceName = name,
+                    name = lowerMixinBridgeFunctionName(source),
+                    sourceJvmName = jvmName,
+                    parameters = parameters.map { it.asIrParameter() },
+                    returnTypeName = returnTypeName,
+                )
+            }
         }
 
-    private fun lowerMixinShadowBridgeEntry(source: PatchShadowSource): IrMixinShadowBridgeEntry =
+    private fun lowerMixinInternalBridgeEntry(source: PatchInternalBridgeSource): IrMixinInternalBridgeEntry =
         when (source) {
-            is PatchShadowProperty -> {
-                val (setterName, setterSourceJvmName) = if (source.isMutable) {
-                    source.setterJvmName.let { it?.withModIdPrefix() to it }
-                } else {
-                    null to null
-                }
-                IrMixinShadowBridgeEntryProperty(
-                    sourceName = source.name,
-                    typeName = source.typeName,
-                    getterName = source.getterJvmName.withModIdPrefix(),
-                    getterSourceJvmName = source.getterJvmName,
+            is PatchInternalBridgeProperty -> with(source) {
+                val (setterName, setterSourceJvmName) = lowerMixinBridgePropertySetterNames(source)
+                IrMixinInternalBridgePropertyEntry(
+                    sourceName = name,
+                    typeName = typeName,
+                    getterName = getterJvmName.withModIdPrefix(),
+                    getterSourceJvmName = getterJvmName,
                     setterName = setterName,
                     setterSourceJvmName = setterSourceJvmName,
-                    mappingName = source.mappingName,
-                    isStatic = source.isStatic,
-                    isFinal = source.isFinal,
+                    mappingName = mappingName,
+                    isStatic = isStatic,
+                    isFinal = isFinal,
                 )
             }
 
-            is PatchShadowFunction -> IrMixinShadowBridgeEntryFunction(
-                sourceName = source.name,
-                name = source.jvmName.withModIdPrefix(),
-                sourceJvmName = source.jvmName,
-                parameters = source.parameters.map { it.asIrParameter() },
-                returnTypeName = source.returnTypeName,
-                mappingName = source.mappingName,
-                isStatic = source.isStatic,
-            )
+            is PatchInternalBridgeFunction -> with(source) {
+                IrMixinInternalBridgeFunctionEntry(
+                    sourceName = name,
+                    name = lowerMixinBridgeFunctionName(source),
+                    sourceJvmName = jvmName,
+                    parameters = parameters.map { it.asIrParameter() },
+                    returnTypeName = returnTypeName,
+                    mappingName = mappingName,
+                    isStatic = isStatic,
+                )
+            }
         }
+
+    private fun lowerMixinBridgePropertySetterNames(source: PatchBridgeSourceProperty): Pair<String?, String?> =
+        if (source.isMutable) {
+            source.setterJvmName.let { it?.withModIdPrefix() to it }
+        } else {
+            null to null
+        }
+
+    private fun lowerMixinBridgeFunctionName(source: PatchBridgeSourceFunction): String =
+        source.jvmName.withModIdPrefix()
 
     private fun lowerInjections(hook: PatchHook): List<IrInjection> {
         val parameters = buildList {

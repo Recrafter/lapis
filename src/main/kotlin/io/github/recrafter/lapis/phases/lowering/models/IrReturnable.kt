@@ -4,7 +4,5 @@ import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 interface IrReturnable {
     val returnTypeName: IrTypeName?
-
-    val isReturnable: Boolean
-        get() = returnTypeName != null
+    val isReturn: Boolean get() = returnTypeName != null
 }

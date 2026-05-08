@@ -13,7 +13,7 @@ value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
         if (isReturn) {
             return_(format, argumentsBuilder)
         } else {
-            builder.addStatement(buildKotlinCodeBlock(format, argumentsBuilder = argumentsBuilder))
+            builder.addStatement(buildKotlinCodeBlock(format, argumentsBuilder))
         }
     }
 
@@ -21,7 +21,7 @@ value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
         format: String? = null,
         argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {
-        builder.addReturnStatement(format?.let { buildKotlinCodeBlock(it, argumentsBuilder = argumentsBuilder) })
+        builder.addReturnStatement(format?.let { buildKotlinCodeBlock(it, argumentsBuilder) })
     }
 
     fun IrKotlinFunctionBody.with_(
@@ -35,7 +35,7 @@ value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
         format: String,
         argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {
-        builder.addStatement(buildKotlinCodeBlock("throw $format", argumentsBuilder = argumentsBuilder))
+        builder.addStatement(buildKotlinCodeBlock("throw $format", argumentsBuilder))
     }
 
     private fun IrKotlinFunctionBody.withControlFlow(controlFlow: KPCodeBlock, body: Builder<IrKotlinCodeBlock>) {

@@ -62,15 +62,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 receiverParameter?.let(::addParameter)
                 setReturnType(impl.fieldTypeName)
                 setBody {
-                    return_(
-                        buildString {
-                            append("(this as %T).%N.%L(")
-                            receiverParameter?.let { append("%N") }
-                            append(")")
-                        }
-                    ) {
-                        +impl.className; +operationParameter; +Operation<*>::call
-                        receiverParameter?.let { +it }
+                    val receiverFormat = receiverParameter?.let { "%N" }.orEmpty()
+                    return_("(this as %T).%N.%L($receiverFormat)") {
+                        +impl.className; +operationParameter; +Operation<*>::call; receiverParameter?.let { +it }
                     }
                 }
             })
@@ -128,11 +122,8 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }?.also(::addParameter)
                 setBody {
-                    code_(buildString {
-                        append("(this as %T).%N.%L(")
-                        receiverParameter?.let { append("%N, ") }
-                        append("%N)")
-                    }) {
+                    val receiverFormat = receiverParameter?.let { "%N, " }.orEmpty()
+                    code_("(this as %T).%N.%L(${receiverFormat}%N)") {
                         +impl.className; +operationParameter; +Operation<*>::call
                         receiverParameter?.let { +it }
                         +valueParameter
@@ -287,7 +278,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setReturnType(impl.returnTypeName)
                 setBody {
                     val callArgumentReferences = suites.map { it.callArgumentReference }
-                    code_("(this as %T).%N.%L(${callArgumentReferences.format})", impl.isReturnable) {
+                    code_("(this as %T).%N.%L(${callArgumentReferences.format})", isReturn = impl.isReturn) {
                         +impl.className; +operationParameter; +Operation<*>::call
                         callArgumentReferences.forEach { +it }
                     }
@@ -346,17 +337,11 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 addParameters(invokeParameters)
                 setReturnType(impl.returnTypeName)
                 setBody {
-                    code_(
-                        format = buildString {
-                            append("(this as %T).%N.%L(")
-                            getReceiverFunction?.let { append("%N()") }
-                            if (callArgumentReferences.isNotEmpty()) {
-                                append(callArgumentReferences.joinToString(prefix = ", ") { "%N" })
-                            }
-                            append(")")
-                        },
-                        isReturn = impl.isReturnable
-                    ) {
+                    val receiverFunctionFormat = getReceiverFunction?.let { "%N()" }
+                    val callArgumentsFormat = if (callArgumentReferences.isNotEmpty()) {
+                        callArgumentReferences.joinToString(prefix = ", ") { "%N" }
+                    } else ""
+                    code_("(this as %T).%N.%L($receiverFunctionFormat$callArgumentsFormat)", isReturn = impl.isReturn) {
                         +impl.className; +operationParameter; +Operation<*>::call
                         getReceiverFunction?.let { +it }
                         callArgumentReferences.forEach { +it }
@@ -372,16 +357,10 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     addParameters(invokeParameters)
                     setReturnType(impl.returnTypeName)
                     setBody {
-                        code_(
-                            format = buildString {
-                                append("(this as %T).%N.%L(%N")
-                                if (callArgumentReferences.isNotEmpty()) {
-                                    append(callArgumentReferences.joinToString(prefix = ", ") { "%N" })
-                                }
-                                append(")")
-                            },
-                            isReturn = impl.isReturnable
-                        ) {
+                        val callArgumentsFormat = if (callArgumentReferences.isNotEmpty()) {
+                            callArgumentReferences.joinToString(prefix = ", ") { "%N" }
+                        } else ""
+                        code_("(this as %T).%N.%L(%N$callArgumentsFormat)", isReturn = impl.isReturn) {
                             +impl.className; +operationParameter; +Operation<*>::call; +receiverParameter
                             callArgumentReferences.forEach { +it }
                         }
@@ -421,12 +400,10 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setGetter {
                     setModifiers(IrModifier.INLINE)
                     setBody {
-                        return_(
-                            buildString {
-                                append("(this as %T).%N.%L()")
-                                if (impl.isReturnable) append(" != null")
-                            }
-                        ) { +impl.className; +callbackParameter; +callbackCheck }
+                        val notNullCheckFormat = if (impl.isReturn) " != null" else ""
+                        return_("(this as %T).%N.%L()$notNullCheckFormat") {
+                            +impl.className; +callbackParameter; +callbackCheck
+                        }
                     }
                 }
             }.also(destination::addProperty)
@@ -454,11 +431,8 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     ?.also(::addParameter)
                 setBody {
                     code_("(this as %T)") { +impl.className }
-                    code_(buildString {
-                        append("%N.%L(")
-                        returnValueParameter?.let { append("%N") }
-                        append(")")
-                    }) {
+                    val returnValueFormat = returnValueParameter?.let { "%N" }.orEmpty()
+                    code_("%N.%L($returnValueFormat)") {
                         +callbackParameter; +callbackCancel
                         returnValueParameter?.let { +it }
                     }

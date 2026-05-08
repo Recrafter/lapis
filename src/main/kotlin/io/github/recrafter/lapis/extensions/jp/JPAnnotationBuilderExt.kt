@@ -60,9 +60,6 @@ inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayArgumentValue(
 ) {
     addMember(
         property.name,
-        buildJavaCodeBlock(
-            format = array.joinToString(prefix = "{", postfix = "}") { placeholder },
-            argumentsBuilder = argumentsBuilder
-        )
+        buildJavaCodeBlock(array.joinToString(prefix = "{", postfix = "}") { placeholder }, argumentsBuilder)
     )
 }

@@ -52,8 +52,8 @@ class MixinGenerator(
         generateDescriptorWrapperImpls(schemas.flatMap { it.descriptors })
         patches.forEach { patch ->
             patch.impl?.let { generatePatchImpl(patch, it) }
-            patch.mixin.extensionBridge?.let { generateExtensionBridge(patch, it) }
-            patch.mixin.shadowBridge?.let { generateShadowBridge(it) }
+            patch.mixin.externalBridge?.let { generateMixinExternalBridge(patch, it) }
+            patch.mixin.internalBridge?.let { generateMixinInternalBridge(it) }
             generateMixin(patch)
         }
         schemas.mapNotNull { it.mixinAccessor }.forEach(::generateMixinAccessor)
@@ -101,7 +101,7 @@ class MixinGenerator(
             }
             setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
             val patchImplMember = patch.impl?.let { generatePatchInitializer(this, it, patch.mixin) }
-            patch.mixin.extensionBridge?.let { bridge ->
+            patch.mixin.externalBridge?.let { bridge ->
                 addSuperInterface(bridge.className)
                 addMethods(bridge.entries.flatMap { it.kinds }.map { kind ->
                     buildJavaMethod(kind.name) {
@@ -111,18 +111,18 @@ class MixinGenerator(
                         setBody {
                             val patchImplFormat = patchImplMember?.format
                                 ?: lapisError("Patch impl member cannot be null")
-                            code_("$patchImplFormat.%L(${kind.parameters.format})", isReturn = kind.isReturnable) {
+                            code_("$patchImplFormat.%L(${kind.parameters.format})", isReturn = kind.isReturn) {
                                 +patchImplMember; +kind.sourceJvmName; kind.parameters.forEach { +it }
                             }
                         }
                     }
                 })
             }
-            patch.mixin.shadowBridge?.let { bridge ->
+            patch.mixin.internalBridge?.let { bridge ->
                 addSuperInterface(bridge.className)
                 addMethods(bridge.entries.flatMap { entry ->
                     val shadowMemberReference = when (entry) {
-                        is IrMixinShadowBridgeEntryProperty -> {
+                        is IrMixinInternalBridgePropertyEntry -> {
                             buildJavaField(entry.mappingName, entry.typeName) {
                                 if (entry.setter != null) {
                                     addAnnotation<Mutable>()
@@ -140,7 +140,7 @@ class MixinGenerator(
                             }.also(::addField).let(::IrFieldMember)
                         }
 
-                        is IrMixinShadowBridgeEntryFunction -> {
+                        is IrMixinInternalBridgeFunctionEntry -> {
                             buildJavaMethod(entry.mappingName) {
                                 addAnnotation<Shadow>()
                                 setModifiers(
@@ -162,18 +162,18 @@ class MixinGenerator(
                             setReturnType(kind.returnTypeName)
                             setBody {
                                 when (kind) {
-                                    is IrMixinBridgeEntryProperty.IrMixinBridgeEntryPropertyGetter -> {
+                                    is IrMixinBridgePropertyEntry.IrMixinBridgeEntryPropertyGetter -> {
                                         return_(shadowMemberReference.format) { +shadowMemberReference }
                                     }
 
-                                    is IrMixinBridgeEntryProperty.IrMixinBridgeEntryPropertySetter -> {
+                                    is IrMixinBridgePropertyEntry.IrMixinBridgeEntryPropertySetter -> {
                                         code_("this.${shadowMemberReference.format} = %N") {
                                             +shadowMemberReference; +kind.parameter
                                         }
                                     }
 
-                                    is IrMixinBridgeEntryFunction -> {
-                                        code_("this.${shadowMemberReference.format}", isReturn = kind.isReturnable) {
+                                    is IrMixinBridgeFunctionEntry -> {
+                                        code_("this.${shadowMemberReference.format}", isReturn = kind.isReturn) {
                                             +shadowMemberReference
                                         }
                                     }
@@ -194,10 +194,10 @@ class MixinGenerator(
             addType(buildKotlinClass(impl.className.simpleName) {
                 setModifiers(IrModifier.PUBLIC)
                 val instanceParameter = IrParameter("instance", patch.mixin.targetInstanceTypeName)
-                val (bridgeParameter, bridgeEntries) = patch.mixin.shadowBridge.let { shadowBridge ->
-                    val shadowEntries = shadowBridge?.entries.orEmpty()
-                    if (shadowBridge != null && shadowEntries.isNotEmpty()) {
-                        IrParameter("shadow", shadowBridge.className, IrModifier.PRIVATE) to shadowEntries
+                val (internalBridgeParameter, internalBridgeEntries) = patch.mixin.internalBridge.let { bridge ->
+                    val shadowEntries = bridge?.entries.orEmpty()
+                    if (bridge != null && shadowEntries.isNotEmpty()) {
+                        IrParameter("internal", bridge.className, IrModifier.PRIVATE) to shadowEntries
                     } else {
                         null to emptyList()
                     }
@@ -206,8 +206,8 @@ class MixinGenerator(
                     when (parameter) {
                         is IrPatchImplConstructorInstanceParameter -> instanceParameter
 
-                        is IrPatchImplConstructorShadowBridgeParameter -> {
-                            bridgeParameter ?: lapisError("Bridge parameter cannot be null")
+                        is IrPatchImplConstructorInternalBridgeParameter -> {
+                            internalBridgeParameter ?: lapisError("Internal bridge parameter cannot be null")
                         }
                     }
                 }
@@ -222,40 +222,36 @@ class MixinGenerator(
                         }
                     }
                 )
-                bridgeParameter?.let {
-                    bridgeEntries.forEach { entry ->
+                internalBridgeParameter?.let {
+                    internalBridgeEntries.forEach { entry ->
                         when (entry) {
-                            is IrMixinBridgeEntryProperty -> {
+                            is IrMixinBridgePropertyEntry -> {
                                 addProperty(buildKotlinProperty(entry.sourceName, entry.typeName) {
                                     setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                                     setGetter {
                                         setBody {
-                                            return_("%N.%L()") { +bridgeParameter; +entry.getter.name }
+                                            return_("%N.%L()") { +internalBridgeParameter; +entry.getter.name }
                                         }
                                     }
                                     entry.setter?.let { setter ->
                                         setSetter {
                                             setParameters(setter.parameters)
                                             setBody {
-                                                code_("%N.%L(%N)") {
-                                                    +bridgeParameter
-                                                    +setter.name
-                                                    +setter.parameter
-                                                }
+                                                code_("%N.%L(%N)") { +internalBridgeParameter; +setter.name; +setter.parameter }
                                             }
                                         }
                                     }
                                 })
                             }
 
-                            is IrMixinBridgeEntryFunction -> {
+                            is IrMixinBridgeFunctionEntry -> {
                                 addFunction(buildKotlinFunction(entry.sourceName) {
                                     setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
                                     setParameters(entry.parameters)
                                     setReturnType(entry.returnTypeName)
                                     setBody {
-                                        code_("%N.%L(${entry.parameters.format})", entry.isReturnable) {
-                                            +bridgeParameter; +entry.name; entry.parameters.forEach { +it }
+                                        code_("%N.%L(${entry.parameters.format})", isReturn = entry.isReturn) {
+                                            +internalBridgeParameter; +entry.name; entry.parameters.forEach { +it }
                                         }
                                     }
                                 })
@@ -282,7 +278,7 @@ class MixinGenerator(
                     }
                 }
 
-                is IrPatchImplConstructorShadowBridgeParameter -> buildJavaCodeBlock("this")
+                is IrPatchImplConstructorInternalBridgeParameter -> buildJavaCodeBlock("this")
             }
         }
         val initializerCodeBlock = buildJavaCodeBlock("new %T(${constructorArgumentCodeBlocks.format})") {
@@ -369,10 +365,7 @@ class MixinGenerator(
         patch: IrPatch,
         patchImplMember: IrJavaMember?,
     ): JPMethod =
-        buildJavaMethod(buildString {
-            append(injection.jvmName)
-            injection.ordinal?.let { append("_ordinal${it}") }
-        }) {
+        buildJavaMethod(injection.jvmName + injection.ordinal?.let { "_ordinal${it}" }.orEmpty()) {
             val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelDescriptorWrapperImplArgument }
             when (injection) {
                 is IrWrapMethodInjection -> addAnnotation<WrapMethod> {
@@ -642,19 +635,10 @@ class MixinGenerator(
                                 else -> PARAM
                             }
                         )
-                        if (argument.varBuiltin != null) {
-                            buildJavaCodeBlock(
-                                buildString {
-                                    append("new %T")
-                                    if (argument.varBuiltin == LocalVarImplBuiltin.ObjectLocalVar) {
-                                        append("<>")
-                                    }
-                                    append("(%L)")
-                                }
-                            ) { +builtins[argument.varBuiltin]; +localName }
-                        } else {
-                            buildJavaCodeBlock("%L") { +localName }
-                        }
+                        argument.varBuiltin?.let {
+                            val diamondFormat = if (it == LocalVarImplBuiltin.ObjectLocalVar) "<>" else ""
+                            buildJavaCodeBlock("new %T$diamondFormat(%L)") { +builtins[it]; +localName }
+                        } ?: localName.toJavaCodeBlock()
                     }
                 }
             }
@@ -665,7 +649,7 @@ class MixinGenerator(
                     } else {
                         patchImplMember?.format ?: lapisError("Patch impl reference member cannot be null")
                     }
-                    code_("$patchInstanceFormat.%L(${hookArgumentCodeBlocks.format})", injection.isReturnable) {
+                    code_("$patchInstanceFormat.%L(${hookArgumentCodeBlocks.format})", isReturn = injection.isReturn) {
                         if (injection.isStatic) {
                             +patch.className
                         } else {
@@ -688,9 +672,9 @@ class MixinGenerator(
             }
         }
 
-    private fun generateExtensionBridge(patch: IrPatch, bridge: IrMixinExtensionBridge) {
+    private fun generateMixinExternalBridge(patch: IrPatch, bridge: IrMixinExternalBridge) {
         generateMixinBridge(bridge)
-        val extensionProperties = bridge.entries.filterIsInstance<IrMixinBridgeEntryProperty>().map { entry ->
+        val extensionProperties = bridge.entries.filterIsInstance<IrMixinBridgePropertyEntry>().map { entry ->
             buildKotlinProperty(entry.sourceName, entry.typeName) {
                 setReceiverType(patch.mixin.targetInstanceTypeName)
                 setGetter {
@@ -710,14 +694,14 @@ class MixinGenerator(
                 }
             }
         }
-        val extensionFunctions = bridge.entries.filterIsInstance<IrMixinBridgeEntryFunction>().map { entry ->
+        val extensionFunctions = bridge.entries.filterIsInstance<IrMixinBridgeFunctionEntry>().map { entry ->
             buildKotlinFunction(entry.sourceName) {
                 setModifiers(IrModifier.INLINE)
                 setReceiverType(patch.mixin.targetInstanceTypeName)
                 setParameters(entry.parameters)
                 setReturnType(entry.returnTypeName)
                 setBody {
-                    code_("(this as %T).%L(${entry.parameters.format})", isReturn = entry.isReturnable) {
+                    code_("(this as %T).%L(${entry.parameters.format})", isReturn = entry.isReturn) {
                         +bridge.className; +entry.name; entry.parameters.forEach { +it }
                     }
                 }
@@ -733,7 +717,7 @@ class MixinGenerator(
         }
     }
 
-    private fun generateShadowBridge(bridge: IrMixinShadowBridge) {
+    private fun generateMixinInternalBridge(bridge: IrMixinInternalBridge) {
         generateMixinBridge(bridge)
     }
 
@@ -764,22 +748,18 @@ class MixinGenerator(
             setModifiers(IrModifier.PUBLIC)
             accessor.members.forEach { member ->
                 val isDelegated = !accessor.isAccessibleSchema && !member.isStatic
-                val delegateParameter = if (isDelegated) {
-                    IrParameter("delegate", accessor.receiverTypeName)
-                } else null
+                val delegateParameter = if (isDelegated) IrParameter("delegate", accessor.receiverTypeName) else null
                 val jvmNamespace = if (isDelegated) member.schemaReceiverClassName else null
                 val extensionReceiverTypeName = if (member.isStatic || isDelegated) {
                     member.schemaReceiverClassName
                 } else {
                     accessor.receiverTypeName
                 }
-                val interfaceCodeBlock = buildKotlinCodeBlock(
-                    when {
-                        delegateParameter != null -> "(%N as %T)"
-                        member.isStatic -> "%T"
-                        else -> "(this as %T)"
-                    }
-                ) { delegateParameter?.let { +it }; +accessor.className }
+                val interfaceCodeBlock = if (delegateParameter != null) {
+                    buildKotlinCodeBlock("(%N as %T)") { +delegateParameter; +accessor.className }
+                } else {
+                    buildKotlinCodeBlock(if (member.isStatic) "%T" else "(this as %T)") { +accessor.className }
+                }
                 when (member) {
                     is IrMixinAccessorFieldMember -> {
                         val methods = member.ops.associateWith { op ->
@@ -851,7 +831,7 @@ class MixinGenerator(
                             setParameters(member.parameters)
                             setReturnType(member.returnTypeName)
                             setBody {
-                                code_("%L.%N(${member.parameters.format})", isReturn = member.isReturnable) {
+                                code_("%L.%N(${member.parameters.format})", isReturn = member.isReturn) {
                                     +interfaceCodeBlock; +invokerMethod; member.parameters.forEach { +it }
                                 }
                             }

@@ -35,14 +35,12 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArrayArgumentValue(
     isVararg: Boolean = false,
     noinline argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
 ) {
-    addMember(buildKotlinCodeBlock(buildString {
-        if (isVararg) {
-            append(array.joinToString { placeholder })
-        } else {
-            append("%L = ")
-            append(array.joinToString(prefix = "[", postfix = "]") { placeholder })
-        }
-    }) {
+    val format = if (isVararg) {
+        array.joinToString { placeholder }
+    } else {
+        "%L = " + array.joinToString(prefix = "[", postfix = "]") { placeholder }
+    }
+    addMember(buildKotlinCodeBlock(format) {
         if (!isVararg) +property.name
         argumentsBuilder()
     })

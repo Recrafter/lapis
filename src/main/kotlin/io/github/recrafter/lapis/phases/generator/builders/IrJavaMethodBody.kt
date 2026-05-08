@@ -20,7 +20,7 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
         if (isReturn) {
             return_(format, argumentsBuilder)
         } else {
-            code_(buildJavaCodeBlock(format, argumentsBuilder = argumentsBuilder))
+            code_(buildJavaCodeBlock(format, argumentsBuilder))
         }
     }
 
@@ -28,15 +28,7 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
         format: String? = null,
         argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
     ) {
-        code_(
-            buildJavaCodeBlock(
-                buildString {
-                    append("return")
-                    format?.let { append(" $it") }
-                },
-                argumentsBuilder = argumentsBuilder
-            )
-        )
+        code_(buildJavaCodeBlock("return" + format?.let { " $it" }.orEmpty(), argumentsBuilder))
     }
 
     fun IrJavaMethodBody.return_(codeBlock: JPCodeBlock) {
@@ -51,7 +43,7 @@ value class IrJavaMethodBody(private val builder: JPMethodBuilder) {
         format: String,
         argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
     ) {
-        builder.addStatement(buildJavaCodeBlock("throw $format", argumentsBuilder = argumentsBuilder))
+        builder.addStatement(buildJavaCodeBlock("throw $format", argumentsBuilder))
     }
 
     @Suppress("LocalVariableName")

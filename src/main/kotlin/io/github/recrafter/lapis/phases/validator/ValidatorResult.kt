@@ -161,18 +161,15 @@ class FieldDescriptor(
 class Patch(
     symbol: KSNode,
     classDeclaration: KSClassDeclaration,
-
     val name: String,
     val side: Side,
     val initStrategy: InitStrategy,
     val isObject: Boolean,
-    val hasStaticHooksOnly: Boolean,
+    val isImplRequired: Boolean,
     val schema: Schema,
-
     val constructorParameters: List<PatchConstructorParameter>,
-    val extensionSources: List<PatchExtensionSource>,
-    val shadowSources: List<PatchShadowSource>,
-
+    val externalBridgeSources: List<PatchExternalBridgeSource>,
+    val internalBridgeSources: List<PatchInternalBridgeSource>,
     val hooks: List<PatchHook>,
 ) : SourceFile(symbol, classDeclaration)
 
@@ -199,24 +196,24 @@ sealed class PatchBridgeSourceFunction(
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
-sealed interface PatchExtensionSource
-class PatchExtensionProperty(
+sealed interface PatchExternalBridgeSource
+class PatchExternalBridgeProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
     isMutable: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchExtensionSource
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchExternalBridgeSource
 
-class PatchExtensionFunction(
+class PatchExternalBridgeFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
     returnType: KSType?,
-) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchExtensionSource
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchExternalBridgeSource
 
-sealed interface PatchShadowSource
-class PatchShadowProperty(
+sealed interface PatchInternalBridgeSource
+class PatchInternalBridgeProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
@@ -225,16 +222,16 @@ class PatchShadowProperty(
     val mappingName: String,
     val isStatic: Boolean,
     val isFinal: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchShadowSource
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type, isMutable), PatchInternalBridgeSource
 
-class PatchShadowFunction(
+class PatchInternalBridgeFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
     returnType: KSType?,
     val mappingName: String,
     val isStatic: Boolean,
-) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchShadowSource
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchInternalBridgeSource
 
 sealed class PatchHook(
     val jvmName: String,
