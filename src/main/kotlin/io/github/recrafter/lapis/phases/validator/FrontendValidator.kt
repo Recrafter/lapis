@@ -221,7 +221,8 @@ class FrontendValidator(
         kspRequire(isPublic) { "221" }
         val schema = validSchemas[schemaClassDeclaration.qualifiedName?.asString()]
         kspRequireNotNull(schema) { "223" }
-        kspRequire(isClass || isObject) { "224" }
+        kspRequire(isClass) { "224" }
+        kspRequire(!isObject) { "225" }
         kspRequire(!isSealed) { "225" }
         kspRequire(!isOpen) { "226" }
         val constructor = kspRequireNotNull(patch.constructors.singleOrNull()) { "227" }
@@ -231,7 +232,7 @@ class FrontendValidator(
         }
         val companionObjectHooks = companionObjects.flatMap { companionObject ->
             companionObject.functions.filter { it.hasHookAnnotation }.mapNotNull {
-                runOrNullOnSkip { validatePatchHook(it, isObject, isInCompanionObject = true) }
+                runOrNullOnSkip { validatePatchHook(it, isInCompanionObject = true) }
             }
         }
         val (parsedHookFunctions, parsedRegularFunctions) = functions.partition { it.hasHookAnnotation }
@@ -251,7 +252,7 @@ class FrontendValidator(
             runOrNullOnSkip { validatePatchShadowFunction(it) }
         }
         val hooks = parsedHookFunctions.mapNotNull {
-            runOrNullOnSkip { validatePatchHook(it, isObject, isInCompanionObject = false) }
+            runOrNullOnSkip { validatePatchHook(it, isInCompanionObject = false) }
         }
         val hasStaticHooksOnly = constructorParameters.isEmpty()
             && extensionProperties.isEmpty() && extensionFunctions.isEmpty()
@@ -267,8 +268,8 @@ class FrontendValidator(
             name = name,
             side = side,
             initStrategy = initStrategy,
-            isObject = isObject,
             isImplRequired = !hasStaticHooksOnly,
+            hasCompanionObject = companionObjects.isNotEmpty(),
             schema = schema,
 
             constructorParameters = constructorParameters,
@@ -393,7 +394,6 @@ class FrontendValidator(
 
     private fun validatePatchHook(
         function: ParsedPatchFunction,
-        isInObject: Boolean,
         isInCompanionObject: Boolean,
     ): PatchHook = with(function) {
         kspRequireNotNull(hookAt) { "399" }
@@ -402,9 +402,8 @@ class FrontendValidator(
         val hookDescriptor = validateDescriptorReference(hookDescriptorClassDeclaration)
         kspRequire(hookDescriptor is InvokableDescriptor) { "403" }
         if (hookDescriptor.isStatic) {
-            kspRequire(isInObject || isInCompanionObject) { "405" }
+            kspRequire(isInCompanionObject) { "405" }
         } else {
-            kspRequire(!isInObject) { "407" }
             kspRequire(!isInCompanionObject) { "408" }
         }
         val ordinals: (List<Int>) -> List<Int> = { validateOrdinals(it) }

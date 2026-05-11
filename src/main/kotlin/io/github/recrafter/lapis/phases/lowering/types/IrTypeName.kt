@@ -10,7 +10,7 @@ open class IrTypeName(
     open val kotlin: KPTypeName,
     val boxed: Boolean = kotlin.isNullable,
 ) {
-    val javaPrimitiveType: JPTypeName? by lazy {
+    fun getJavaPrimitiveType(allowVoid: Boolean = true): JPTypeName? =
         when (makeNotNullable().kotlin) {
             KPBoolean -> JPBoolean
             KPByte -> JPByte
@@ -20,16 +20,15 @@ open class IrTypeName(
             KPChar -> JPChar
             KPFloat -> JPFloat
             KPDouble -> JPDouble
-            KPUnit -> JPVoid
+            KPUnit -> if (allowVoid) JPVoid else null
             else -> null
         }?.run {
             if (boxed) box()
             else this
         }
-    }
 
     open val java: JPTypeName by lazy {
-        javaPrimitiveType ?: javaArrayType ?: when (val kotlin = kotlin) {
+        getJavaPrimitiveType() ?: javaArrayType ?: when (val kotlin = kotlin) {
             is KPClassName -> kotlin.asIrClassName().java
             is KPParameterizedTypeName -> kotlin.asIrParameterizedTypeName().java
             is KPWildcardTypeName -> kotlin.asIrWildcardTypeName().java
@@ -40,7 +39,12 @@ open class IrTypeName(
     }
 
     val is64bit: Boolean by lazy {
-        !boxed && (javaPrimitiveType == JPLong || javaPrimitiveType == JPDouble)
+        if (boxed) {
+            false
+        } else {
+            val primitiveType = getJavaPrimitiveType()
+            primitiveType == JPLong || primitiveType == JPDouble
+        }
     }
 
     private val javaArrayType: JPArrayTypeName? by lazy {

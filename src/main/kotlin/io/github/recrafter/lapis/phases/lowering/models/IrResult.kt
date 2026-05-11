@@ -66,7 +66,6 @@ class IrTweakAccessor(
 ) : IrAccessor
 
 class IrPatch(
-    val isObject: Boolean,
     val className: IrClassName,
     val constructorArguments: List<IrPatchConstructorArgument>,
     val impl: IrPatchImpl?,

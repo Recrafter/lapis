@@ -10,13 +10,12 @@ import kotlin.reflect.KCallable
 value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
 
     fun add(format: String, argumentsBuilder: Builder<Arguments> = {}) {
-        builder.add(
-            format,
-            *Arguments().apply(argumentsBuilder).build().toTypedArray()
-        )
+        builder.add(format, *argumentsBuilder.build())
     }
 
     fun build(): KPCodeBlock = builder.build()
+
+    private fun Builder<Arguments>.build(): Array<Any> = Arguments().apply(this).build()
 
     @JvmInline
     value class Arguments(private val arguments: MutableList<Any> = mutableListOf()) {
@@ -61,7 +60,7 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
             arguments += buildKotlinFunction(this.name)
         }
 
-        fun build(): List<Any> = arguments
+        fun build(): Array<Any> = arguments.toTypedArray()
     }
 }
 

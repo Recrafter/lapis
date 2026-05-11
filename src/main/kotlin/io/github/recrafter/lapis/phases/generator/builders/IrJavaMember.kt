@@ -6,13 +6,14 @@ import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.format
 
 sealed interface IrJavaMember {
-    val format: String
+    val callFormat: String
+    val referenceFormat: String get() = "%N"
 }
 
 class IrFieldMember(val field: JPField) : IrJavaMember {
-    override val format: String = "%N"
+    override val callFormat: String = "%N"
 }
 
 class IrMethodMember(val method: JPMethod, val parameters: List<IrParameter> = emptyList()) : IrJavaMember {
-    override val format: String = "%N(${parameters.format})"
+    override val callFormat: String = "%N(${parameters.format})"
 }

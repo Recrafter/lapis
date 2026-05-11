@@ -3,6 +3,7 @@ package io.github.recrafter.lapis.phases.lowering.models
 import com.google.devtools.ksp.symbol.KSFile
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
+import ksp.org.jetbrains.kotlin.builtins.functions.BuiltInFunctionArity
 
 sealed class IrMixinBridge(
     override val originatingFiles: List<KSFile>,
@@ -32,6 +33,9 @@ sealed interface IrMixinBridgeEntryKind : IrReturnable {
     val sourceJvmName: String
     val parameters: List<IrParameter>
     override val returnTypeName: IrTypeName?
+
+    val hasBigArity: Boolean
+        get() = parameters.size >= BuiltInFunctionArity.BIG_ARITY
 }
 
 sealed class IrMixinBridgePropertyEntry(
@@ -54,7 +58,7 @@ sealed class IrMixinBridgePropertyEntry(
     class IrMixinBridgeEntryPropertyGetter(
         override val name: String,
         override val sourceJvmName: String,
-        typeName: IrTypeName,
+        val typeName: IrTypeName,
     ) : IrMixinBridgeEntryKind {
         override val parameters: List<IrParameter> = emptyList()
         override val returnTypeName: IrTypeName = typeName
@@ -110,6 +114,10 @@ class IrMixinExternalBridgeFunctionEntry(
 
 sealed interface IrMixinInternalBridgeEntry : IrMixinBridgeEntry
 
+sealed interface IrMixinInternalBridgeShadowEntry : IrMixinInternalBridgeEntry {
+    val isStatic: Boolean
+}
+
 class IrMixinInternalBridgeShadowPropertyEntry(
     sourceName: String,
     typeName: IrTypeName,
@@ -118,7 +126,7 @@ class IrMixinInternalBridgeShadowPropertyEntry(
     setterName: String?,
     sourceSetterJvmName: String?,
     val mappingName: String,
-    val isStatic: Boolean,
+    override val isStatic: Boolean,
     val isFinal: Boolean,
 ) : IrMixinBridgePropertyEntry(
     sourceName,
@@ -127,7 +135,7 @@ class IrMixinInternalBridgeShadowPropertyEntry(
     sourceGetterJvmName,
     setterName,
     sourceSetterJvmName,
-), IrMixinInternalBridgeEntry
+), IrMixinInternalBridgeShadowEntry
 
 class IrMixinInternalBridgeShadowFunctionEntry(
     sourceName: String,
@@ -136,6 +144,6 @@ class IrMixinInternalBridgeShadowFunctionEntry(
     parameters: List<IrParameter>,
     returnTypeName: IrTypeName?,
     val mappingName: String,
-    val isStatic: Boolean,
+    override val isStatic: Boolean,
 ) : IrMixinBridgeFunctionEntry(sourceName, name, sourceJvmName, parameters, returnTypeName),
-    IrMixinInternalBridgeEntry
+    IrMixinInternalBridgeShadowEntry

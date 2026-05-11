@@ -172,7 +172,6 @@ class MixinLowering(
     private fun lowerPatch(patch: Patch, mixinSourcePackageLCP: String): IrPatch {
         val constructorArguments = patch.constructorParameters.map(::lowerPatchConstructorArgument)
         return IrPatch(
-            isObject = patch.isObject,
             className = patch.className,
             constructorArguments = constructorArguments,
             impl = lowerPatchImpl(patch, constructorArguments),

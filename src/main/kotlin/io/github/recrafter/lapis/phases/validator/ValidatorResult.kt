@@ -164,8 +164,8 @@ class Patch(
     val name: String,
     val side: Side,
     val initStrategy: InitStrategy,
-    val isObject: Boolean,
     val isImplRequired: Boolean,
+    val hasCompanionObject: Boolean,
     val schema: Schema,
     val constructorParameters: List<PatchConstructorParameter>,
     val externalBridgeSources: List<PatchExternalBridgeSource>,
@@ -211,15 +211,19 @@ class PatchExternalBridgeExtensionFunction(
 ) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchExternalBridgeSource
 
 sealed interface PatchInternalBridgeSource
+sealed interface PatchInternalBridgeShadowSource : PatchInternalBridgeSource {
+    val isStatic: Boolean
+}
+
 class PatchInternalBridgeShadowProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
     val mappingName: String,
-    val isStatic: Boolean,
+    override val isStatic: Boolean,
     val isFinal: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchInternalBridgeSource
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchInternalBridgeShadowSource
 
 class PatchInternalBridgeShadowFunction(
     name: String,
@@ -227,8 +231,8 @@ class PatchInternalBridgeShadowFunction(
     parameters: List<FunctionParameter>,
     returnType: KSType?,
     val mappingName: String,
-    val isStatic: Boolean,
-) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchInternalBridgeSource
+    override val isStatic: Boolean,
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchInternalBridgeShadowSource
 
 sealed class PatchHook(
     val jvmName: String,

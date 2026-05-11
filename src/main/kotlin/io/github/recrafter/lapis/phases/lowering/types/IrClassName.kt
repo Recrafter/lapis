@@ -14,7 +14,7 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
     val internalName: String get() = java.internalName
 
     override val java: JPClassName by lazy {
-        box().javaPrimitiveType as? JPClassName ?: when (kotlin) {
+        box().getJavaPrimitiveType(allowVoid = false) as? JPClassName ?: when (kotlin) {
             KPAny -> JPObject
             KPString -> JPString
             KPList -> JPList
