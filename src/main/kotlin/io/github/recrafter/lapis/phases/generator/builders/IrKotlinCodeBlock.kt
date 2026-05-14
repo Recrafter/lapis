@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.recrafter.lapis.extensions.jp.JPField
 import io.github.recrafter.lapis.extensions.jp.JPMethod
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
@@ -48,8 +49,21 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
             arguments += this
         }
 
-        operator fun JPMethod.unaryPlus() {
-            arguments += buildKotlinFunction(this.name())
+        operator fun KPEntity.invoke() {
+            when (this) {
+                is KPPropertyEntity -> +property
+
+                is KPFunctionEntity -> {
+                    +function; parameters.forEach { +it }
+                }
+            }
+        }
+
+        operator fun KPEntity.unaryPlus() {
+            when (this) {
+                is KPPropertyEntity -> +property
+                is KPFunctionEntity -> +function
+            }
         }
 
         operator fun IrTypeName.unaryPlus() {
@@ -58,6 +72,31 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
 
         operator fun IrParameter.unaryPlus() {
             arguments += buildKotlinFunction(this.name)
+        }
+
+        operator fun JPField.unaryPlus() {
+            arguments += this
+        }
+
+        operator fun JPMethod.unaryPlus() {
+            arguments += buildKotlinFunction(this.name())
+        }
+
+        operator fun JPEntity.invoke() {
+            when (this) {
+                is JPFieldEntity -> +field
+
+                is JPMethodEntity -> {
+                    +method; parameters.forEach { +it }
+                }
+            }
+        }
+
+        operator fun JPEntity.unaryPlus() {
+            when (this) {
+                is JPFieldEntity -> +field
+                is JPMethodEntity -> +method
+            }
         }
 
         fun build(): Array<Any> = arguments.toTypedArray()

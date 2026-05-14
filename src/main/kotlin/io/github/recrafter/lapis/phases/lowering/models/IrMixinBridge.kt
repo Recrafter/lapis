@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
 import com.google.devtools.ksp.symbol.KSFile
+import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import ksp.org.jetbrains.kotlin.builtins.functions.BuiltInFunctionArity
@@ -9,7 +10,7 @@ sealed class IrMixinBridge(
     override val originatingFiles: List<KSFile>,
     override val className: IrClassName,
     open val entries: List<IrMixinBridgeEntry>,
-) : IrKotlinBlueprint()
+) : IrKotlinClassBlueprint(IrKotlinClassKind.INTERFACE)
 
 class IrMixinExternalBridge(
     originatingFiles: List<KSFile>,
@@ -115,7 +116,8 @@ class IrMixinExternalBridgeFunctionEntry(
 sealed interface IrMixinInternalBridgeEntry : IrMixinBridgeEntry
 
 sealed interface IrMixinInternalBridgeShadowEntry : IrMixinInternalBridgeEntry {
-    val isStatic: Boolean
+    val modifiers: List<JPModifier>
+    val isStatic: Boolean get() = JPModifier.STATIC in modifiers
 }
 
 class IrMixinInternalBridgeShadowPropertyEntry(
@@ -126,7 +128,7 @@ class IrMixinInternalBridgeShadowPropertyEntry(
     setterName: String?,
     sourceSetterJvmName: String?,
     val mappingName: String,
-    override val isStatic: Boolean,
+    override val modifiers: List<JPModifier>,
     val isFinal: Boolean,
 ) : IrMixinBridgePropertyEntry(
     sourceName,
@@ -144,6 +146,6 @@ class IrMixinInternalBridgeShadowFunctionEntry(
     parameters: List<IrParameter>,
     returnTypeName: IrTypeName?,
     val mappingName: String,
-    override val isStatic: Boolean,
+    override val modifiers: List<JPModifier>,
 ) : IrMixinBridgeFunctionEntry(sourceName, name, sourceJvmName, parameters, returnTypeName),
     IrMixinInternalBridgeShadowEntry

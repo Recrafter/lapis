@@ -5,15 +5,18 @@ import io.github.recrafter.lapis.extensions.jp.JPMethod
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.format
 
-sealed interface IrJavaMember {
+sealed interface JPEntity {
     val callFormat: String
     val referenceFormat: String get() = "%N"
 }
 
-class IrFieldMember(val field: JPField) : IrJavaMember {
-    override val callFormat: String = "%N"
+class JPFieldEntity(val field: JPField) : JPEntity {
+    override val callFormat: String = referenceFormat
 }
 
-class IrMethodMember(val method: JPMethod, val parameters: List<IrParameter> = emptyList()) : IrJavaMember {
-    override val callFormat: String = "%N(${parameters.format})"
+class JPMethodEntity(
+    val method: JPMethod,
+    val parameters: List<IrParameter> = emptyList()
+) : JPEntity {
+    override val callFormat: String = "$referenceFormat(${parameters.format})"
 }

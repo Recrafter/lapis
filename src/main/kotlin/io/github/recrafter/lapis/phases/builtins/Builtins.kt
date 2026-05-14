@@ -5,7 +5,11 @@ import com.google.devtools.ksp.processing.Dependencies
 import com.squareup.kotlinpoet.ksp.writeTo
 import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.kp.KPClass
+import io.github.recrafter.lapis.extensions.kp.KPTypeAlias
+import io.github.recrafter.lapis.extensions.kp.buildKotlinFile
+import io.github.recrafter.lapis.extensions.kp.buildKotlinObject
+import io.github.recrafter.lapis.phases.generator.models.GenDescriptorWrapperImplResult
 import io.github.recrafter.lapis.phases.lowering.models.IrDescriptorWrapperImpl
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrParameterizedTypeName
@@ -52,9 +56,7 @@ class Builtins(
         }
         buildKotlinFile(internalClassName) {
             val builtins = requestedInternalBuiltins.values.map { it.generate(::get) }
-            builtins.filterIsInstance<KPTypeAlias>().forEach {
-                addTypeAlias(it)
-            }
+            builtins.filterIsInstance<KPTypeAlias>().forEach(::addTypeAlias)
             addType(buildKotlinObject(internalClassName.simpleName) {
                 addTypes(builtins.filterIsInstance<KPClass>())
             })
@@ -74,10 +76,8 @@ class Builtins(
     }
 
     fun <T : IrDescriptorWrapperImpl<T>> generateDescriptorWrapperImpl(
-        destination: KPFileBuilder,
         impl: T,
         superClassTypeName: IrParameterizedTypeName,
-    ) {
-        impl.wrapperBuiltin.generateImpl(destination, impl, superClassTypeName, ::get)
-    }
+    ): GenDescriptorWrapperImplResult =
+        impl.wrapperBuiltin.generateImpl(impl, superClassTypeName, ::get)
 }

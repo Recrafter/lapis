@@ -26,7 +26,7 @@ data class JvmClassName(
     companion object {
         fun of(name: String): JvmClassName {
             val normalized = name.replace('/', '.')
-            val (packageName, classes) = if (normalized.contains('.')) {
+            val (packageName, classes) = if ('.' in normalized) {
                 normalized.substringBeforeLast('.') to normalized.substringAfterLast('.')
             } else {
                 "" to normalized

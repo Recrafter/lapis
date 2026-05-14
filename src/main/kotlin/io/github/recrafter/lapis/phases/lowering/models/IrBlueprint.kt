@@ -7,12 +7,18 @@ interface IrBlueprint {
     val originatingFiles: List<KSFile>
 }
 
-abstract class IrKotlinBlueprint : IrBlueprint {
+abstract class IrKotlinClassBlueprint(val classKind: IrKotlinClassKind) : IrBlueprint {
     abstract val className: IrClassName
 }
 
-abstract class IrJavaBlueprint(val isInterface: Boolean) : IrBlueprint {
+abstract class IrKotlinFileBlueprint(val packageName: String, val fileName: String) : IrBlueprint
+
+enum class IrKotlinClassKind { CLASS, INTERFACE, OBJECT }
+
+abstract class IrJavaBlueprint(val classKind: IrJavaClassKind) : IrBlueprint {
     abstract val className: IrClassName
 }
+
+enum class IrJavaClassKind { CLASS, INTERFACE }
 
 abstract class IrResourceBlueprint(val path: String) : IrBlueprint

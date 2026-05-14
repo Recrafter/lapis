@@ -37,11 +37,8 @@ fun JPMethodBuilder.setParameters(parameters: List<IrParameter>): List<JPParamet
 fun JPMethodBuilder.setModifiers(vararg modifiers: IrModifier) {
     modifiers.forEach {
         when (it) {
-            IrModifier.PUBLIC -> addModifiers(JPModifier.PUBLIC)
-            IrModifier.PRIVATE -> addModifiers(JPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
             IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
-            IrModifier.OVERRIDE -> addAnnotation<Override>()
             IrModifier.FINAL -> addModifiers(JPModifier.FINAL)
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Java methods")
         }

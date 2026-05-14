@@ -100,20 +100,20 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
             arguments += buildJavaMethod(this.name)
         }
 
-        operator fun IrJavaMember.invoke() {
+        operator fun JPEntity.invoke() {
             when (this) {
-                is IrFieldMember -> +field
+                is JPFieldEntity -> +field
 
-                is IrMethodMember -> {
+                is JPMethodEntity -> {
                     +method; parameters.forEach { +it }
                 }
             }
         }
 
-        operator fun IrJavaMember.unaryPlus() {
+        operator fun JPEntity.unaryPlus() {
             when (this) {
-                is IrFieldMember -> +field
-                is IrMethodMember -> +method
+                is JPFieldEntity -> +field
+                is JPMethodEntity -> +method
             }
         }
 
@@ -130,7 +130,7 @@ fun IrTypeName.toJavaCodeBlock(asClass: Boolean = false): JPCodeBlock =
     buildJavaCodeBlock(if (asClass) "%T.class" else "%T") { +this@toJavaCodeBlock }
 
 fun JPField.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%N") { +this@toCodeBlock }
-fun IrJavaMember.toCodeBlock(asCall: Boolean = true): JPCodeBlock = buildJavaCodeBlock("%N") {
+fun JPEntity.toCodeBlock(asCall: Boolean = true): JPCodeBlock = buildJavaCodeBlock("%N") {
     if (asCall) this@toCodeBlock()
     else +this@toCodeBlock
 }

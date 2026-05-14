@@ -11,7 +11,7 @@ sealed class IrDescriptorWrapperImpl<T : IrDescriptorWrapperImpl<T>>(
     val descriptorClassName: IrClassName,
     val wrapperBuiltin: DescriptorWrapperBuiltin<T>,
     val receiverTypeName: IrTypeName?,
-) : IrKotlinBlueprint() {
+) : IrKotlinClassBlueprint(IrKotlinClassKind.CLASS) {
     override val className: IrClassName = descriptorClassName.derived(wrapperBuiltin.name)
 }
 

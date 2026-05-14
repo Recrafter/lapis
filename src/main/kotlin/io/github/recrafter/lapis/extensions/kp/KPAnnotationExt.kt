@@ -8,16 +8,6 @@ fun <A : Annotation> KPAnnotationBuilder.setArgumentValue(property: KProperty1<A
     addMember(buildKotlinCodeBlock("%L = %S") { +property.name; +string })
 }
 
-@JvmName("setStringArrayArgumentValue")
-inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
-    property: KProperty1<A, Array<String>>,
-    vararg strings: String,
-) {
-    setArrayArgumentValue<A>(property, strings, "%S", false) {
-        strings.forEach { +it }
-    }
-}
-
 @JvmName("setStringVarargArgumentValue")
 inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
     property: KProperty1<A, Array<out String>>,

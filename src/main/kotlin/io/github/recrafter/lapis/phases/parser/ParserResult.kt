@@ -2,12 +2,15 @@ package io.github.recrafter.lapis.phases.parser
 
 import com.google.devtools.ksp.symbol.*
 import io.github.recrafter.lapis.annotations.*
+import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.phases.common.JvmClassName
 
 class ParserPrepareResult(
     val schemaClassDeclarations: List<KSClassDeclaration>,
     val patchClassDeclarations: List<KSClassDeclaration>,
-)
+) {
+    val deferredSymbols: List<KSAnnotated> get() = schemaClassDeclarations + patchClassDeclarations
+}
 
 class ParserResult(
     val schemas: List<ParsedSchema>,
@@ -21,7 +24,6 @@ class ParsedSchema(
     val side: Side,
     val isTopLevel: Boolean,
     val hasPackageName: Boolean,
-    val isObject: Boolean,
     val originClassDeclaration: KSClassDeclaration?,
     val originJvmClassName: JvmClassName?,
     val hasSchemaAnnotation: Boolean,
@@ -48,7 +50,7 @@ class ParsedDescriptor(
     val accessStrategy: AccessStrategy?,
     val accessFieldOps: List<Op>,
     val hasMappingNameAnnotation: Boolean,
-    val mappingName: String?,
+    val explicitMappingName: String?,
     val superClassDeclaration: KSClassDeclaration?,
     val genericType: ParsedDescriptorGenericType?,
 ) : SymbolSource(symbol)
@@ -84,7 +86,7 @@ class ParsedPatch(
 
     val companionObjects: List<ParsedPatchCompanionObject>,
     val constructors: List<ParsedPatchConstructor>,
-    val properties: List<ParsedPatchProperty>,
+    val bodyProperties: List<ParsedPatchProperty>,
     val functions: List<ParsedPatchFunction>,
 ) : SymbolSource(symbol)
 
@@ -125,9 +127,8 @@ class ParsedPatchProperty(
 
     val hasExtensionAnnotation: Boolean,
     val hasShadowAnnotation: Boolean,
-    val hasStaticAnnotation: Boolean,
-    val explicitShadowName: String?,
-    val isShadowFinal: Boolean,
+    val explicitMappingName: String?,
+    val shadowModifiers: List<JPModifier>,
 ) : SymbolSource(symbol)
 
 class ParsedPatchFunction(
@@ -142,13 +143,12 @@ class ParsedPatchFunction(
     val isPublic: Boolean,
     val isOpen: Boolean,
     val isAbstract: Boolean,
-    val isExtension: Boolean,
+    val hasExtensionReceiver: Boolean,
 
     val hasExtensionAnnotation: Boolean,
     val hasShadowAnnotation: Boolean,
-    val hasStaticAnnotation: Boolean,
-    val explicitShadowName: String?,
-    val isShadowFinal: Boolean,
+    val explicitMappingName: String?,
+    val shadowModifiers: List<JPModifier>,
 
     val hasHookAnnotation: Boolean,
     val hookDescriptorClassDeclaration: KSClassDeclaration?,

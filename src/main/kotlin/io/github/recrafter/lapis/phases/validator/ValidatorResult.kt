@@ -8,6 +8,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import io.github.recrafter.lapis.annotations.*
+import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.extensions.ks.starProjectedType
 import io.github.recrafter.lapis.phases.common.JvmClassName
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
@@ -67,6 +68,33 @@ sealed class Descriptor(
 ) : SourceFile(symbol, classDeclaration) {
     val receiverTypeName: IrTypeName = receiverType.asIrTypeName()
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
+}
+
+class FieldDescriptor(
+    symbol: KSNode,
+
+    name: String,
+    mappingName: String,
+    classDeclaration: KSClassDeclaration,
+    receiverType: KSType,
+    inaccessibleReceiverJvmClassName: JvmClassName?,
+    val fieldType: KSType,
+    val arrayComponentType: KSType?,
+    isStatic: Boolean,
+    accessRequest: AccessRequest?,
+) : Descriptor(
+    symbol,
+    classDeclaration,
+    name,
+    mappingName,
+    receiverType,
+    inaccessibleReceiverJvmClassName,
+    emptyList(),
+    fieldType,
+    isStatic,
+    accessRequest,
+) {
+    val fieldTypeName: IrTypeName = fieldType.asIrTypeName()
 }
 
 sealed class InvokableDescriptor(
@@ -131,33 +159,6 @@ open class MethodDescriptor(
     accessRequest,
 )
 
-class FieldDescriptor(
-    symbol: KSNode,
-
-    name: String,
-    mappingName: String,
-    classDeclaration: KSClassDeclaration,
-    receiverType: KSType,
-    inaccessibleReceiverJvmClassName: JvmClassName?,
-    val fieldType: KSType,
-    val arrayComponentType: KSType?,
-    isStatic: Boolean,
-    accessRequest: AccessRequest?,
-) : Descriptor(
-    symbol,
-    classDeclaration,
-    name,
-    mappingName,
-    receiverType,
-    inaccessibleReceiverJvmClassName,
-    emptyList(),
-    fieldType,
-    isStatic,
-    accessRequest,
-) {
-    val fieldTypeName: IrTypeName = fieldType.asIrTypeName()
-}
-
 class Patch(
     symbol: KSNode,
     classDeclaration: KSClassDeclaration,
@@ -165,11 +166,10 @@ class Patch(
     val side: Side,
     val initStrategy: InitStrategy,
     val isImplRequired: Boolean,
-    val hasCompanionObject: Boolean,
     val schema: Schema,
     val constructorParameters: List<PatchConstructorParameter>,
-    val externalBridgeSources: List<PatchExternalBridgeSource>,
-    val internalBridgeSources: List<PatchInternalBridgeSource>,
+    val extensionSources: List<PatchExtensionSource>,
+    val shadowSources: List<PatchShadowSource>,
     val hooks: List<PatchHook>,
 ) : SourceFile(symbol, classDeclaration)
 
@@ -195,44 +195,42 @@ sealed class PatchBridgeSourceFunction(
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
-sealed interface PatchExternalBridgeSource
-class PatchExternalBridgeExtensionProperty(
+sealed interface PatchExtensionSource
+class PatchExtensionProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchExternalBridgeSource
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchExtensionSource
 
-class PatchExternalBridgeExtensionFunction(
+class PatchExtensionFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
     returnType: KSType?,
-) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchExternalBridgeSource
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchExtensionSource
 
-sealed interface PatchInternalBridgeSource
-sealed interface PatchInternalBridgeShadowSource : PatchInternalBridgeSource {
-    val isStatic: Boolean
+sealed interface PatchShadowSource {
+    val modifiers: List<JPModifier>
 }
 
-class PatchInternalBridgeShadowProperty(
+class PatchShadowProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
     val mappingName: String,
-    override val isStatic: Boolean,
-    val isFinal: Boolean,
-) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchInternalBridgeShadowSource
+    override val modifiers: List<JPModifier>,
+) : PatchBridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchShadowSource
 
-class PatchInternalBridgeShadowFunction(
+class PatchShadowFunction(
     name: String,
     jvmName: String,
     parameters: List<FunctionParameter>,
     returnType: KSType?,
     val mappingName: String,
-    override val isStatic: Boolean,
-) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchInternalBridgeShadowSource
+    override val modifiers: List<JPModifier>,
+) : PatchBridgeSourceFunction(name, jvmName, parameters, returnType), PatchShadowSource
 
 sealed class PatchHook(
     val jvmName: String,
@@ -458,7 +456,7 @@ object HookOrdinalParameter : HookParameter
 sealed class HookLocalParameter(
     val name: String,
     type: KSType,
-    val isVar: Boolean,
+    val isLocalVar: Boolean,
 ) : HookParameter {
     val typeName: IrTypeName = type.asIrTypeName()
 }
@@ -467,15 +465,15 @@ class HookParamLocalParameter(
     name: String,
     type: KSType,
     val index: Int,
-    isVar: Boolean,
-) : HookLocalParameter(name, type, isVar)
+    isLocalVar: Boolean,
+) : HookLocalParameter(name, type, isLocalVar)
 
 class HookBodyLocalParameter(
     name: String,
     type: KSType,
     val local: DomainLocal,
-    isVar: Boolean,
-) : HookLocalParameter(name, type, isVar)
+    isLocalVar: Boolean,
+) : HookLocalParameter(name, type, isLocalVar)
 
 class HookShareLocalParameter(
     name: String,

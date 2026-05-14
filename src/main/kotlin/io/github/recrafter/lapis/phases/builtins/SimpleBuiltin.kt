@@ -3,32 +3,28 @@ package io.github.recrafter.lapis.phases.builtins
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.generator.builders.toKotlinCodeBlock
-import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIrClassName
-import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
-import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.*
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
+import io.github.recrafter.lapis.phases.lowering.models.toKotlinConstructorProperty
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 
 enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPClass> {
     Field {
         override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
-                setModifiers(IrModifier.PUBLIC)
                 setVariableTypes(IrTypeVariableName.of("T"))
             }
     },
     Callable {
         override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
+                setModifiers(IrModifier.SEALED)
                 setVariableTypes(IrTypeVariableName.of("F", Function::class.asIrParameterizedTypeName()))
             }
     },
     Method {
         override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
-                setModifiers(IrModifier.PUBLIC)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
                     Function::class.asIrParameterizedTypeName()
@@ -40,7 +36,6 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
     Constructor {
         override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
-                setModifiers(IrModifier.PUBLIC)
                 val functionTypeVariableName = IrTypeVariableName.of(
                     "F",
                     Function::class.asIrParameterizedTypeName()
@@ -52,11 +47,11 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
     LocalVar {
         override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
             buildKotlinInterface(name) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.SEALED)
+                setModifiers(IrModifier.SEALED)
                 val localTypeVariableName = IrTypeVariableName.of("T")
                 setVariableTypes(localTypeVariableName)
                 addProperty(buildKotlinProperty("value", localTypeVariableName) {
-                    setModifiers(IrModifier.PUBLIC, IrModifier.ABSTRACT)
+                    setModifiers(IrModifier.ABSTRACT)
                     mutable(true)
                 })
             }
@@ -64,16 +59,20 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
     Instanceof {
         override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
             buildKotlinClass(name) {
-                setModifiers(IrModifier.PUBLIC)
-                val valueParameter = IrParameter("value", KPAny.asIrClassName(), IrModifier.PUBLIC)
+                val valueParameter = IrParameter("value", KPAny.asIrClassName())
                 val operationParameter = IrParameter(
                     "operation",
                     Operation::class.asIrParameterizedTypeName(KPBoolean.asIrClassName()),
-                    IrModifier.PRIVATE
                 )
                 setConstructor(valueParameter, operationParameter)
+                addProperties(
+                    listOf(
+                        valueParameter.toKotlinConstructorProperty(),
+                        operationParameter.toKotlinConstructorProperty(IrVisibilityModifier.PRIVATE),
+                    )
+                )
                 addFunction(buildKotlinFunction("invoke") {
-                    setModifiers(IrModifier.PUBLIC, IrModifier.OPERATOR)
+                    setModifiers(IrModifier.OPERATOR)
                     val valueParameter = buildKotlinParameter("value", valueParameter.typeName) {
                         setDefaultValue("this.%N") { +valueParameter }
                     }
@@ -88,7 +87,6 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
     CancelSignal(isInternal = true) {
         override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
             buildKotlinObject(name) {
-                setModifiers(IrModifier.PUBLIC)
                 setSuperClass(
                     RuntimeException::class.asIrTypeName(),
                     constructorArguments = listOf(

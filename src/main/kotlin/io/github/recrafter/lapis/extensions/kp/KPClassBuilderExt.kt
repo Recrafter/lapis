@@ -11,12 +11,6 @@ fun KPClassBuilder.setConstructor(parameters: List<IrParameter>) {
     primaryConstructor(buildKotlinConstructor {
         setParameters(parameters)
     })
-    parameters.filter { it.propertyModifiers.isNotEmpty() }.forEach { parameter ->
-        addProperty(buildKotlinProperty(parameter.name, parameter.typeName) {
-            initializer(parameter.name)
-            setModifiers(*parameter.propertyModifiers)
-        })
-    }
 }
 
 fun KPClassBuilder.setConstructor(vararg parameters: IrParameter) {
@@ -41,8 +35,6 @@ fun KPClassBuilder.setVariableTypes(vararg types: IrTypeVariableName) {
 fun KPClassBuilder.setModifiers(vararg modifiers: IrModifier) {
     modifiers.forEach {
         when (it) {
-            IrModifier.PUBLIC -> addModifiers(KPModifier.PUBLIC)
-            IrModifier.PRIVATE -> addModifiers(KPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
             IrModifier.SEALED -> addModifiers(KPModifier.SEALED)

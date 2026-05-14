@@ -33,7 +33,7 @@ class LapisProcessor(
         if (!builtins.isExternalGenerated) {
             logger.setPhase(LapisPhase.BUILTINS)
             builtins.generateExternal()
-            return parser.prepare().run { schemaClassDeclarations + patchClassDeclarations }
+            return parser.prepare().deferredSymbols
         }
 
         logger.setPhase(LapisPhase.PARSING)

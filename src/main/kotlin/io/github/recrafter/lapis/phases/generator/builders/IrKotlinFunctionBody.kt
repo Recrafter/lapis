@@ -1,6 +1,9 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
-import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.kp.KPFunctionBuilder
+import io.github.recrafter.lapis.extensions.kp.addReturnStatement
+import io.github.recrafter.lapis.extensions.kp.addStatement
+import io.github.recrafter.lapis.extensions.kp.buildKotlinCodeBlock
 
 @JvmInline
 value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
@@ -24,23 +27,10 @@ value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
         builder.addReturnStatement(format?.let { buildKotlinCodeBlock(it, argumentsBuilder) })
     }
 
-    fun IrKotlinFunctionBody.with_(
-        receiver: KPCodeBlock,
-        block: Builder<IrKotlinCodeBlock>
-    ) {
-        withControlFlow(buildKotlinCodeBlock("with(%L)") { +receiver }, block)
-    }
-
     fun IrKotlinFunctionBody.throw_(
         format: String,
         argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {
         builder.addStatement(buildKotlinCodeBlock("throw $format", argumentsBuilder))
-    }
-
-    private fun IrKotlinFunctionBody.withControlFlow(controlFlow: KPCodeBlock, body: Builder<IrKotlinCodeBlock>) {
-        builder.beginControlFlow("%L", controlFlow)
-        buildKotlinCodeBlock(body)
-        builder.endControlFlow()
     }
 }

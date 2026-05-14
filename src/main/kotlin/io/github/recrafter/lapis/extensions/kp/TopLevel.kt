@@ -6,6 +6,7 @@ import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.phases.generator.GeneratorConstants
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrKotlinCodeBlock
+import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
@@ -97,10 +98,12 @@ fun buildKotlinCodeBlock(
 fun buildKotlinProperty(
     name: String,
     typeName: IrTypeName,
+    visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
     jvmNamespace: IrClassName? = null,
     builder: KPPropertyBuilder.(propertyName: String) -> Unit = {}
 ): KPProperty {
     val initialBuilder = KPProperty.builder(name, typeName.kotlin).apply {
+        addModifiers(visibility.kotlin)
         builder(name)
     }
     val property = initialBuilder.build()
@@ -135,6 +138,7 @@ fun buildKotlinSetter(builder: Builder<KPFunctionBuilder> = {}): KPFunction =
 
 fun buildKotlinFunction(
     name: String,
+    visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
     jvmNamespace: IrClassName? = null,
     builder: KPFunctionBuilder.(functionName: String) -> Unit = {}
 ): KPFunction =
@@ -144,6 +148,7 @@ fun buildKotlinFunction(
                 setArgumentValue(JvmName::name, jvmNamespace.derived(name).simpleName)
             }
         }
+        addModifiers(visibility.kotlin)
         builder(name)
     }.build()
 
@@ -157,24 +162,62 @@ fun buildKotlinParameter(
 fun buildKotlinParameter(parameter: IrParameter, builder: Builder<KPParameterBuilder> = {}): KPParameter =
     buildKotlinParameter(parameter.name, parameter.typeName, builder)
 
-fun buildKotlinInterface(name: String, builder: Builder<KPClassBuilder> = {}): KPClass =
-    KPClass.interfaceBuilder(name).apply(builder).build()
+fun buildKotlinInterface(
+    name: String,
+    visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
+    builder: Builder<KPClassBuilder> = {}
+): KPClass =
+    KPClass.interfaceBuilder(name).apply {
+        addModifiers(visibility.kotlin)
+        builder()
+    }.build()
 
-fun buildKotlinConstructor(builder: Builder<KPFunctionBuilder> = {}): KPFunction =
-    KPFunction.constructorBuilder().apply(builder).build()
+fun buildKotlinConstructor(
+    visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
+    builder: Builder<KPFunctionBuilder> = {}
+): KPFunction =
+    KPFunction.constructorBuilder().apply {
+        addModifiers(visibility.kotlin)
+        builder()
+    }.build()
 
-fun buildKotlinClass(name: String, builder: Builder<KPClassBuilder> = {}): KPClass =
-    KPClass.classBuilder(name).apply(builder).build()
+fun buildKotlinClass(
+    name: String,
+    visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
+    builder: Builder<KPClassBuilder> = {}
+): KPClass =
+    KPClass.classBuilder(name).apply {
+        addModifiers(visibility.kotlin)
+        builder()
+    }.build()
 
-fun buildKotlinObject(name: String, builder: Builder<KPClassBuilder> = {}): KPClass =
-    KPClass.objectBuilder(name).apply(builder).build()
+fun buildKotlinObject(
+    name: String,
+    visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
+    builder: Builder<KPClassBuilder> = {}
+): KPClass =
+    KPClass.objectBuilder(name).apply {
+        addModifiers(visibility.kotlin)
+        builder()
+    }.build()
 
-fun buildKotlinTypeAlias(name: String, typeName: IrTypeName, builder: Builder<KPTypeAliasBuilder> = {}): KPTypeAlias =
-    KPTypeAlias.builder(name, typeName.kotlin).apply(builder).build()
+fun buildKotlinTypeAlias(
+    name: String,
+    typeName: IrTypeName,
+    visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
+    builder: Builder<KPTypeAliasBuilder> = {}
+): KPTypeAlias =
+    KPTypeAlias.builder(name, typeName.kotlin).apply {
+        addModifiers(visibility.kotlin)
+        builder()
+    }.build()
 
-fun buildKotlinFile(className: IrClassName, builder: Builder<KPFileBuilder> = {}): KPFile =
-    KPFile.builder(className.packageName, className.nestedName)
+fun buildKotlinFile(packageName: String, fileName: String, builder: Builder<KPFileBuilder> = {}): KPFile =
+    KPFile.builder(packageName, fileName)
         .addFileComment(GeneratorConstants.GENERATED_HEADER)
         .apply(builder)
         .indent(GeneratorConstants.INDENT)
         .build()
+
+fun buildKotlinFile(className: IrClassName, builder: Builder<KPFileBuilder> = {}): KPFile =
+    buildKotlinFile(className.packageName, className.nestedName, builder)

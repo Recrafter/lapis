@@ -19,30 +19,24 @@ val KSClassDeclaration.isObject: Boolean
     get() = classKind == ClassKind.OBJECT
 
 val KSClassDeclaration.isExplicitlyOpen: Boolean
-    get() = modifiers.contains(Modifier.OPEN)
+    get() = Modifier.OPEN in modifiers
 
 val KSClassDeclaration.isExplicitlyAbstract: Boolean
-    get() = modifiers.contains(Modifier.ABSTRACT)
+    get() = Modifier.ABSTRACT in modifiers
 
 val KSClassDeclaration.isSealed: Boolean
-    get() = modifiers.contains(Modifier.SEALED)
+    get() = Modifier.SEALED in modifiers
 
 val KSClassDeclaration.isValid: Boolean
     get() = validate()
 
-val KSClassDeclaration.constructorPropertyDeclarations: Sequence<KSPropertyDeclaration>
-    get() {
-        val constructorPropertyNames = primaryConstructor
-            ?.parameters
-            ?.filter { it.isVal || it.isVar }
-            ?.mapNotNull { it.name?.asString() }
-            ?.toSet()
-            ?: emptySet()
-        return getDeclaredProperties().filter { it.simpleName.asString() in constructorPropertyNames }
-    }
-
 val KSClassDeclaration.bodyPropertyDeclarations: Sequence<KSPropertyDeclaration>
-    get() = getDeclaredProperties() - constructorPropertyDeclarations.toSet()
+    get() {
+        val constructorPropertyNames = constructorDeclarations.flatMap {
+            it.constructorProperties.mapNotNull { property -> property.name?.asString() }
+        }
+        return getDeclaredProperties().filter { it.name !in constructorPropertyNames }
+    }
 
 val KSClassDeclaration.constructorDeclarations: Sequence<KSFunctionDeclaration>
     get() = getConstructors()
@@ -55,6 +49,3 @@ val KSClassDeclaration.classDeclarations: Sequence<KSClassDeclaration>
 
 val KSClassDeclaration.companionObjectClassDeclarations: Sequence<KSClassDeclaration>
     get() = classDeclarations.filter { it.isCompanionObject }
-
-fun KSClassDeclaration.isAssignableFrom(other: KSClassDeclaration): Boolean =
-    type.isAssignableFrom(other.type)

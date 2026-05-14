@@ -13,14 +13,16 @@ class IrResult(
     val patches: List<IrPatch>,
 )
 
+sealed class IrSourceFile(val className: IrClassName)
+
 class IrSchema(
-    val className: IrClassName,
+    className: IrClassName,
     val descriptors: List<IrDescriptor>,
     val tweakAccessor: IrTweakAccessor?,
     val mixinAccessor: IrMixinAccessor?,
-)
+) : IrSourceFile(className)
 
-abstract class IrMixinRelatedBlueprint(isInterface: Boolean) : IrJavaBlueprint(isInterface) {
+abstract class IrMixinRelatedBlueprint(classKind: IrJavaClassKind) : IrJavaBlueprint(classKind) {
     abstract val side: Side
 }
 
@@ -30,33 +32,36 @@ class IrMixinAccessor(
     override val originatingFiles: List<KSFile>,
     override val className: IrClassName,
     override val side: Side,
-    val schemaClassName: IrClassName,
     val isAccessibleSchema: Boolean,
     val targetInternalName: String,
-    val receiverTypeName: IrTypeName,
+    val instanceTypeName: IrTypeName,
     val members: List<IrMixinAccessorMember>,
-) : IrMixinRelatedBlueprint(isInterface = true), IrAccessor
+) : IrMixinRelatedBlueprint(IrJavaClassKind.INTERFACE), IrAccessor
 
-sealed class IrMixinAccessorMember(val isStatic: Boolean, val schemaReceiverClassName: IrClassName)
+sealed class IrMixinAccessorMember(
+    val name: String,
+    val isStatic: Boolean,
+    val descriptorClassName: IrClassName,
+)
 
 class IrMixinAccessorFieldMember(
-    val name: String,
+    name: String,
     val mappingName: String,
     val typeName: IrTypeName,
     isStatic: Boolean,
     val removeFinal: Boolean,
     val ops: List<Op>,
-    schemaReceiverClassName: IrClassName,
-) : IrMixinAccessorMember(isStatic, schemaReceiverClassName)
+    descriptorClassName: IrClassName,
+) : IrMixinAccessorMember(name, isStatic, descriptorClassName)
 
 class IrMixinAccessorMethodMember(
-    val name: String,
+    name: String,
     val mappingName: String,
     val parameters: List<IrParameter>,
     override val returnTypeName: IrTypeName?,
     isStatic: Boolean,
-    schemaReceiverClassName: IrClassName,
-) : IrMixinAccessorMember(isStatic, schemaReceiverClassName), IrReturnable
+    descriptorClassName: IrClassName,
+) : IrMixinAccessorMember(name, isStatic, descriptorClassName), IrReturnable
 
 class IrTweakAccessor(
     val originatingFiles: List<KSFile>,
@@ -66,11 +71,11 @@ class IrTweakAccessor(
 ) : IrAccessor
 
 class IrPatch(
-    val className: IrClassName,
+    className: IrClassName,
     val constructorArguments: List<IrPatchConstructorArgument>,
     val impl: IrPatchImpl?,
     val mixin: IrMixin,
-)
+) : IrSourceFile(className)
 
 class IrMixin(
     override val originatingFiles: List<KSFile>,
@@ -82,7 +87,7 @@ class IrMixin(
     val injections: List<IrInjection>,
     val externalBridge: IrMixinExternalBridge?,
     val internalBridge: IrMixinInternalBridge?,
-) : IrMixinRelatedBlueprint(isInterface = false)
+) : IrMixinRelatedBlueprint(IrJavaClassKind.CLASS)
 
 sealed interface IrPatchConstructorArgument
 object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
@@ -92,7 +97,7 @@ class IrPatchImpl(
     override val className: IrClassName,
     val constructorParameters: List<IrPatchImplConstructorParameter>,
     val initStrategy: InitStrategy,
-) : IrKotlinBlueprint()
+) : IrKotlinClassBlueprint(IrKotlinClassKind.CLASS)
 
 sealed interface IrPatchImplConstructorParameter
 object IrPatchImplConstructorInstanceParameter : IrPatchImplConstructorParameter

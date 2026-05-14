@@ -7,7 +7,7 @@ val KSPropertyDeclaration.isExtension: Boolean
     get() = extensionReceiver != null
 
 val KSPropertyDeclaration.isExplicitlyOpen: Boolean
-    get() = modifiers.contains(Modifier.OPEN)
+    get() = Modifier.OPEN in modifiers
 
 val KSPropertyDeclaration.isExplicitlyAbstract: Boolean
-    get() = modifiers.contains(Modifier.ABSTRACT)
+    get() = Modifier.ABSTRACT in modifiers

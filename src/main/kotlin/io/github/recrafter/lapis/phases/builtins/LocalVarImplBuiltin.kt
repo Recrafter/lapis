@@ -3,12 +3,10 @@ package io.github.recrafter.lapis.phases.builtins
 import com.llamalad7.mixinextras.sugar.ref.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin.LocalVar
-import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIrClassName
-import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
-import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.*
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.IrSetterParameter
+import io.github.recrafter.lapis.phases.lowering.models.toKotlinConstructorProperty
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 import kotlin.reflect.KCallable
@@ -81,7 +79,6 @@ enum class LocalVarImplBuiltin(
 
     override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
         buildKotlinClass(name) {
-            setModifiers(IrModifier.PUBLIC)
             val (genericTypeName, referenceTypeName) = if (valueKPClassName != null) {
                 valueKPClassName.asIrClassName() to referenceTypeName
             } else {
@@ -89,11 +86,12 @@ enum class LocalVarImplBuiltin(
                 setVariableTypes(typeVariableName)
                 typeVariableName to referenceKClass.asIrParameterizedTypeName(typeVariableName)
             }
-            val referenceParameter = IrParameter("reference", referenceTypeName, IrModifier.PRIVATE)
+            val referenceParameter = IrParameter("reference", referenceTypeName)
             setConstructor(referenceParameter)
+            addProperty(referenceParameter.toKotlinConstructorProperty(IrVisibilityModifier.PRIVATE))
             addSuperInterface(resolveBuiltin(LocalVar).parameterizedBy(genericTypeName))
             addProperty(buildKotlinProperty("value", genericTypeName) {
-                setModifiers(IrModifier.PUBLIC, IrModifier.OVERRIDE)
+                setModifiers(IrModifier.OVERRIDE)
                 setGetter {
                     setBody {
                         return_("%N.%L()") { +referenceParameter; +getterCallable }

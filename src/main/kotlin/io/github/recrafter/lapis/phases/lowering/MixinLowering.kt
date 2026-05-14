@@ -6,6 +6,7 @@ import io.github.recrafter.lapis.LapisOptions
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.common.lapisError
+import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ks.isInterface
 import io.github.recrafter.lapis.extensions.withInternalPrefix
@@ -130,6 +131,16 @@ class MixinLowering(
         val members = mutableListOf<IrMixinAccessorMember>()
         descriptors.forEach { (descriptor, accessRequest) ->
             members += when (descriptor) {
+                is FieldDescriptor -> IrMixinAccessorFieldMember(
+                    name = descriptor.name,
+                    mappingName = descriptor.mappingName,
+                    typeName = descriptor.fieldTypeName,
+                    isStatic = descriptor.isStatic,
+                    removeFinal = accessRequest.shouldRemoveFinal,
+                    ops = accessRequest.fieldOps,
+                    descriptorClassName = descriptor.className,
+                )
+
                 is InvokableDescriptor -> {
                     val parameters = descriptor.parameters.map {
                         IrParameter(it.name ?: lapisError("Parameter name cannot be null"), it.typeName)
@@ -140,30 +151,17 @@ class MixinLowering(
                         parameters = parameters,
                         returnTypeName = descriptor.returnTypeName,
                         isStatic = descriptor is ConstructorDescriptor || descriptor.isStatic,
-                        schemaReceiverClassName = schema.className,
-                    )
-                }
-
-                is FieldDescriptor -> {
-                    IrMixinAccessorFieldMember(
-                        name = descriptor.name,
-                        mappingName = descriptor.mappingName,
-                        typeName = descriptor.fieldTypeName,
-                        isStatic = descriptor.isStatic,
-                        removeFinal = accessRequest.shouldRemoveFinal,
-                        ops = accessRequest.fieldOps,
-                        schemaReceiverClassName = descriptor.className,
+                        descriptorClassName = descriptor.className,
                     )
                 }
             }
         }
         return IrMixinAccessor(
             originatingFiles = listOfNotNull(schema.containingFile),
-            className = lowerMixinRelatedClassName(schema.className, sourcePackageLCP, "Accessor"),
-            schemaClassName = schema.className,
+            className = resolveMixinRelatedClassName(schema.className, sourcePackageLCP, "Accessor"),
             side = schema.side,
             targetInternalName = schema.originJvmClassName.internalName,
-            receiverTypeName = schema.originTypeName,
+            instanceTypeName = schema.originTypeName,
             isAccessibleSchema = schema.isAccessible,
             members = members,
         )
@@ -193,7 +191,7 @@ class MixinLowering(
                     if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
                         add(IrPatchImplConstructorInstanceParameter)
                     }
-                    if (patch.internalBridgeSources.isNotEmpty()) {
+                    if (patch.shadowSources.isNotEmpty()) {
                         add(IrPatchImplConstructorInternalBridgeParameter)
                     }
                 },
@@ -204,7 +202,7 @@ class MixinLowering(
     private fun lowerMixin(patch: Patch, sourcePackageLCP: String): IrMixin =
         IrMixin(
             originatingFiles = listOfNotNull(patch.containingFile),
-            className = lowerMixinRelatedClassName(patch.className, sourcePackageLCP, "Mixin"),
+            className = resolveMixinRelatedClassName(patch.className, sourcePackageLCP, "Mixin"),
             targetInstanceTypeName = patch.schema.originTypeName,
             isInterfaceTarget = patch.schema.originClassDeclaration.isInterface,
             targetInternalName = patch.schema.originJvmClassName.internalName,
@@ -215,26 +213,26 @@ class MixinLowering(
         )
 
     private fun lowerMixinExternalBridge(patch: Patch): IrMixinExternalBridge? =
-        if (patch.externalBridgeSources.isNotEmpty()) {
+        if (patch.extensionSources.isNotEmpty()) {
             IrMixinExternalBridge(
                 originatingFiles = listOfNotNull(patch.containingFile),
                 className = patch.className.derived("ExternalBridge"),
-                entries = patch.externalBridgeSources.map(::lowerMixinExternalBridgeEntry),
+                entries = patch.extensionSources.map(::lowerMixinExternalBridgeEntry),
             )
         } else null
 
     private fun lowerMixinInternalBridge(patch: Patch): IrMixinInternalBridge? =
-        if (patch.internalBridgeSources.isNotEmpty()) {
+        if (patch.shadowSources.isNotEmpty()) {
             IrMixinInternalBridge(
                 originatingFiles = listOfNotNull(patch.containingFile),
                 className = patch.className.derived("InternalBridge"),
-                entries = patch.internalBridgeSources.map(::lowerMixinInternalBridgeEntry),
+                entries = patch.shadowSources.map(::lowerMixinInternalBridgeEntry),
             )
         } else null
 
-    private fun lowerMixinExternalBridgeEntry(source: PatchExternalBridgeSource): IrMixinExternalBridgeEntry =
+    private fun lowerMixinExternalBridgeEntry(source: PatchExtensionSource): IrMixinExternalBridgeEntry =
         when (source) {
-            is PatchExternalBridgeExtensionProperty -> with(source) {
+            is PatchExtensionProperty -> with(source) {
                 IrMixinExternalBridgePropertyEntry(
                     typeName = typeName,
                     sourceName = name,
@@ -245,7 +243,7 @@ class MixinLowering(
                 )
             }
 
-            is PatchExternalBridgeExtensionFunction -> with(source) {
+            is PatchExtensionFunction -> with(source) {
                 IrMixinExternalBridgeFunctionEntry(
                     sourceName = name,
                     sourceJvmName = jvmName,
@@ -256,9 +254,9 @@ class MixinLowering(
             }
         }
 
-    private fun lowerMixinInternalBridgeEntry(source: PatchInternalBridgeSource): IrMixinInternalBridgeEntry =
+    private fun lowerMixinInternalBridgeEntry(source: PatchShadowSource): IrMixinInternalBridgeEntry =
         when (source) {
-            is PatchInternalBridgeShadowProperty -> with(source) {
+            is PatchShadowProperty -> with(source) {
                 IrMixinInternalBridgeShadowPropertyEntry(
                     typeName = typeName,
                     sourceName = name,
@@ -267,12 +265,12 @@ class MixinLowering(
                     getterName = getterJvmName.withModIdPrefix(),
                     setterName = source.setterJvmName?.withModIdPrefix(),
                     mappingName = mappingName,
-                    isStatic = isStatic,
-                    isFinal = isFinal,
+                    modifiers = modifiers,
+                    isFinal = JPModifier.FINAL in modifiers,
                 )
             }
 
-            is PatchInternalBridgeShadowFunction -> with(source) {
+            is PatchShadowFunction -> with(source) {
                 IrMixinInternalBridgeShadowFunctionEntry(
                     sourceName = name,
                     sourceJvmName = jvmName,
@@ -280,7 +278,7 @@ class MixinLowering(
                     parameters = parameters.map { it.asIrParameter() },
                     returnTypeName = returnTypeName,
                     mappingName = mappingName,
-                    isStatic = isStatic,
+                    modifiers = modifiers,
                 )
             }
         }
@@ -354,7 +352,7 @@ class MixinLowering(
             if (!hook.isInjectBased && hook.parameters.any { it is HookCancelDescriptorWrapperParameter }) {
                 add(IrInjectionCallbackParameter(hook.descriptor.returnTypeName))
             }
-            addAll(hook.parameters.mapNotNull { lowerInjectionLocalParameter(hook, it) })
+            addAll(hook.parameters.mapNotNull { lowerInjectionLocalParameter(it, hook) })
         }
         val hookArguments = hook.parameters.map(::lowerHookArgument)
         return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
@@ -535,7 +533,7 @@ class MixinLowering(
         }
     }
 
-    private fun lowerInjectionLocalParameter(hook: PatchHook, parameter: HookParameter): IrInjectionLocalParameter? =
+    private fun lowerInjectionLocalParameter(parameter: HookParameter, hook: PatchHook): IrInjectionLocalParameter? =
         when (parameter) {
             is HookParamLocalParameter -> {
                 if (hook.isInjectBased) {
@@ -698,10 +696,10 @@ class MixinLowering(
         }
 
     private fun lowerLocalVarBuiltin(parameter: HookLocalParameter): LocalVarImplBuiltin? =
-        if (parameter.isVar) LocalVarImplBuiltin.of(parameter.typeName)
+        if (parameter.isLocalVar) LocalVarImplBuiltin.of(parameter.typeName)
         else null
 
-    private fun lowerMixinRelatedClassName(
+    private fun resolveMixinRelatedClassName(
         sourceClassName: IrClassName,
         sourcePackageLCP: String,
         suffix: String,

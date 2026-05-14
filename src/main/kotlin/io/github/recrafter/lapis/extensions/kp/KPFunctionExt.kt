@@ -8,10 +8,8 @@ import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrKotlinFunctionBody
 import io.github.recrafter.lapis.phases.lowering.IrModifier
-import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 
 inline fun <reified A : Annotation> KPFunctionBuilder.addAnnotation(
     useSiteTarget: UseSiteTarget? = null,
@@ -24,10 +22,6 @@ fun KPFunctionBuilder.setBody(builder: Builder<IrKotlinFunctionBody> = {}) {
     IrKotlinFunctionBody(this).builder()
 }
 
-fun KPFunctionBuilder.setStubBody(message: String = "Stub!") {
-    setBody { throw_("%T(%S)") { +AssertionError::class.asIrTypeName(); +message } }
-}
-
 fun KPFunctionBuilder.addStatement(codeBlock: KPCodeBlock) {
     addStatement("%L", codeBlock)
 }
@@ -38,10 +32,6 @@ fun KPFunctionBuilder.addReturnStatement(codeBlock: KPCodeBlock?) {
     } else {
         addStatement("return")
     }
-}
-
-fun KPFunctionBuilder.setVariableTypes(vararg types: IrTypeVariableName) {
-    addTypeVariables(types.map { it.kotlin })
 }
 
 fun KPFunctionBuilder.setReturnType(typeName: IrTypeName?) {
@@ -71,8 +61,6 @@ fun KPFunctionBuilder.setContextParameters(parameters: List<IrParameter>) {
 fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
     modifiers.forEach {
         when (it) {
-            IrModifier.PUBLIC -> addModifiers(KPModifier.PUBLIC)
-            IrModifier.PRIVATE -> addModifiers(KPModifier.PRIVATE)
             IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
             IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
             IrModifier.INLINE -> addModifiers(KPModifier.INLINE)
@@ -81,4 +69,8 @@ fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
             else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin functions")
         }
     }
+}
+
+fun KPFunctionBuilder.setModifiers(modifiers: List<IrModifier>) {
+    setModifiers(*modifiers.toTypedArray())
 }

@@ -1,6 +1,6 @@
 package io.github.recrafter.lapis.extensions
 
-import io.github.recrafter.lapis.LapisMeta
+import io.github.recrafter.lapis.phases.generator.models.GenInternalPrefix
 
 fun String.capitalize(): String =
     replaceFirstChar {
@@ -14,14 +14,5 @@ fun String.quoted(): String =
 fun String.withInternalPrefix(prefix: String): String =
     "_${prefix}_$this"
 
-fun String.withInternalPrefix(prefix: InternalPrefix = InternalPrefix.BUILTIN): String =
+fun String.withInternalPrefix(prefix: GenInternalPrefix = GenInternalPrefix.BUILTIN): String =
     withInternalPrefix(prefix.value)
-
-enum class InternalPrefix(val value: String) {
-    BUILTIN(LapisMeta.NAME.lowercase()),
-    PARAM("param"),
-    LOCAL("local"),
-    SHARE("share"),
-    ARGUMENT("argument"),
-    ACCESS("access"),
-}

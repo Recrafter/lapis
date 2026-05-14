@@ -111,7 +111,6 @@ class SymbolParser(
             symbol = classDeclaration,
             classDeclaration = classDeclaration,
             side = side ?: Side.Common,
-            isObject = classDeclaration.isObject,
             isTopLevel = classDeclaration.parentDeclaration == null,
             hasPackageName = classDeclaration.packageName.asString().isNotEmpty(),
             originClassDeclaration = originClassDeclaration,
@@ -157,7 +156,7 @@ class SymbolParser(
             isObject = classDeclaration.isObject,
             hasStaticAnnotation = classDeclaration.hasAnnotation<Static>(),
             hasMappingNameAnnotation = mappingNameAnnotation != null,
-            mappingName = mappingNameAnnotation?.getArgumentValue(MappingName::name),
+            explicitMappingName = mappingNameAnnotation?.getArgumentValue(MappingName::name, explicit = true),
             hasAccessAnnotation = accessAnnotation != null,
             isAccessUnfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
             accessFieldOps = accessAnnotation?.getArgumentValue(Access::field).orEmpty(),
@@ -221,7 +220,7 @@ class SymbolParser(
             companionObjects = classDeclaration.companionObjectClassDeclarations.map(::parsePatchCompanionObject)
                 .toList(),
             constructors = classDeclaration.constructorDeclarations.map(::parsePatchConstructor).toList(),
-            properties = classDeclaration.bodyPropertyDeclarations.map(::parsePatchProperty).toList(),
+            bodyProperties = classDeclaration.bodyPropertyDeclarations.map(::parsePatchBodyProperty).toList(),
             functions = classDeclaration.functionDeclarations.map(::parsePatchFunction).toList(),
         )
     }
@@ -250,8 +249,9 @@ class SymbolParser(
         )
 
     @OptIn(KspExperimental::class)
-    private fun parsePatchProperty(propertyDeclaration: KSPropertyDeclaration): ParsedPatchProperty {
-        val shadowAnnotation = propertyDeclaration.findAnnotation<Shadow>()
+    private fun parsePatchBodyProperty(propertyDeclaration: KSPropertyDeclaration): ParsedPatchProperty {
+        val shadowAnnotation = propertyDeclaration.findAnnotation<KShadow>()
+        val mappingNameAnnotation = propertyDeclaration.findAnnotation<MappingName>()
         return ParsedPatchProperty(
             symbol = propertyDeclaration,
 
@@ -268,16 +268,16 @@ class SymbolParser(
 
             hasExtensionAnnotation = propertyDeclaration.hasAnnotation<Extension>(),
             hasShadowAnnotation = shadowAnnotation != null,
-            hasStaticAnnotation = propertyDeclaration.hasAnnotation<Static>(),
-            explicitShadowName = shadowAnnotation?.getArgumentValue(Shadow::name),
-            isShadowFinal = shadowAnnotation?.getArgumentValue(Shadow::final) == true,
+            explicitMappingName = mappingNameAnnotation?.getArgumentValue(MappingName::name, explicit = true),
+            shadowModifiers = shadowAnnotation?.getArgumentValue(KShadow::modifiers).orEmpty(),
         )
     }
 
     @OptIn(KspExperimental::class)
     private fun parsePatchFunction(functionDeclaration: KSFunctionDeclaration): ParsedPatchFunction {
-        val shadowAnnotation = functionDeclaration.findAnnotation<Shadow>()
+        val shadowAnnotation = functionDeclaration.findAnnotation<KShadow>()
         val hookAnnotation = functionDeclaration.findAnnotation<Hook>()
+        val mappingNameAnnotation = functionDeclaration.findAnnotation<MappingName>()
 
         val atConstructorHeadAnnotation = functionDeclaration.findAnnotation<AtConstructorHead>()
 
@@ -309,13 +309,12 @@ class SymbolParser(
             isPublic = functionDeclaration.isPublic(),
             isOpen = functionDeclaration.isExplicitlyOpen,
             isAbstract = functionDeclaration.isAbstract,
-            isExtension = functionDeclaration.isExtension,
+            hasExtensionReceiver = functionDeclaration.hasExtensionReceiver,
 
             hasExtensionAnnotation = functionDeclaration.hasAnnotation<Extension>(),
             hasShadowAnnotation = shadowAnnotation != null,
-            hasStaticAnnotation = functionDeclaration.hasAnnotation<Static>(),
-            explicitShadowName = shadowAnnotation?.getArgumentValue(Shadow::name, explicit = true),
-            isShadowFinal = shadowAnnotation?.getArgumentValue(Shadow::final) == true,
+            explicitMappingName = mappingNameAnnotation?.getArgumentValue(MappingName::name, explicit = true),
+            shadowModifiers = shadowAnnotation?.getArgumentValue(KShadow::modifiers).orEmpty(),
 
             hasHookAnnotation = hookAnnotation != null,
             hookDescriptorClassDeclaration = hookAnnotation?.getArgumentValue(Hook::desc)?.toClassDeclaration(),
