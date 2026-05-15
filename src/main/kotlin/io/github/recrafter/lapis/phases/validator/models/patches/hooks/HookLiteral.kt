@@ -3,9 +3,9 @@ package io.github.recrafter.lapis.phases.validator.models.patches.hooks
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import io.github.recrafter.lapis.annotations.ZeroCondition
+import io.github.recrafter.lapis.common.KSTypes
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
-import io.github.recrafter.lapis.phases.parser.KSTypes
 
 sealed interface HookLiteral {
     fun getType(types: KSTypes): KSType

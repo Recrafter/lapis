@@ -49,13 +49,13 @@ value class GenJavaMethodBody(private val builder: JPMethodBuilder) {
 
     @Suppress("LocalVariableName")
     fun GenJavaMethodBody.try_(
-        block: Builder<IrJavaCodeBlock>,
+        block_: Builder<IrJavaCodeBlock>,
         catchingClassName: IrClassName,
         catch_: Builder<IrJavaCodeBlock>? = null,
         finally_: Builder<IrJavaCodeBlock>? = null,
     ) {
         builder.beginControlFlow(buildJavaCodeBlock("try"))
-        buildJavaCodeBlock(block)
+        buildJavaCodeBlock(block_)
         builder.nextControlFlow(buildJavaCodeBlock("catch (%T %L)") {
             +catchingClassName; +(if (catch_ == null) "ignored" else "e")
         })

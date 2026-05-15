@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
-import io.github.recrafter.lapis.phases.common.JvmClassName
-import io.github.recrafter.lapis.phases.common.JvmDescriptor
-import io.github.recrafter.lapis.phases.common.jvmDescriptor
+import io.github.recrafter.lapis.common.JvmClassName
+import io.github.recrafter.lapis.common.JvmDescriptor
+import io.github.recrafter.lapis.common.jvmDescriptor
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 sealed interface IrTweakAccessorEntry {

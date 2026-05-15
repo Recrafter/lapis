@@ -1,9 +1,9 @@
-package io.github.recrafter.lapis
+package io.github.recrafter.lapis.phases.bootstrap
 
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class LapisOptions(
+data class Options(
     val modId: String,
     private val modPackage: String,
     private val mixinPackage: String,

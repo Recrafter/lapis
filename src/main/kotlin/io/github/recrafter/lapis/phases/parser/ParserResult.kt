@@ -2,8 +2,8 @@ package io.github.recrafter.lapis.phases.parser
 
 import com.google.devtools.ksp.symbol.*
 import io.github.recrafter.lapis.annotations.*
+import io.github.recrafter.lapis.common.JvmClassName
 import io.github.recrafter.lapis.extensions.jp.JPModifier
-import io.github.recrafter.lapis.phases.common.JvmClassName
 
 class ParserPrepareResult(
     val schemaClassDeclarations: List<KSClassDeclaration>,

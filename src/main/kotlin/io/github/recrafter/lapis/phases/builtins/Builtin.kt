@@ -13,10 +13,7 @@ sealed interface Builtin<T> {
 
     companion object {
         val entries: List<Builtin<*>> by lazy {
-            TypeAliasBuiltin.entries +
-                SimpleBuiltin.entries +
-                DescriptorWrapperBuiltin.entries +
-                LocalVarImplBuiltin.entries
+            SimpleBuiltin.entries + DescriptorWrapperBuiltin.entries + LocalVarImplBuiltin.entries
         }
     }
 }

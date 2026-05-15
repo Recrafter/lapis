@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.phases.parser
+package io.github.recrafter.lapis.common
 
 import com.google.devtools.ksp.processing.KSBuiltIns
 import com.google.devtools.ksp.symbol.KSType

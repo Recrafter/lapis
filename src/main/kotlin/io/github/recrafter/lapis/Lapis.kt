@@ -1,5 +1,5 @@
 package io.github.recrafter.lapis
 
-object LapisMeta {
+object Lapis {
     const val NAME: String = ProjektBuildConfig.LIBRARY_NAME
 }

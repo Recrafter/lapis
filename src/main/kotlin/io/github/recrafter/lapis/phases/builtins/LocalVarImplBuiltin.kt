@@ -3,7 +3,10 @@ package io.github.recrafter.lapis.phases.builtins
 import com.llamalad7.mixinextras.sugar.ref.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin.LocalVar
-import io.github.recrafter.lapis.phases.lowering.*
+import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.IrSetterParameter
 import io.github.recrafter.lapis.phases.lowering.models.toKotlinConstructorProperty
@@ -91,7 +94,7 @@ enum class LocalVarImplBuiltin(
             addProperty(referenceParameter.toKotlinConstructorProperty(IrVisibilityModifier.PRIVATE))
             addSuperInterface(resolveBuiltin(LocalVar).parameterizedBy(genericTypeName))
             addProperty(buildKotlinProperty("value", genericTypeName) {
-                setModifiers(IrModifier.OVERRIDE)
+                addModifiers(KPModifier.OVERRIDE)
                 setGetter {
                     setBody {
                         return_("%N.%L()") { +referenceParameter; +getterCallable }

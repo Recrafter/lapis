@@ -13,27 +13,30 @@ import com.llamalad7.mixinextras.sugar.Local
 import com.llamalad7.mixinextras.sugar.Share
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ksp.writeTo
-import io.github.recrafter.lapis.LapisLogger
-import io.github.recrafter.lapis.LapisOptions
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
+import io.github.recrafter.lapis.common.JavaModifiers
+import io.github.recrafter.lapis.common.JvmClassName
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
+import io.github.recrafter.lapis.logging.Logger
+import io.github.recrafter.lapis.phases.bootstrap.Options
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin
-import io.github.recrafter.lapis.phases.common.JavaModifiers
-import io.github.recrafter.lapis.phases.common.JvmClassName
 import io.github.recrafter.lapis.phases.generator.builders.*
 import io.github.recrafter.lapis.phases.generator.models.GenExtensionPack
 import io.github.recrafter.lapis.phases.generator.models.GenExtensionPackAccumulator
 import io.github.recrafter.lapis.phases.generator.models.GenInternalPrefix.*
 import io.github.recrafter.lapis.phases.generator.models.GenMixinConfig
 import io.github.recrafter.lapis.phases.generator.models.GenTweakAccessorConfig
-import io.github.recrafter.lapis.phases.lowering.*
+import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
+import io.github.recrafter.lapis.phases.lowering.asIrClassName
+import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
+import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrLambdaTypeName
@@ -48,10 +51,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
 class Generator(
-    private val options: LapisOptions,
+    private val options: Options,
     private val builtins: Builtins,
     private val codeGenerator: CodeGenerator,
-    @Suppress("unused") private val logger: LapisLogger,
+    @Suppress("unused") private val logger: Logger,
 ) {
     fun generate(schemas: List<IrSchema>, patches: List<IrPatch>) {
         schemas.forEach { schema ->
@@ -118,7 +121,7 @@ class Generator(
             addAnnotation<Mixin> {
                 setArgumentValue(Mixin::targets, listOf(mixin.targetInternalName))
             }
-            setModifiers(IrModifier.ABSTRACT)
+            addModifiers(JPModifier.ABSTRACT)
             val patchImplEntity = patchImpl?.let { generatePatchInitializer(this, it, mixin) }
             mixin.externalBridge?.let { bridge ->
                 addSuperInterface(bridge.className)
@@ -231,7 +234,7 @@ class Generator(
                 generateStaticBridge(staticBridge, patchClassName.inner("Companion"), extensionPackAccumulator)
                 buildJavaMethod("syncStaticBridge".withInternalPrefix(), visibility = IrVisibilityModifier.PRIVATE) {
                     addAnnotation<Unique>()
-                    setModifiers(IrModifier.STATIC)
+                    addModifiers(JPModifier.STATIC)
                     setBody {
                         staticBridgeSync.forEach { (entry, shadowMember) ->
                             when (entry) {
@@ -324,7 +327,7 @@ class Generator(
                     when (entry) {
                         is IrMixinBridgePropertyEntry -> {
                             addProperty(buildKotlinProperty(entry.sourceName, entry.typeName) {
-                                setModifiers(IrModifier.OVERRIDE)
+                                addModifiers(KPModifier.OVERRIDE)
                                 setGetter {
                                     setBody {
                                         return_("%N.%L()") { +internalBridgeParameter; +entry.getter.name }
@@ -345,7 +348,7 @@ class Generator(
 
                         is IrMixinBridgeFunctionEntry -> {
                             addFunction(buildKotlinFunction(entry.sourceName) {
-                                setModifiers(IrModifier.OVERRIDE)
+                                addModifiers(KPModifier.OVERRIDE)
                                 setParameters(entry.parameters)
                                 setReturnType(entry.returnTypeName)
                                 setBody {
@@ -395,12 +398,8 @@ class Generator(
             visibility = IrVisibilityModifier.PRIVATE,
         ) {
             addAnnotation<Unique>()
-            setModifiers(
-                listOfNotNull(
-                    if (isEagerStrategy) IrModifier.FINAL else null,
-                    if (isThreadSafeStrategy) IrModifier.VOLATILE else null,
-                )
-            )
+            if (isEagerStrategy) addModifiers(JPModifier.FINAL)
+            if (isThreadSafeStrategy) addModifiers(JPModifier.VOLATILE)
             if (isEagerStrategy) {
                 initializer(initializerCodeBlock)
             }
@@ -415,7 +414,7 @@ class Generator(
                 visibility = IrVisibilityModifier.PRIVATE,
             ) {
                 addAnnotation<Unique>()
-                setModifiers(IrModifier.FINAL)
+                addModifiers(JPModifier.FINAL)
                 initializer(buildJavaCodeBlock("new %T()") { +Object::class })
             }.also(destination::addField)
         } else null
@@ -601,7 +600,7 @@ class Generator(
                 }
             }
             if (injection.isStatic) {
-                setModifiers(IrModifier.STATIC)
+                addModifiers(JPModifier.STATIC)
             }
             val receiverParameterName = "receiver".withInternalPrefix()
             val valueParameterName = "value".withInternalPrefix()
@@ -755,24 +754,19 @@ class Generator(
                         code_("%N()") { +it }
                     }
                 }
-                val invokeHook: Builder<IrJavaCodeBlock> = {
-                    val patchInstanceFormat = if (injection.isStatic) {
-                        "%T.Companion"
-                    } else {
-                        patchImplMember?.callFormat ?: lapisError("Patch impl cannot be null")
+                fun invokeHook_() {
+                    val patchImplMember = if (injection.isStatic) null else {
+                        patchImplMember ?: lapisError("Patch impl cannot be null")
                     }
+                    val patchInstanceFormat = patchImplMember?.callFormat ?: "%T.Companion"
                     code_("$patchInstanceFormat.%L(${hookArgumentCodeBlocks.format})", isReturn = injection.isReturn) {
-                        if (injection.isStatic) {
-                            +patchClassName
-                        } else {
-                            (patchImplMember ?: lapisError("Patch impl cannot be null"))()
-                        }
+                        patchImplMember?.let { it() } ?: +patchClassName
                         +injection.jvmName; hookArgumentCodeBlocks.forEach { +it }
                     }
                 }
                 if (hasCancelArgument) {
                     try_(
-                        block = invokeHook,
+                        block_ = { invokeHook_() },
                         catchingClassName = builtins[SimpleBuiltin.CancelSignal],
                         catch_ = injection.returnTypeName?.let {
                             {
@@ -790,7 +784,7 @@ class Generator(
                         },
                     )
                 } else {
-                    buildJavaCodeBlock(invokeHook)
+                    buildJavaCodeBlock { invokeHook_() }
                 }
             }
         }
@@ -808,14 +802,14 @@ class Generator(
                     extensionPackEntities += buildKotlinProperty(entry.sourceName, entry.typeName) {
                         setReceiverType(patch.mixin.targetInstanceTypeName)
                         setGetter {
-                            setModifiers(IrModifier.INLINE)
+                            addModifiers(KPModifier.INLINE)
                             setBody {
                                 return_("(this as %T).%L()") { +bridge.className; +entry.getter.name }
                             }
                         }
                         entry.setter?.let { setter ->
                             setSetter {
-                                setModifiers(IrModifier.INLINE)
+                                addModifiers(KPModifier.INLINE)
                                 setParameters(setter.parameters)
                                 setBody {
                                     code_("(this as %T).%L(%N)") { +bridge.className; +setter.name; +setter.parameter }
@@ -827,7 +821,7 @@ class Generator(
 
                 is IrMixinExternalBridgeFunctionEntry -> {
                     extensionPackEntities += buildKotlinFunction(entry.sourceName) {
-                        setModifiers(IrModifier.INLINE)
+                        addModifiers(KPModifier.INLINE)
                         setReceiverType(patch.mixin.targetInstanceTypeName)
                         setParameters(entry.parameters)
                         setReturnType(entry.returnTypeName)
@@ -851,7 +845,7 @@ class Generator(
         generateKotlinFile(bridge, aggregating = false) {
             addFunctions(bridge.entries.flatMap { it.kinds }.map { kind ->
                 buildKotlinFunction(kind.name) {
-                    setModifiers(IrModifier.ABSTRACT)
+                    addModifiers(KPModifier.ABSTRACT)
                     setParameters(kind.parameters)
                     setReturnType(kind.returnTypeName)
                 }
@@ -888,7 +882,7 @@ class Generator(
                             addType(buildKotlinInterface(funInterfaceClassName.simpleName) {
                                 addModifiers(KModifier.PUBLIC, KModifier.FUN)
                                 addFunction(buildKotlinFunction("invoke") {
-                                    setModifiers(IrModifier.ABSTRACT, IrModifier.OPERATOR)
+                                    addModifiers(KPModifier.ABSTRACT, KPModifier.OPERATOR)
                                     setParameters(kind.parameters)
                                     setReturnType(kind.returnTypeName)
                                 })
@@ -913,14 +907,14 @@ class Generator(
                         extensionPackEntities += buildKotlinProperty(entry.sourceName, entry.typeName) {
                             setReceiverType(patchCompanionClassName)
                             setGetter {
-                                setModifiers(IrModifier.INLINE)
+                                addModifiers(KPModifier.INLINE)
                                 setBody {
                                     return_("%T.%L()") { +bridge.className; +entry.getter.sourceJvmName }
                                 }
                             }
                             entry.setter?.let { setter ->
                                 setSetter {
-                                    setModifiers(IrModifier.INLINE)
+                                    addModifiers(KPModifier.INLINE)
                                     setParameters(setter.parameters)
                                     setBody {
                                         code_("%T.%L(%N)") {
@@ -934,7 +928,7 @@ class Generator(
 
                     is IrMixinInternalBridgeShadowFunctionEntry -> {
                         extensionPackEntities += buildKotlinFunction(entry.sourceName) {
-                            setModifiers(IrModifier.INLINE)
+                            addModifiers(KPModifier.INLINE)
                             setReceiverType(patchCompanionClassName)
                             setParameters(entry.parameters)
                             setReturnType(entry.returnTypeName)
@@ -985,7 +979,7 @@ class Generator(
                                 Op.Set -> listOf(IrSetterParameter(member.typeName))
                             }
                             val callable = buildJavaMethod(name) {
-                                setModifiers(if (member.isStatic) IrModifier.STATIC else IrModifier.ABSTRACT)
+                                addModifiers(if (member.isStatic) JPModifier.STATIC else JPModifier.ABSTRACT)
                                 if (op == Op.Set && member.removeFinal) {
                                     addAnnotation<Mutable>()
                                 }
@@ -1002,12 +996,8 @@ class Generator(
                             extensionPackEntities += buildKotlinFunction(extensionName) {
                                 delegateParameter?.let { setContextParameters(listOf(it)) }
                                 setReceiverType(extensionReceiverTypeName)
-                                setModifiers(
-                                    listOfNotNull(
-                                        IrModifier.INLINE,
-                                        if (isDescriptorExtension) IrModifier.OPERATOR else null,
-                                    )
-                                )
+                                addModifiers(KPModifier.INLINE)
+                                if (isDescriptorExtension) addModifiers(KPModifier.OPERATOR)
                                 setParameters(parameters)
                                 if (op == Op.Get) {
                                     setReturnType(member.typeName)
@@ -1023,7 +1013,7 @@ class Generator(
 
                     is IrMixinAccessorMethodMember -> {
                         val invokerMethod = buildJavaMethod(member.name.withInternalPrefix(ACCESS)) {
-                            setModifiers(if (member.isStatic) IrModifier.STATIC else IrModifier.ABSTRACT)
+                            addModifiers(if (member.isStatic) JPModifier.STATIC else JPModifier.ABSTRACT)
                             addAnnotation<Invoker> {
                                 setArgumentValue(Invoker::value, member.mappingName)
                             }
@@ -1035,12 +1025,8 @@ class Generator(
                             name = if (isDescriptorExtension) "invoke" else member.name,
                             jvmNamespace = jvmNamespace
                         ) {
-                            setModifiers(
-                                listOfNotNull(
-                                    IrModifier.INLINE,
-                                    if (isDescriptorExtension) IrModifier.OPERATOR else null,
-                                )
-                            )
+                            addModifiers(KPModifier.INLINE)
+                            if (isDescriptorExtension) addModifiers(KPModifier.OPERATOR)
                             delegateParameter?.let { setContextParameters(listOf(it)) }
                             setReceiverType(extensionReceiverTypeName)
                             setParameters(member.parameters)

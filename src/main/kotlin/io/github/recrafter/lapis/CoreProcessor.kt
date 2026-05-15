@@ -4,21 +4,23 @@ import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
+import io.github.recrafter.lapis.common.KSTypes
+import io.github.recrafter.lapis.logging.Logger
 import io.github.recrafter.lapis.phases.LapisPhase
+import io.github.recrafter.lapis.phases.bootstrap.Options
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.generator.Generator
 import io.github.recrafter.lapis.phases.lowering.Lowering
 import io.github.recrafter.lapis.phases.lowering.models.IrPatch
 import io.github.recrafter.lapis.phases.lowering.models.IrSchema
-import io.github.recrafter.lapis.phases.parser.KSTypes
 import io.github.recrafter.lapis.phases.parser.SymbolParser
 import io.github.recrafter.lapis.phases.validator.FrontendValidator
 import java.util.*
 
-class LapisProcessor(
-    private val options: LapisOptions,
+class CoreProcessor(
+    private val options: Options,
     private val codeGenerator: CodeGenerator,
-    private val logger: LapisLogger,
+    private val logger: Logger,
 ) : SymbolProcessor {
 
     private val builtins: Builtins = Builtins(options.generatedModPackageName, codeGenerator)

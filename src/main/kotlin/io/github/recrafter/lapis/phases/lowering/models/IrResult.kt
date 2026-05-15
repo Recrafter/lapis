@@ -4,7 +4,7 @@ import com.google.devtools.ksp.symbol.KSFile
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.annotations.Side
-import io.github.recrafter.lapis.phases.common.JvmClassName
+import io.github.recrafter.lapis.common.JvmClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 

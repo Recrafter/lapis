@@ -6,14 +6,14 @@ import com.google.devtools.ksp.impl.symbol.kotlin.KSClassDeclarationImpl
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
-import io.github.recrafter.lapis.LapisLogger
 import io.github.recrafter.lapis.annotations.*
 import io.github.recrafter.lapis.annotations.Origin
+import io.github.recrafter.lapis.common.*
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.ks.*
 import io.github.recrafter.lapis.extensions.ksp.getSymbolsAnnotatedWith
-import io.github.recrafter.lapis.phases.common.JvmClassName
+import io.github.recrafter.lapis.logging.Logger
 import ksp.org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import ksp.org.jetbrains.kotlin.psi.KtClassOrObject
 import ksp.org.jetbrains.kotlin.psi.KtFunctionType
@@ -24,7 +24,7 @@ import kotlin.reflect.KProperty1
 class SymbolParser(
     private val resolver: Resolver,
     private val types: KSTypes,
-    @Suppress("unused") private val logger: LapisLogger,
+    @Suppress("unused") private val logger: Logger,
 ) {
     fun prepare(): ParserPrepareResult =
         ParserPrepareResult(

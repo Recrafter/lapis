@@ -1,15 +1,14 @@
 package io.github.recrafter.lapis.phases.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
+import io.github.recrafter.lapis.common.jvmDescriptor
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
-import io.github.recrafter.lapis.phases.common.jvmDescriptor
 import io.github.recrafter.lapis.phases.generator.builders.GenKotlinEntity
 import io.github.recrafter.lapis.phases.generator.builders.GenKotlinFunctionEntity
 import io.github.recrafter.lapis.phases.generator.builders.GenKotlinPropertyEntity
 import io.github.recrafter.lapis.phases.generator.models.GenDescriptorWrapperImplResult
 import io.github.recrafter.lapis.phases.generator.models.GenInternalPrefix.ARGUMENT
-import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
@@ -42,7 +41,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             )
             val getReceiverFunction = receiverConstructorParameter?.let {
                 buildKotlinFunction("getReceiver", jvmNamespace = impl.className) {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setReceiverType(superClassTypeName)
                     setReturnType(receiverConstructorParameter.typeName)
                     setBody {
@@ -51,7 +50,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 }.let(::GenKotlinFunctionEntity)
             }?.also { extensionPackEntities += it }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 val receiverParameter = getReceiverFunction?.let {
                     buildKotlinParameter("receiver", impl.receiverTypeName) {
@@ -92,7 +91,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             val valueProperty = buildKotlinProperty("value", impl.fieldTypeName, jvmNamespace = impl.className) {
                 setReceiverType(superClassTypeName)
                 setGetter {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setBody {
                         return_("(this as %T).%N") { +impl.className; +valueConstructorParameter }
                     }
@@ -100,7 +99,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             }.also { extensionPackEntities += GenKotlinPropertyEntity(it) }
             val getReceiverFunction = receiverConstructorParameter?.let {
                 buildKotlinFunction("getReceiver", jvmNamespace = impl.className) {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setReceiverType(superClassTypeName)
                     setReturnType(receiverConstructorParameter.typeName)
                     setBody {
@@ -109,7 +108,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 }.let(::GenKotlinFunctionEntity)
             }?.also { extensionPackEntities += it }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 val valueParameter = buildKotlinParameter("value", impl.fieldTypeName) {
                     setDefaultValue("this.%N") { +valueProperty }
@@ -150,7 +149,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             ) {
                 setReceiverType(superClassTypeName)
                 setGetter {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setBody {
                         return_("(this as %T).%N") { +impl.className; +arrayConstructorParameter }
                     }
@@ -161,14 +160,14 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             ) {
                 setReceiverType(superClassTypeName)
                 setGetter {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setBody {
                         return_("(this as %T).%N") { +impl.className; +indexConstructorParameter }
                     }
                 }
             }.also { extensionPackEntities += GenKotlinPropertyEntity(it) }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 val arrayParameter = buildKotlinParameter("array", arrayConstructorParameter.typeName) {
                     setDefaultValue("this.%N") { +arrayProperty }
@@ -204,7 +203,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             ) {
                 setReceiverType(superClassTypeName)
                 setGetter {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setBody {
                         return_("(this as %T).%N") { +impl.className; +arrayConstructorParameter }
                     }
@@ -215,7 +214,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             ) {
                 setReceiverType(superClassTypeName)
                 setGetter {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setBody {
                         return_("(this as %T).%N") { +impl.className; +indexConstructorParameter }
                     }
@@ -226,14 +225,14 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             ) {
                 setReceiverType(superClassTypeName)
                 setGetter {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setBody {
                         return_("(this as %T).%N") { +impl.className; +valueConstructorParameter }
                     }
                 }
             }.also { extensionPackEntities += GenKotlinPropertyEntity(it) }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 val arrayParameter = buildKotlinParameter(arrayProperty.name, arrayConstructorParameter.typeName) {
                     setDefaultValue("this.%N") { +arrayProperty }
@@ -274,7 +273,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 buildKotlinProperty(property.name, property.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
-                        setModifiers(IrModifier.INLINE)
+                        addModifiers(KPModifier.INLINE)
                         setBody {
                             return_("(this as %T).%L") { +impl.className; +property.name.withInternalPrefix(ARGUMENT) }
                         }
@@ -282,7 +281,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 }.let(::GenKotlinPropertyEntity)
             }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 addParameters(parameterSuites.mapNotNull { it.invokeParameter })
                 setReturnType(impl.returnTypeName)
@@ -320,7 +319,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 buildKotlinProperty(property.name, property.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
-                        setModifiers(IrModifier.INLINE)
+                        addModifiers(KPModifier.INLINE)
                         setBody {
                             return_("(this as %T).%L") { +impl.className; +property.name.withInternalPrefix(ARGUMENT) }
                         }
@@ -329,7 +328,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             }
             val getReceiverFunction = receiverConstructorParameter?.let {
                 buildKotlinFunction("getReceiver", jvmNamespace = impl.className) {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setReceiverType(superClassTypeName)
                     setReturnType(receiverConstructorParameter.typeName)
                     setBody {
@@ -340,7 +339,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             val invokeParameters = parameterSuites.mapNotNull { it.invokeParameter }
             val callArguments = parameterSuites.map { it.callArgument }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 addParameters(invokeParameters)
                 setReturnType(impl.returnTypeName)
@@ -358,7 +357,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             }.also { extensionPackEntities += GenKotlinFunctionEntity(it) }
             if (impl.receiverTypeName != null) {
                 buildKotlinFunction("call", jvmNamespace = impl.className) {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     val receiverParameter = IrParameter("_receiver", impl.receiverTypeName)
                     setContextParameters(listOf(receiverParameter))
                     setReceiverType(superClassTypeName)
@@ -408,7 +407,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
             buildKotlinProperty("isCanceled", KPBoolean.asIrTypeName(), jvmNamespace = impl.className) {
                 setReceiverType(superClassTypeName)
                 setGetter {
-                    setModifiers(IrModifier.INLINE)
+                    addModifiers(KPModifier.INLINE)
                     setBody {
                         val notNullCheckFormat = if (impl.isReturn) " != null" else ""
                         return_("(this as %T).%N.%L()$notNullCheckFormat") {
@@ -423,7 +422,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 buildKotlinProperty("returnValue", type, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
-                        setModifiers(IrModifier.INLINE)
+                        addModifiers(KPModifier.INLINE)
                         setBody {
                             val callableName = primitiveJvmName?.let { checkCallable.name + it } ?: checkCallable.name
                             return_("(this as %T).%N.%L()") {
@@ -434,7 +433,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 }.also { extensionPackEntities += GenKotlinPropertyEntity(it) }
             }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
-                setModifiers(IrModifier.INLINE, IrModifier.OPERATOR)
+                addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 setReturnType(KPNothing.asIrClassName())
                 val returnValueParameter = impl.returnTypeName

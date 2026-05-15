@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.phases.common
+package io.github.recrafter.lapis.common
 
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*

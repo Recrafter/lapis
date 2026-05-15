@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.phases.common
+package io.github.recrafter.lapis.common
 
 data class JvmClassName(
     val packageName: String,

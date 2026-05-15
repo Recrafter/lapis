@@ -3,6 +3,8 @@ package io.github.recrafter.lapis.phases.parser
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import io.github.recrafter.lapis.common.KSTypes
+import io.github.recrafter.lapis.common.isNothing
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ks.name
 import kotlin.enums.enumEntries

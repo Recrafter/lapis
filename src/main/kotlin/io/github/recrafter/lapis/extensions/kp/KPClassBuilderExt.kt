@@ -1,8 +1,5 @@
 package io.github.recrafter.lapis.extensions.kp
 
-import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
@@ -30,16 +27,4 @@ fun KPClassBuilder.addSuperInterface(typeName: IrTypeName) {
 
 fun KPClassBuilder.setVariableTypes(vararg types: IrTypeVariableName) {
     addTypeVariables(types.map { it.kotlin })
-}
-
-fun KPClassBuilder.setModifiers(vararg modifiers: IrModifier) {
-    modifiers.forEach {
-        when (it) {
-            IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
-            IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
-            IrModifier.SEALED -> addModifiers(KPModifier.SEALED)
-            IrModifier.FINAL -> addModifiers(KPModifier.FINAL)
-            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin classes")
-        }
-    }
 }

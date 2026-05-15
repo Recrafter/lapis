@@ -1,12 +1,13 @@
-package io.github.recrafter.lapis
+package io.github.recrafter.lapis.logging
 
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.FileLocation
 import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.NonExistLocation
+import io.github.recrafter.lapis.Lapis
 import io.github.recrafter.lapis.phases.LapisPhase
 
-class LapisLogger(private val logger: KSPLogger) {
+class Logger(private val logger: KSPLogger) {
 
     private var currentPhase: LapisPhase = LapisPhase.entries.first()
 
@@ -32,7 +33,7 @@ class LapisLogger(private val logger: KSPLogger) {
     }
 
     private fun buildFullMessage(message: String, symbol: KSNode?): String = buildString {
-        appendLine("[${LapisMeta.NAME}] [Phase: $currentPhase]")
+        appendLine("[${Lapis.NAME}] [Phase: $currentPhase]")
         appendLine(message.trimEnd())
         symbol?.let {
             val locationText = when (val location = it.location) {

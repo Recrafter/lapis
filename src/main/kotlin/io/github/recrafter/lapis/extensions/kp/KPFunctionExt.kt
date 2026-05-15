@@ -4,10 +4,7 @@ import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
 import com.squareup.kotlinpoet.ContextParameter
 import com.squareup.kotlinpoet.ExperimentalKotlinPoetApi
 import io.github.recrafter.lapis.extensions.common.Builder
-import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.phases.generator.builders.GenKotlinFunctionBody
-import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
@@ -56,21 +53,4 @@ fun KPFunctionBuilder.setParameters(parameters: List<IrParameter>) {
 @OptIn(ExperimentalKotlinPoetApi::class)
 fun KPFunctionBuilder.setContextParameters(parameters: List<IrParameter>) {
     contextParameters(parameters.map { ContextParameter(it.name, it.typeName.kotlin) })
-}
-
-fun KPFunctionBuilder.setModifiers(vararg modifiers: IrModifier) {
-    modifiers.forEach {
-        when (it) {
-            IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
-            IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
-            IrModifier.INLINE -> addModifiers(KPModifier.INLINE)
-            IrModifier.OPERATOR -> addModifiers(KPModifier.OPERATOR)
-            IrModifier.FINAL -> addModifiers(KPModifier.FINAL)
-            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin functions")
-        }
-    }
-}
-
-fun KPFunctionBuilder.setModifiers(modifiers: List<IrModifier>) {
-    setModifiers(*modifiers.toTypedArray())
 }

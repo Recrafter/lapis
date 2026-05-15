@@ -5,18 +5,18 @@ import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import io.github.recrafter.lapis.LapisLogger
-import io.github.recrafter.lapis.LapisOptions
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
+import io.github.recrafter.lapis.common.binaryName
+import io.github.recrafter.lapis.common.getMixinReference
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.ks.isInterface
 import io.github.recrafter.lapis.extensions.withInternalPrefix
+import io.github.recrafter.lapis.logging.Logger
+import io.github.recrafter.lapis.phases.bootstrap.Options
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
-import io.github.recrafter.lapis.phases.common.binaryName
-import io.github.recrafter.lapis.phases.common.getMixinReference
 import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.types.*
 import io.github.recrafter.lapis.phases.validator.models.ValidatorResult
@@ -28,8 +28,8 @@ import org.spongepowered.asm.mixin.injection.Constant
 import kotlin.reflect.KClass
 
 class Lowering(
-    private val options: LapisOptions,
-    @Suppress("unused") private val logger: LapisLogger,
+    private val options: Options,
+    @Suppress("unused") private val logger: Logger,
 ) {
     private val patches: MutableList<IrPatch> = mutableListOf()
 

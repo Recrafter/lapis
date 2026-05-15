@@ -2,9 +2,6 @@ package io.github.recrafter.lapis.extensions.kp
 
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
 import io.github.recrafter.lapis.extensions.common.Builder
-import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> KPPropertyBuilder.addAnnotation(
@@ -25,17 +22,6 @@ fun KPPropertyBuilder.setSetter(builder: Builder<KPFunctionBuilder> = {}) {
 
 fun KPPropertyBuilder.setReceiverType(typeName: IrTypeName) {
     receiver(typeName.kotlin)
-}
-
-fun KPPropertyBuilder.setModifiers(vararg modifiers: IrModifier) {
-    modifiers.forEach {
-        when (it) {
-            IrModifier.ABSTRACT -> addModifiers(KPModifier.ABSTRACT)
-            IrModifier.OVERRIDE -> addModifiers(KPModifier.OVERRIDE)
-            IrModifier.FINAL -> addModifiers(KPModifier.FINAL)
-            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Kotlin properties")
-        }
-    }
 }
 
 val List<KPProperty>.format: String

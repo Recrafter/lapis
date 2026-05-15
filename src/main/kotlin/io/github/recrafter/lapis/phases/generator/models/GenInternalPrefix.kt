@@ -1,9 +1,9 @@
 package io.github.recrafter.lapis.phases.generator.models
 
-import io.github.recrafter.lapis.LapisMeta
+import io.github.recrafter.lapis.Lapis
 
 enum class GenInternalPrefix(val value: String) {
-    BUILTIN(LapisMeta.NAME.lowercase()),
+    BUILTIN(Lapis.NAME.lowercase()),
     PARAM("param"),
     LOCAL("local"),
     SHARE("share"),

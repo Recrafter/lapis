@@ -1,9 +1,6 @@
 package io.github.recrafter.lapis.extensions.jp
 
 import io.github.recrafter.lapis.extensions.common.Builder
-import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 inline fun <reified A : Annotation> JPClassBuilder.addAnnotation(builder: Builder<JPAnnotationBuilder> = {}) {
@@ -12,15 +9,4 @@ inline fun <reified A : Annotation> JPClassBuilder.addAnnotation(builder: Builde
 
 fun JPClassBuilder.addSuperInterface(typeName: IrTypeName) {
     addSuperinterface(typeName.java)
-}
-
-fun JPClassBuilder.setModifiers(vararg modifiers: IrModifier) {
-    modifiers.forEach {
-        when (it) {
-            IrModifier.ABSTRACT -> addModifiers(JPModifier.ABSTRACT)
-            IrModifier.STATIC -> addModifiers(JPModifier.STATIC)
-            IrModifier.FINAL -> addModifiers(JPModifier.FINAL)
-            else -> lapisError("Modifier ${it.name.quoted()} is not applicable to Java classes")
-        }
-    }
 }

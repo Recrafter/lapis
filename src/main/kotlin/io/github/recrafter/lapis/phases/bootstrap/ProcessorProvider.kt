@@ -1,11 +1,14 @@
-package io.github.recrafter.lapis
+package io.github.recrafter.lapis.phases.bootstrap
 
 import com.google.auto.service.AutoService
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
+import io.github.recrafter.lapis.CoreProcessor
+import io.github.recrafter.lapis.Lapis
 import io.github.recrafter.lapis.extensions.elements
 import io.github.recrafter.lapis.extensions.quoted
+import io.github.recrafter.lapis.logging.Logger
 import kotlinx.serialization.descriptors.serialDescriptor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -13,23 +16,23 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 
 @AutoService(SymbolProcessorProvider::class)
-class LapisProcessorProvider : SymbolProcessorProvider {
+class ProcessorProvider : SymbolProcessorProvider {
 
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        val logger = LapisLogger(environment.logger)
-        return LapisProcessor(
+        val logger = Logger(environment.logger)
+        return CoreProcessor(
             parseOptions(environment.options, logger),
             environment.codeGenerator,
             logger,
         )
     }
 
-    private fun parseOptions(options: Map<String, String>, logger: LapisLogger): LapisOptions {
+    private fun parseOptions(options: Map<String, String>, logger: Logger): Options {
         val processorOptions = options
             .filterKeys { it.startsWith(ARGUMENT_PREFIX) }
             .mapKeys { it.key.removeArgumentPrefix() }
 
-        val descriptorElements = serialDescriptor<LapisOptions>().elements
+        val descriptorElements = serialDescriptor<Options>().elements
         val existingOptions = descriptorElements.map { it.name }.toSet()
 
         val unknownKeys = processorOptions.keys - existingOptions
@@ -70,7 +73,7 @@ class LapisProcessorProvider : SymbolProcessorProvider {
         removePrefix(ARGUMENT_PREFIX)
 
     companion object {
-        private val ARGUMENT_PREFIX: String = LapisMeta.NAME.lowercase() + "."
+        private val ARGUMENT_PREFIX: String = Lapis.NAME.lowercase() + "."
     }
 }
 

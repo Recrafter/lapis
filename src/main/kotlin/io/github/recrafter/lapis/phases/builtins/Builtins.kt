@@ -3,7 +3,7 @@ package io.github.recrafter.lapis.phases.builtins
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.squareup.kotlinpoet.ksp.writeTo
-import io.github.recrafter.lapis.LapisMeta
+import io.github.recrafter.lapis.Lapis
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.kp.KPClass
 import io.github.recrafter.lapis.extensions.kp.KPTypeAlias
@@ -24,7 +24,7 @@ class Builtins(
     private var isInternalGenerated: Boolean = false
 
     private val externalClassName: IrClassName =
-        IrClassName.of(generatedModPackageName, LapisMeta.NAME)
+        IrClassName.of(generatedModPackageName, Lapis.NAME)
 
     private val internalClassName: IrClassName =
         IrClassName.of(externalClassName.packageName, externalClassName.simpleName + "Internal")
@@ -68,11 +68,7 @@ class Builtins(
         if (builtin.isInternal) {
             requestedInternalBuiltins.getOrPut(builtin.name) { builtin }
         }
-        val rootClassName = if (builtin.isInternal) internalClassName else externalClassName
-        if (builtin is TypeAliasBuiltin) {
-            return IrClassName.of(rootClassName.packageName, builtin.name)
-        }
-        return rootClassName.inner(builtin.name)
+        return (if (builtin.isInternal) internalClassName else externalClassName).inner(builtin.name)
     }
 
     fun <T : IrDescriptorWrapperImpl<T>> generateDescriptorWrapperImpl(
