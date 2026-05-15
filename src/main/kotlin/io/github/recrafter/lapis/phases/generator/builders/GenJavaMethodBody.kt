@@ -49,33 +49,33 @@ value class GenJavaMethodBody(private val builder: JPMethodBuilder) {
 
     @Suppress("LocalVariableName")
     fun GenJavaMethodBody.try_(
-        block_: JPCodeBlock,
+        block_: Builder<IrJavaCodeBlock>,
         catchingClassName: IrClassName,
         catch_: Builder<IrJavaCodeBlock>? = null,
         finally_: Builder<IrJavaCodeBlock>? = null,
     ) {
         builder.beginControlFlow(buildJavaCodeBlock("try"))
-        builder.addCode(block_)
+        buildJavaCodeBlock(block_)
         builder.nextControlFlow(buildJavaCodeBlock("catch (%T %L)") {
             +catchingClassName; +(if (catch_ == null) "ignored" else "e")
         })
-        catch_?.let { builder.addCode(buildJavaCodeBlock(it)) }
+        catch_?.let(::buildJavaCodeBlock)
         finally_?.let {
             builder.nextControlFlow(buildJavaCodeBlock("finally"))
-            builder.addCode(buildJavaCodeBlock(it))
+            buildJavaCodeBlock(it)
         }
         builder.endControlFlow()
     }
 
     fun GenJavaMethodBody.synchronized_(lock: JPCodeBlock, body: Builder<IrJavaCodeBlock>) {
         builder.beginControlFlow(buildJavaCodeBlock("synchronized (%L)") { +lock })
-        builder.addCode(buildJavaCodeBlock(body))
+        buildJavaCodeBlock(body)
         builder.endControlFlow()
     }
 
     private fun GenJavaMethodBody.withControlFlow(controlFlow: JPCodeBlock, body: Builder<IrJavaCodeBlock>) {
         builder.beginControlFlow(controlFlow)
-        builder.addCode(buildJavaCodeBlock(body))
+        buildJavaCodeBlock(body)
         builder.endControlFlow()
     }
 }
