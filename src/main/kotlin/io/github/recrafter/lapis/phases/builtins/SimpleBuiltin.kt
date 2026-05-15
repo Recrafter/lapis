@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.phases.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
 import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.phases.generator.builders.nullKotlinCodeBlock
 import io.github.recrafter.lapis.phases.generator.builders.toKotlinCodeBlock
 import io.github.recrafter.lapis.phases.lowering.*
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
@@ -90,8 +91,8 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
                 setSuperClass(
                     RuntimeException::class.asIrTypeName(),
                     constructorArguments = listOf(
-                        buildKotlinCodeBlock("null"),
-                        buildKotlinCodeBlock("null"),
+                        nullKotlinCodeBlock,
+                        nullKotlinCodeBlock,
                         false.toKotlinCodeBlock(),
                         false.toKotlinCodeBlock(),
                     )

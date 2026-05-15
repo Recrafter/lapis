@@ -6,7 +6,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class MixinConfig(
+data class GenMixinConfigJson(
     @SerialName("required")
     val isRequired: Boolean,
 
@@ -46,8 +46,8 @@ data class MixinConfig(
     data class OverwriteConfig(val requireAnnotations: Boolean)
 
     companion object {
-        fun of(mixinPackage: String, qualifiedNames: Map<Side, List<IrClassName>>): MixinConfig =
-            MixinConfig(
+        fun of(mixinPackage: String, qualifiedNames: Map<Side, List<IrClassName>>): GenMixinConfigJson =
+            GenMixinConfigJson(
                 isRequired = true,
                 minVersion = "0.8.6",
                 extrasConfig = ExtrasConfig(minVersion = "0.4.0"),

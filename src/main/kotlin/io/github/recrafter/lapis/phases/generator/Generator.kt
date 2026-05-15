@@ -775,7 +775,18 @@ class Generator(
                         block = invokeHook,
                         catchingClassName = builtins[SimpleBuiltin.CancelSignal],
                         catch_ = injection.returnTypeName?.let {
-                            { return_(it.getJavaPrimitiveType(allowVoid = false)?.primitiveDefaultValue ?: "null") }
+                            {
+                                val defaultValueCodeBlock = when (it.getJavaPrimitiveType(allowVoid = false)) {
+                                    JPBoolean -> false.toJavaCodeBlock()
+                                    JPByte, JPShort, JPInt -> 0.toJavaCodeBlock()
+                                    JPLong -> 0L.toJavaCodeBlock()
+                                    JPChar -> Char.MIN_VALUE.toJavaCodeBlock()
+                                    JPFloat -> 0f.toJavaCodeBlock()
+                                    JPDouble -> 0.0.toJavaCodeBlock()
+                                    else -> null
+                                }
+                                return_(defaultValueCodeBlock ?: nullJavaCodeBlock)
+                            }
                         },
                     )
                 } else {
@@ -1067,7 +1078,7 @@ class Generator(
         val mixinConfig = GenMixinConfig(mixinBlueprints.flatMap { it.originatingFiles }, options.mixinConfig)
         generateResourceFile(mixinConfig, aggregating = true) {
             val qualifiedNames = mixinBlueprints.map { it.side to it.className }.groupBy({ it.first }) { it.second }
-            configJson.encodeToString(MixinConfig.of(options.generatedMixinPackageName, qualifiedNames))
+            configJson.encodeToString(GenMixinConfigJson.of(options.generatedMixinPackageName, qualifiedNames))
         }
     }
 
