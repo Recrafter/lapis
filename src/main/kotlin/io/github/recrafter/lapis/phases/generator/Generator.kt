@@ -754,19 +754,21 @@ class Generator(
                         code_("%N()") { +it }
                     }
                 }
-                fun invokeHook_() {
+                fun invokeHook_(): JPCodeBlock {
                     val patchImplMember = if (injection.isStatic) null else {
                         patchImplMember ?: lapisError("Patch impl cannot be null")
                     }
-                    val patchInstanceFormat = patchImplMember?.callFormat ?: "%T.Companion"
-                    code_("$patchInstanceFormat.%L(${hookArgumentCodeBlocks.format})", isReturn = injection.isReturn) {
-                        patchImplMember?.let { it() } ?: +patchClassName
-                        +injection.jvmName; hookArgumentCodeBlocks.forEach { +it }
+                    val receiverFormat = patchImplMember?.callFormat ?: "%T.Companion"
+                    return buildJavaCodeBlock {
+                        code_("$receiverFormat.%L(${hookArgumentCodeBlocks.format})", isReturn = injection.isReturn) {
+                            patchImplMember?.let { it() } ?: +patchClassName
+                            +injection.jvmName; hookArgumentCodeBlocks.forEach { +it }
+                        }
                     }
                 }
                 if (hasCancelArgument) {
                     try_(
-                        block_ = { invokeHook_() },
+                        block_ = invokeHook_(),
                         catchingClassName = builtins[SimpleBuiltin.CancelSignal],
                         catch_ = injection.returnTypeName?.let {
                             {
@@ -784,7 +786,7 @@ class Generator(
                         },
                     )
                 } else {
-                    buildJavaCodeBlock { invokeHook_() }
+                    invokeHook_()
                 }
             }
         }
