@@ -48,7 +48,7 @@ class SymbolParser(
         val innerSchemaAnnotation = classDeclaration.findAnnotation<InnerSchema>()
         val localSchemaAnnotation = classDeclaration.findAnnotation<LocalSchema>()
         val anonymousSchemaAnnotation = classDeclaration.findAnnotation<AnonymousSchema>()
-        val isResolvable = classDeclaration.parentDeclarations(includeSelf = true).none {
+        val isAccessible = classDeclaration.parentDeclarations(includeSelf = true).none {
             it.hasAnnotation<LocalSchema>() || it.hasAnnotation<AnonymousSchema>()
         }
         val (currentJvmClassName, originClassDeclaration, side) = when {
@@ -65,7 +65,7 @@ class SymbolParser(
             innerSchemaAnnotation != null -> {
                 val innerJvmClassName = innerSchemaAnnotation.getArgumentValue(InnerSchema::name)
                     ?.let(parentJvmClassName::inner)
-                val classDeclaration = if (isResolvable) {
+                val classDeclaration = if (isAccessible) {
                     innerJvmClassName?.qualifiedName?.let(resolver::getClassDeclarationByName)
                 } else {
                     innerSchemaAnnotation.getArgumentValue(InnerSchema::delegate)
@@ -119,7 +119,7 @@ class SymbolParser(
             hasInnerSchemaAnnotation = innerSchemaAnnotation != null,
             hasLocalSchemaAnnotation = localSchemaAnnotation != null,
             hasAnonymousSchemaAnnotation = anonymousSchemaAnnotation != null,
-            isResolvable = isResolvable,
+            isAccessible = isAccessible,
             hasAccessAnnotation = accessAnnotation != null,
             isAccessUnfinal = accessAnnotation?.getArgumentValue(Access::unfinal) == true,
             accessStrategy = accessAnnotation?.getArgumentValue(Access::strategy),
@@ -317,7 +317,7 @@ class SymbolParser(
             shadowModifiers = shadowAnnotation?.getArgumentValue(KShadow::modifiers).orEmpty(),
 
             hasHookAnnotation = hookAnnotation != null,
-            hookDescriptorClassDeclaration = hookAnnotation?.getArgumentValue(Hook::desc)?.toClassDeclaration(),
+            hookDescClassDeclaration = hookAnnotation?.getArgumentValue(Hook::desc)?.toClassDeclaration(),
             hookAt = functionDeclaration.findAnnotation<Hook>()?.getArgumentValue(Hook::at),
 
             hasAtConstructorHeadAnnotation = atConstructorHeadAnnotation != null,
@@ -356,7 +356,7 @@ class SymbolParser(
 
             hasAtFieldAnnotation = atFieldAnnotation != null,
             atFieldOp = atFieldAnnotation?.getArgumentValue(AtField::op),
-            atFieldDescriptorClassDeclaration = functionDeclaration
+            atFieldDescClassDeclaration = functionDeclaration
                 .findAnnotation<AtField>()
                 ?.getArgumentValue(AtField::desc)
                 ?.toClassDeclaration(),
@@ -364,14 +364,14 @@ class SymbolParser(
 
             hasAtArrayAnnotation = atArrayAnnotation != null,
             atArrayOp = atArrayAnnotation?.getArgumentValue(AtArray::op),
-            atArrayDescriptorClassDeclaration = functionDeclaration
+            atArrayDescClassDeclaration = functionDeclaration
                 .findAnnotation<AtArray>()
                 ?.getArgumentValue(AtArray::desc)
                 ?.toClassDeclaration(),
             atArrayOrdinals = atArrayAnnotation?.getArgumentValue(AtArray::ordinal).orEmpty(),
 
             hasAtCallAnnotation = atCallAnnotation != null,
-            atCallDescriptorClassDeclaration = functionDeclaration
+            atCallDescClassDeclaration = functionDeclaration
                 .findAnnotation<AtCall>()
                 ?.getArgumentValue(AtCall::desc)
                 ?.toClassDeclaration(),

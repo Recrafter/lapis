@@ -3,6 +3,8 @@ package io.github.recrafter.lapis.extensions.common
 import io.github.recrafter.lapis.LapisMeta
 import io.github.recrafter.lapis.ProjektBuildConfig
 
+typealias Builder<T> = T.() -> Unit
+
 fun lapisError(message: String): Nothing =
     error(
         "$message. " +

@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.extensions.jp
 
 import com.palantir.javapoet.*
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.GeneratorConstants
-import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName

@@ -32,7 +32,7 @@ class ParsedSchema(
     val hasAnonymousSchemaAnnotation: Boolean,
     val hasAccessAnnotation: Boolean,
     val isAccessUnfinal: Boolean,
-    val isResolvable: Boolean,
+    val isAccessible: Boolean,
     val accessStrategy: AccessStrategy?,
     val descriptors: List<ParsedDescriptor>,
     val nestedSchemas: List<ParsedSchema>,
@@ -151,7 +151,7 @@ class ParsedPatchFunction(
     val shadowModifiers: List<JPModifier>,
 
     val hasHookAnnotation: Boolean,
-    val hookDescriptorClassDeclaration: KSClassDeclaration?,
+    val hookDescClassDeclaration: KSClassDeclaration?,
     val hookAt: At?,
 
     val hasAtConstructorHeadAnnotation: Boolean,
@@ -186,16 +186,16 @@ class ParsedPatchFunction(
 
     val hasAtFieldAnnotation: Boolean,
     val atFieldOp: Op?,
-    val atFieldDescriptorClassDeclaration: KSClassDeclaration?,
+    val atFieldDescClassDeclaration: KSClassDeclaration?,
     val atFieldOrdinals: List<Int>,
 
     val hasAtArrayAnnotation: Boolean,
     val atArrayOp: Op?,
-    val atArrayDescriptorClassDeclaration: KSClassDeclaration?,
+    val atArrayDescClassDeclaration: KSClassDeclaration?,
     val atArrayOrdinals: List<Int>,
 
     val hasAtCallAnnotation: Boolean,
-    val atCallDescriptorClassDeclaration: KSClassDeclaration?,
+    val atCallDescClassDeclaration: KSClassDeclaration?,
     val atCallOrdinals: List<Int>,
 ) : SymbolSource(symbol) {
 

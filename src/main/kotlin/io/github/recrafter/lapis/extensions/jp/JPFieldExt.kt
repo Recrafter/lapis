@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.extensions.jp
 
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 
 inline fun <reified A : Annotation> JPFieldBuilder.addAnnotation(builder: Builder<JPAnnotationBuilder> = {}) {

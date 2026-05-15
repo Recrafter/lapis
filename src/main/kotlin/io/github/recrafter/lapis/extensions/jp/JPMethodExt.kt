@@ -1,9 +1,9 @@
 package io.github.recrafter.lapis.extensions.jp
 
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.phases.generator.builders.Builder
-import io.github.recrafter.lapis.phases.generator.builders.IrJavaMethodBody
+import io.github.recrafter.lapis.phases.generator.builders.GenJavaMethodBody
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
@@ -13,8 +13,8 @@ inline fun <reified A : Annotation> JPMethodBuilder.addAnnotation(builder: Build
     addAnnotation(buildJavaAnnotation<A>(builder))
 }
 
-fun JPMethodBuilder.setBody(builder: Builder<IrJavaMethodBody> = {}) {
-    IrJavaMethodBody(this).builder()
+fun JPMethodBuilder.setBody(builder: Builder<GenJavaMethodBody> = {}) {
+    GenJavaMethodBody(this).builder()
 }
 
 fun JPMethodBuilder.setStubBody(message: String = "Stub!") {

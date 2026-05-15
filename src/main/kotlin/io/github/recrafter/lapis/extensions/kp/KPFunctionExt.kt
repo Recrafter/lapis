@@ -3,10 +3,10 @@ package io.github.recrafter.lapis.extensions.kp
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
 import com.squareup.kotlinpoet.ContextParameter
 import com.squareup.kotlinpoet.ExperimentalKotlinPoetApi
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.quoted
-import io.github.recrafter.lapis.phases.generator.builders.Builder
-import io.github.recrafter.lapis.phases.generator.builders.IrKotlinFunctionBody
+import io.github.recrafter.lapis.phases.generator.builders.GenKotlinFunctionBody
 import io.github.recrafter.lapis.phases.lowering.IrModifier
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
@@ -18,8 +18,8 @@ inline fun <reified A : Annotation> KPFunctionBuilder.addAnnotation(
     addAnnotation(buildKotlinAnnotation<A>(useSiteTarget, builder))
 }
 
-fun KPFunctionBuilder.setBody(builder: Builder<IrKotlinFunctionBody> = {}) {
-    IrKotlinFunctionBody(this).builder()
+fun KPFunctionBuilder.setBody(builder: Builder<GenKotlinFunctionBody> = {}) {
+    GenKotlinFunctionBody(this).builder()
 }
 
 fun KPFunctionBuilder.addStatement(codeBlock: KPCodeBlock) {

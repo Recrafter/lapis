@@ -3,8 +3,8 @@ package io.github.recrafter.lapis.extensions.kp
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
 import io.github.recrafter.lapis.extensions.capitalize
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.GeneratorConstants
-import io.github.recrafter.lapis.phases.generator.builders.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrKotlinCodeBlock
 import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter

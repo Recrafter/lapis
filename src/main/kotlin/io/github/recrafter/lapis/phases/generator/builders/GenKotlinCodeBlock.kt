@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.jp.JPField
 import io.github.recrafter.lapis.extensions.jp.JPMethod
 import io.github.recrafter.lapis.extensions.kp.*
@@ -29,10 +30,6 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
             arguments += this
         }
 
-        operator fun KCallable<*>.unaryPlus() {
-            arguments += this.name
-        }
-
         operator fun KPCodeBlock.unaryPlus() {
             arguments += this
         }
@@ -49,57 +46,65 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
             arguments += this
         }
 
-        operator fun KPEntity.invoke() {
+        operator fun GenKotlinEntity.invoke() {
             when (this) {
-                is KPPropertyEntity -> +property
+                is GenKotlinPropertyEntity -> +property
 
-                is KPFunctionEntity -> {
+                is GenKotlinFunctionEntity -> {
                     +function; parameters.forEach { +it }
                 }
             }
         }
 
-        operator fun KPEntity.unaryPlus() {
+        operator fun GenKotlinEntity.unaryPlus() {
             when (this) {
-                is KPPropertyEntity -> +property
-                is KPFunctionEntity -> +function
+                is GenKotlinPropertyEntity -> +property
+                is GenKotlinFunctionEntity -> +function
             }
         }
 
-        operator fun IrTypeName.unaryPlus() {
-            arguments += this.kotlin
-        }
-
-        operator fun IrParameter.unaryPlus() {
-            arguments += buildKotlinFunction(this.name)
-        }
-
         operator fun JPField.unaryPlus() {
-            arguments += this
+            asName(name())
         }
 
         operator fun JPMethod.unaryPlus() {
-            arguments += buildKotlinFunction(this.name())
+            asName(name())
         }
 
-        operator fun JPEntity.invoke() {
+        operator fun GenJavaEntity.invoke() {
             when (this) {
-                is JPFieldEntity -> +field
+                is GenJavaFieldEntity -> +field
 
-                is JPMethodEntity -> {
+                is GenJavaMethodEntity -> {
                     +method; parameters.forEach { +it }
                 }
             }
         }
 
-        operator fun JPEntity.unaryPlus() {
+        operator fun GenJavaEntity.unaryPlus() {
             when (this) {
-                is JPFieldEntity -> +field
-                is JPMethodEntity -> +method
+                is GenJavaFieldEntity -> +field
+                is GenJavaMethodEntity -> +method
             }
         }
 
+        operator fun KCallable<*>.unaryPlus() {
+            arguments += name
+        }
+
+        operator fun IrTypeName.unaryPlus() {
+            arguments += kotlin
+        }
+
+        operator fun IrParameter.unaryPlus() {
+            asName(name)
+        }
+
         fun build(): Array<Any> = arguments.toTypedArray()
+
+        private fun asName(name: String) {
+            arguments += buildKotlinFunction(name)
+        }
     }
 }
 

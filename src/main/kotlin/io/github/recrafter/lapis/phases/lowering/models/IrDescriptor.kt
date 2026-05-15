@@ -12,11 +12,14 @@ sealed class IrInvokableDescriptor(
     override val returnTypeName: IrTypeName?,
 ) : IrDescriptor, IrReturnable
 
-class IrConstructorDescriptor(
-    callWrapperImpl: IrCallDescriptorWrapperImpl?,
-    parameters: List<IrFunctionTypeParameter>,
-    returnTypeName: IrTypeName,
-) : IrInvokableDescriptor(null, callWrapperImpl, null, parameters, returnTypeName)
+class IrFieldDescriptor(
+    val name: String,
+    val fieldGetWrapperImpl: IrFieldGetDescriptorWrapperImpl?,
+    val fieldSetWrapperImpl: IrFieldSetDescriptorWrapperImpl?,
+    val arrayGetWrapperImpl: IrArrayGetDescriptorWrapperImpl?,
+    val arraySetWrapperImpl: IrArraySetDescriptorWrapperImpl?,
+    val typeName: IrTypeName,
+) : IrDescriptor
 
 class IrMethodDescriptor(
     val name: String,
@@ -33,11 +36,8 @@ class IrMethodDescriptor(
     returnTypeName,
 )
 
-class IrFieldDescriptor(
-    val name: String,
-    val fieldGetWrapperImpl: IrFieldGetDescriptorWrapperImpl?,
-    val fieldSetWrapperImpl: IrFieldSetDescriptorWrapperImpl?,
-    val arrayGetWrapperImpl: IrArrayGetDescriptorWrapperImpl?,
-    val arraySetWrapperImpl: IrArraySetDescriptorWrapperImpl?,
-    val typeName: IrTypeName,
-) : IrDescriptor
+class IrConstructorDescriptor(
+    callWrapperImpl: IrCallDescriptorWrapperImpl?,
+    parameters: List<IrFunctionTypeParameter>,
+    returnTypeName: IrTypeName,
+) : IrInvokableDescriptor(null, callWrapperImpl, null, parameters, returnTypeName)

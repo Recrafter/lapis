@@ -3,7 +3,7 @@ package io.github.recrafter.lapis.phases.common
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-import io.github.recrafter.lapis.phases.validator.*
+import io.github.recrafter.lapis.phases.validator.models.schemas.*
 
 class JvmDescriptor(private val type: JPTypeName) {
 
@@ -45,16 +45,13 @@ val IrTypeName.jvmDescriptor: JvmDescriptor
 
 fun Descriptor.getMixinReference(isTarget: Boolean = false): String =
     when (this) {
-        is ConstructorDescriptor -> buildString {
-            if (!isTarget) {
-                append(CONSTRUCTOR_NAME)
+        is FieldDescriptor -> buildString {
+            if (isTarget) {
+                append(inaccessibleReceiverJvmClassName?.descriptor ?: receiverTypeName.jvmDescriptor)
             }
-            append(
-                JvmDescriptor.Signature.of(
-                    parameters.map { it.typeName },
-                    if (isTarget) returnTypeName else null
-                )
-            )
+            append(mappingName)
+            append(":")
+            append(fieldTypeName.jvmDescriptor)
         }
 
         is MethodDescriptor -> buildString {
@@ -64,19 +61,22 @@ fun Descriptor.getMixinReference(isTarget: Boolean = false): String =
             append(mappingName)
             append(
                 JvmDescriptor.Signature.of(
-                    parameters.map { it.typeName },
+                    functionTypeParameters.map { it.typeName },
                     returnTypeName
                 )
             )
         }
 
-        is FieldDescriptor -> buildString {
-            if (isTarget) {
-                append(inaccessibleReceiverJvmClassName?.descriptor ?: receiverTypeName.jvmDescriptor)
+        is ConstructorDescriptor -> buildString {
+            if (!isTarget) {
+                append(CONSTRUCTOR_NAME)
             }
-            append(mappingName)
-            append(":")
-            append(fieldTypeName.jvmDescriptor)
+            append(
+                JvmDescriptor.Signature.of(
+                    functionTypeParameters.map { it.typeName },
+                    if (isTarget) returnTypeName else null
+                )
+            )
         }
     }
 

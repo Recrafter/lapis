@@ -1,4 +1,4 @@
-package io.github.recrafter.lapis.phases.generator.models
+package io.github.recrafter.lapis.phases.common
 
 import io.github.recrafter.lapis.extensions.jp.JPModifier
 
@@ -15,7 +15,7 @@ object JavaModifiers {
         JPModifier.SYNCHRONIZED, JPModifier.NATIVE, JPModifier.STRICTFP,
     )
     val methodConflicts: List<JPModifier> = listOf(
-        JPModifier.ABSTRACT, JPModifier.FINAL, JPModifier.DEFAULT
+        JPModifier.ABSTRACT, JPModifier.FINAL,
     )
     val abstractIllegals: List<JPModifier> = listOf(
         JPModifier.PRIVATE,

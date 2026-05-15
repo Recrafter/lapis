@@ -1,14 +1,15 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.kp.KPFunctionBuilder
 import io.github.recrafter.lapis.extensions.kp.addReturnStatement
 import io.github.recrafter.lapis.extensions.kp.addStatement
 import io.github.recrafter.lapis.extensions.kp.buildKotlinCodeBlock
 
 @JvmInline
-value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
+value class GenKotlinFunctionBody(private val builder: KPFunctionBuilder) {
 
-    fun IrKotlinFunctionBody.code_(
+    fun GenKotlinFunctionBody.code_(
         format: String,
         isReturn: Boolean = false,
         argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
@@ -20,14 +21,14 @@ value class IrKotlinFunctionBody(private val builder: KPFunctionBuilder) {
         }
     }
 
-    fun IrKotlinFunctionBody.return_(
+    fun GenKotlinFunctionBody.return_(
         format: String? = null,
         argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {
         builder.addReturnStatement(format?.let { buildKotlinCodeBlock(it, argumentsBuilder) })
     }
 
-    fun IrKotlinFunctionBody.throw_(
+    fun GenKotlinFunctionBody.throw_(
         format: String,
         argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}
     ) {

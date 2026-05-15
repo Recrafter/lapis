@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
@@ -17,7 +18,7 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
     fun IrJavaCodeBlock.lambda_(
         parameters: List<IrParameter> = emptyList(),
         inline: Boolean = false,
-        bodyBuilder: Builder<IrJavaMethodBody>
+        bodyBuilder: Builder<GenJavaMethodBody>
     ) {
         val bodyCode = buildJavaMethod("temp") { setBody(bodyBuilder) }.code().toString()
         if (inline) {
@@ -88,36 +89,40 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
             arguments += this
         }
 
-        operator fun KClass<*>.unaryPlus() {
-            +this.asIrTypeName()
-        }
-
-        operator fun IrTypeName.unaryPlus() {
-            arguments += this.java
-        }
-
-        operator fun IrParameter.unaryPlus() {
-            arguments += buildJavaMethod(this.name)
-        }
-
-        operator fun JPEntity.invoke() {
+        operator fun GenJavaEntity.invoke() {
             when (this) {
-                is JPFieldEntity -> +field
+                is GenJavaFieldEntity -> +field
 
-                is JPMethodEntity -> {
+                is GenJavaMethodEntity -> {
                     +method; parameters.forEach { +it }
                 }
             }
         }
 
-        operator fun JPEntity.unaryPlus() {
+        operator fun GenJavaEntity.unaryPlus() {
             when (this) {
-                is JPFieldEntity -> +field
-                is JPMethodEntity -> +method
+                is GenJavaFieldEntity -> +field
+                is GenJavaMethodEntity -> +method
             }
         }
 
+        operator fun KClass<*>.unaryPlus() {
+            +asIrTypeName()
+        }
+
+        operator fun IrTypeName.unaryPlus() {
+            arguments += java
+        }
+
+        operator fun IrParameter.unaryPlus() {
+            arguments += asName(name)
+        }
+
         fun build(): Array<Any> = arguments.toTypedArray()
+
+        private fun asName(name: String) {
+            arguments += buildJavaMethod(name)
+        }
     }
 }
 
@@ -130,7 +135,7 @@ fun IrTypeName.toJavaCodeBlock(asClass: Boolean = false): JPCodeBlock =
     buildJavaCodeBlock(if (asClass) "%T.class" else "%T") { +this@toJavaCodeBlock }
 
 fun JPField.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%N") { +this@toCodeBlock }
-fun JPEntity.toCodeBlock(asCall: Boolean = true): JPCodeBlock = buildJavaCodeBlock("%N") {
+fun GenJavaEntity.toCodeBlock(asCall: Boolean = true): JPCodeBlock = buildJavaCodeBlock("%N") {
     if (asCall) this@toCodeBlock()
     else +this@toCodeBlock
 }

@@ -22,10 +22,16 @@ import io.github.recrafter.lapis.phases.builtins.Builtin
 import io.github.recrafter.lapis.phases.builtins.Builtins
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin
+import io.github.recrafter.lapis.phases.common.JavaModifiers
 import io.github.recrafter.lapis.phases.common.JvmClassName
-import io.github.recrafter.lapis.phases.generator.models.JavaModifiers
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.parser.*
+import io.github.recrafter.lapis.phases.validator.models.ValidatorResult
+import io.github.recrafter.lapis.phases.validator.models.common.FunctionParameter
+import io.github.recrafter.lapis.phases.validator.models.patches.*
+import io.github.recrafter.lapis.phases.validator.models.patches.hooks.*
+import io.github.recrafter.lapis.phases.validator.models.schemas.*
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -51,30 +57,36 @@ class FrontendValidator(
         )
 
     private fun ParsedSchema.validate(): List<Schema> {
-        kspRequire(classDeclaration?.isValid == true) { "54" }
-        kspRequire(classDeclaration.typeParameters.isEmpty()) { "55" }
-        kspRequireNotNull(originJvmClassName) { "56" }
-        kspRequire(originClassDeclaration?.isValid == true) { "57" }
+        kspRequire(classDeclaration?.isValid == true) { "60" }
+        kspRequire(classDeclaration.typeParameters.isEmpty()) { "61" }
+        kspRequireNotNull(originJvmClassName) { "62" }
+        kspRequire(originClassDeclaration?.isValid == true) { "63" }
         val hasSingleSchemaAnnotation = listOf(
             hasSchemaAnnotation,
             hasInnerSchemaAnnotation,
             hasLocalSchemaAnnotation,
             hasAnonymousSchemaAnnotation,
         ).count { it } == 1
-        kspRequire(hasSingleSchemaAnnotation) { "64" }
+        kspRequire(hasSingleSchemaAnnotation) { "70" }
         if (hasSchemaAnnotation) {
-            kspRequire(isTopLevel) { "66" }
+            kspRequire(isTopLevel) { "72" }
         }
-        kspRequire(hasPackageName) { "68" }
+        kspRequire(hasPackageName) { "74" }
         val accessRequest = resolveAccessRequest(
-            hasAccessAnnotation, true, isResolvable, accessStrategy, isAccessUnfinal, emptyList()
+            AccessRequestSource.SCHEMA,
+            hasAccessAnnotation,
+            accessStrategy,
+            isAccessUnfinal,
+            isAccessible,
+            emptyList(),
+            emptyList(),
         )
-        val qualifiedName = kspRequireNotNull(classDeclaration.qualifiedName?.asString()) { "72" }
+        val qualifiedName = kspRequireNotNull(classDeclaration.qualifiedName?.asString()) { "84" }
         val descriptors = descriptors.mapNotNull { parsedDescriptor ->
             val descriptorQualifiedName = parsedDescriptor.classDeclaration.qualifiedName?.asString()
                 ?: return@mapNotNull null
             val validatedDescriptor = runOrNullOnSkip {
-                parsedDescriptor.validate(originClassDeclaration, originJvmClassName, isResolvable)
+                parsedDescriptor.validate(originClassDeclaration, originJvmClassName, isAccessible)
             }
             if (validatedDescriptor != null) {
                 validDescriptors[descriptorQualifiedName] = validatedDescriptor
@@ -89,8 +101,8 @@ class FrontendValidator(
 
             originJvmClassName = originJvmClassName,
             originClassDeclaration = originClassDeclaration,
-            side = kspRequireNotNull(side) { "92" },
-            isAccessible = isResolvable,
+            side = kspRequireNotNull(side) { "104" },
+            isAccessible = isAccessible,
             accessRequest = accessRequest,
             descriptors = descriptors,
         )
@@ -106,29 +118,33 @@ class FrontendValidator(
     private fun ParsedDescriptor.validate(
         schemaOriginClassDeclaration: KSClassDeclaration,
         schemaOriginJvmClassName: JvmClassName,
-        isResolvable: Boolean,
+        isAccessibleSchema: Boolean,
     ): Descriptor {
-        kspRequire(classDeclaration.typeParameters.isEmpty()) { "111" }
-        kspRequire(superClassDeclaration?.isValid == true) { "112" }
-        kspRequire(isObject) { "113" }
-        val accessRequest = resolveAccessRequest(
-            hasAccessAnnotation, false, isResolvable, accessStrategy, isAccessUnfinal, accessFieldOps,
-        )
+        kspRequire(classDeclaration.typeParameters.isEmpty()) { "123" }
+        kspRequire(superClassDeclaration?.isValid == true) { "124" }
+        kspRequire(isObject) { "125" }
         val mappingName = resolveMappingName(explicitMappingName, name)
         val receiverType = schemaOriginClassDeclaration.starProjectedType
+        val isField = superClassDeclaration.isBuiltin(SimpleBuiltin.Field)
+        val accessRequest = resolveAccessRequest(
+            if (isField) AccessRequestSource.FIELD else AccessRequestSource.INVOKABLE,
+            hasAccessAnnotation,
+            accessStrategy,
+            isAccessUnfinal,
+            isAccessibleSchema,
+            accessFieldOps,
+            emptyList(),
+        )
         if (superClassDeclaration.isBuiltin(SimpleBuiltin.Field)) {
-            kspRequire(genericType is ParsedTypeDescriptorGenericType) { "120" }
-            kspRequireNotNull(genericType.type) { "121" }
-            if (accessRequest is MixinAccessRequest) {
-                kspRequire(accessRequest.fieldOps.isNotEmpty()) { "123" }
-            }
+            kspRequire(genericType is ParsedTypeDescriptorGenericType) { "139" }
+            kspRequireNotNull(genericType.type) { "140" }
             return FieldDescriptor(
                 symbol = symbol,
                 classDeclaration = classDeclaration,
 
                 name = name,
                 receiverType = receiverType,
-                inaccessibleReceiverJvmClassName = if (isResolvable) null else schemaOriginJvmClassName,
+                inaccessibleReceiverJvmClassName = if (isAccessibleSchema) null else schemaOriginJvmClassName,
                 mappingName = mappingName,
                 fieldType = genericType.type,
                 arrayComponentType = genericType.arrayComponentType,
@@ -136,17 +152,14 @@ class FrontendValidator(
                 accessRequest = accessRequest,
             )
         }
-        kspRequire(genericType is ParsedFunctionTypeDescriptorGenericType) { "139" }
-        kspRequire(genericType.receiverType == null) { "140" }
+        kspRequire(genericType is ParsedFunctionTypeDescriptorGenericType) { "155" }
+        kspRequire(genericType.receiverType == null) { "156" }
         val parameters = genericType.parameters.map { parameter ->
-            kspRequire(!parameter.type.isFunctionType) { "142" }
+            kspRequire(!parameter.type.isFunctionType) { "158" }
             FunctionTypeParameter(
                 type = parameter.type,
                 name = parameter.name,
             )
-        }
-        if (accessRequest != null) {
-            kspRequire(parameters.all { it.name != null }) { "149" }
         }
         return when {
             superClassDeclaration.isBuiltin(SimpleBuiltin.Method) -> {
@@ -156,7 +169,7 @@ class FrontendValidator(
 
                     name = name,
                     receiverType = receiverType,
-                    inaccessibleReceiverJvmClassName = if (isResolvable) null else schemaOriginJvmClassName,
+                    inaccessibleReceiverJvmClassName = if (isAccessibleSchema) null else schemaOriginJvmClassName,
                     returnType = genericType.returnType,
                     mappingName = mappingName,
                     parameters = parameters,
@@ -166,11 +179,10 @@ class FrontendValidator(
             }
 
             superClassDeclaration.isBuiltin(SimpleBuiltin.Constructor) -> {
-                kspRequire(!isAccessUnfinal) { "169" }
-                kspRequire(genericType.returnType == null) { "170" }
-                kspRequire(!hasMappingNameAnnotation) { "171" }
+                kspRequire(genericType.returnType == null) { "182" }
+                kspRequire(!hasMappingNameAnnotation) { "183" }
                 if (accessRequest is MixinAccessRequest) {
-                    kspRequire(isResolvable) { "173" }
+                    kspRequire(isAccessibleSchema) { "185" }
                 }
                 ConstructorDescriptor(
                     symbol = symbol,
@@ -183,28 +195,28 @@ class FrontendValidator(
                 )
             }
 
-            else -> skipWithError { "186" }
+            else -> skipWithError { "198" }
         }
     }
 
     private fun ParsedPatch.validate(): Patch {
-        kspRequireNotNull(name) { "191" }
-        kspRequireNotNull(side) { "192" }
-        kspRequireNotNull(initStrategy) { "193" }
-        kspRequire(classDeclaration?.isValid == true) { "194" }
-        kspRequire(classDeclaration.typeParameters.isEmpty()) { "195" }
-        kspRequire(schemaClassDeclaration?.isValid == true) { "196" }
-        kspRequire(isTopLevel) { "197" }
-        kspRequire(hasPackageName) { "198" }
-        kspRequire(isPublic) { "199" }
+        kspRequireNotNull(name) { "203" }
+        kspRequireNotNull(side) { "204" }
+        kspRequireNotNull(initStrategy) { "205" }
+        kspRequire(classDeclaration?.isValid == true) { "206" }
+        kspRequire(classDeclaration.typeParameters.isEmpty()) { "207" }
+        kspRequire(schemaClassDeclaration?.isValid == true) { "208" }
+        kspRequire(isTopLevel) { "209" }
+        kspRequire(hasPackageName) { "210" }
+        kspRequire(isPublic) { "211" }
         val schema = validSchemas[schemaClassDeclaration.qualifiedName?.asString()]
-        kspRequireNotNull(schema) { "201" }
-        kspRequire(isClass) { "202" }
-        kspRequire(!isObject) { "203" }
-        kspRequire(!isSealed) { "204" }
-        kspRequire(!isOpen) { "205" }
-        val constructor = kspRequireNotNull(constructors.singleOrNull()) { "206" }
-        constructor.kspRequire(constructor.isPublic) { "207" }
+        kspRequireNotNull(schema) { "213" }
+        kspRequire(isClass) { "214" }
+        kspRequire(!isObject) { "215" }
+        kspRequire(!isSealed) { "216" }
+        kspRequire(!isOpen) { "217" }
+        val constructor = kspRequireNotNull(constructors.singleOrNull()) { "218" }
+        constructor.kspRequire(constructor.isPublic) { "219" }
         val companionObjects = companionObjects.mapNotNull {
             runOrNullOnSkip { it.validate() }
         }
@@ -235,9 +247,9 @@ class FrontendValidator(
         val hasStaticHooksOnly = constructorParameters.isEmpty()
             && extensionProperties.isEmpty() && extensionFunctions.isEmpty()
             && shadowProperties.isEmpty() && shadowFunctions.isEmpty()
-            && hooks.all { it.descriptor.isStatic }
+            && hooks.all { it.methodDescriptor.isStatic }
         if (!hasStaticHooksOnly) {
-            kspRequire(isAbstract) { "240" }
+            kspRequire(isAbstract) { "252" }
         }
         return Patch(
             symbol = symbol,
@@ -257,7 +269,7 @@ class FrontendValidator(
     }
 
     private fun ParsedPatchCompanionObject.validate(): ParsedPatchCompanionObject {
-        kspRequire(isPublic) { "260" }
+        kspRequire(isPublic) { "272" }
         return this
     }
 
@@ -265,44 +277,40 @@ class FrontendValidator(
         when {
             hasOriginAnnotation -> {
                 val instanceClassDeclaration = type.toClassDeclaration()
-                kspRequire(instanceClassDeclaration == schema.originClassDeclaration) { "268" }
-                kspRequire(type.arguments.none { it.variance != Variance.STAR }) { "269" }
+                kspRequire(instanceClassDeclaration == schema.originClassDeclaration) { "280" }
+                kspRequire(type.arguments.none { it.variance != Variance.STAR }) { "281" }
                 PatchConstructorOriginParameter
             }
 
-            else -> skipWithError { "273" }
+            else -> skipWithError { "285" }
         }
 
-    private fun ParsedPatchProperty.validateAsExtension(
-        schema: Schema,
-    ): PatchExtensionProperty {
-        kspRequireNotNull(getterJvmName) { "279" }
-        kspRequire(isPublic) { "280" }
-        kspRequire(!isExtension) { "281" }
-        kspRequire(schema.isAccessible) { "282" }
-        kspRequire(!isOpen && !isAbstract) { "283" }
-        return PatchExtensionProperty(
+    private fun ParsedPatchProperty.validateAsExtension(schema: Schema): ExtensionProperty {
+        kspRequireNotNull(getterJvmName) { "289" }
+        kspRequire(isPublic) { "290" }
+        kspRequire(!isExtension) { "291" }
+        kspRequire(schema.isAccessible) { "292" }
+        kspRequire(!isOpen && !isAbstract) { "293" }
+        return ExtensionProperty(
             name = name,
             getterJvmName = getterJvmName,
-            setterJvmName = if (isMutable) kspRequireNotNull(setterJvmName) { "287" } else null,
+            setterJvmName = if (isMutable) kspRequireNotNull(setterJvmName) { "297" } else null,
             type = type,
         )
     }
 
-    private fun ParsedPatchFunction.validateAsExtension(
-        isResolvable: Boolean,
-    ): PatchExtensionFunction {
-        kspRequire(isPublic) { "295" }
-        kspRequire(!hasExtensionReceiver) { "296" }
-        kspRequire(isResolvable) { "297" }
-        kspRequire(!isOpen && !isAbstract) { "298" }
+    private fun ParsedPatchFunction.validateAsExtension(isAccessibleSchema: Boolean): ExtensionFunction {
+        kspRequire(isPublic) { "303" }
+        kspRequire(!hasExtensionReceiver) { "304" }
+        kspRequire(isAccessibleSchema) { "305" }
+        kspRequire(!isOpen && !isAbstract) { "306" }
         val parameters = parameters.map {
             FunctionParameter(
-                name = kspRequireNotNull(it.name) { "301" },
-                type = kspRequireNotNull(it.type) { "302" },
+                name = kspRequireNotNull(it.name) { "309" },
+                type = kspRequireNotNull(it.type) { "310" },
             )
         }
-        return PatchExtensionFunction(
+        return ExtensionFunction(
             name = name,
             jvmName = jvmName,
             parameters = parameters,
@@ -310,36 +318,36 @@ class FrontendValidator(
         )
     }
 
-    private fun ParsedPatchProperty.validateAsShadow(): PatchShadowProperty {
-        kspRequireNotNull(getterJvmName) { "314" }
-        kspRequire(isPublic) { "315" }
-        kspRequire(!isExtension) { "316" }
-        kspRequire(isAbstract) { "317" }
+    private fun ParsedPatchProperty.validateAsShadow(): ShadowProperty {
+        kspRequireNotNull(getterJvmName) { "322" }
+        kspRequire(isPublic) { "323" }
+        kspRequire(!isExtension) { "324" }
+        kspRequire(isAbstract) { "325" }
         val mappingName = resolveMappingName(explicitMappingName, name)
-        val shadowModifiers = resolveModifiers(shadowModifiers.toSet(), isMethod = false)
-        return PatchShadowProperty(
+        val shadowModifiers = resolveModifiers(shadowModifiers, isMethod = false)
+        return ShadowProperty(
             name = name,
             getterJvmName = getterJvmName,
-            setterJvmName = if (isMutable) kspRequireNotNull(setterJvmName) { "323" } else null,
+            setterJvmName = if (isMutable) kspRequireNotNull(setterJvmName) { "331" } else null,
             mappingName = mappingName,
             modifiers = shadowModifiers,
             type = type,
         )
     }
 
-    private fun ParsedPatchFunction.validateAsShadow(): PatchShadowFunction {
-        kspRequire(isPublic) { "331" }
-        kspRequire(isAbstract) { "332" }
-        kspRequire(!hasExtensionReceiver) { "333" }
+    private fun ParsedPatchFunction.validateAsShadow(): ShadowFunction {
+        kspRequire(isPublic) { "339" }
+        kspRequire(isAbstract) { "340" }
+        kspRequire(!hasExtensionReceiver) { "341" }
         val parameters = parameters.map {
             FunctionParameter(
-                name = kspRequireNotNull(it.name) { "336" },
-                type = kspRequireNotNull(it.type) { "337" },
+                name = kspRequireNotNull(it.name) { "344" },
+                type = kspRequireNotNull(it.type) { "345" },
             )
         }
         val mappingName = resolveMappingName(explicitMappingName, name)
-        val shadowModifiers = resolveModifiers(shadowModifiers.toSet(), isMethod = true)
-        return PatchShadowFunction(
+        val shadowModifiers = resolveModifiers(shadowModifiers, isMethod = true)
+        return ShadowFunction(
             name = name,
             jvmName = jvmName,
             parameters = parameters,
@@ -350,74 +358,72 @@ class FrontendValidator(
     }
 
     private fun ParsedPatchFunction.validateAsHook(isInCompanionObject: Boolean): PatchHook {
-        kspRequireNotNull(hookAt) { "353" }
-        kspRequire(!isOpen) { "354" }
-        kspRequire(!hasTypeParameters) { "355" }
-        val hookDescriptor = resolveDescriptorReference(hookDescriptorClassDeclaration)
-        kspRequire(hookDescriptor is InvokableDescriptor) { "357" }
-        if (hookDescriptor.isStatic) {
-            kspRequire(isInCompanionObject) { "359" }
+        kspRequireNotNull(hookAt) { "361" }
+        kspRequire(!isOpen) { "362" }
+        kspRequire(!hasTypeParameters) { "363" }
+        val hookMethodDescriptor = resolveDescriptorReference(hookDescClassDeclaration)
+        kspRequire(hookMethodDescriptor is InvokableDescriptor) { "365" }
+        if (hookMethodDescriptor.isStatic) {
+            kspRequire(isInCompanionObject) { "367" }
         } else {
-            kspRequire(!isInCompanionObject) { "361" }
+            kspRequire(!isInCompanionObject) { "369" }
         }
         val ordinals: (List<Int>) -> List<Int> = { resolveOrdinals(it) }
         val parameters: () -> List<HookParameter> = {
             parameters.mapNotNull { parameter ->
-                runOrNullOnSkip { parameter.validateAsHookParameter(this@validateAsHook, hookAt, hookDescriptor) }
+                runOrNullOnSkip { parameter.validateAsHookParameter(this@validateAsHook, hookAt, hookMethodDescriptor) }
             }
         }
         return when (hookAt) {
             At.Head -> {
-                kspRequire(returnType == null) { "371" }
-                when (hookDescriptor) {
+                kspRequire(returnType == null) { "379" }
+                when (hookMethodDescriptor) {
                     is ConstructorDescriptor -> {
-                        kspRequire(hasAtConstructorHeadAnnotation) { "374" }
+                        kspRequire(hasAtConstructorHeadAnnotation) { "382" }
                         ConstructorHeadHook(
                             jvmName = jvmName,
-                            descriptor = hookDescriptor,
-                            phase = kspRequireNotNull(atConstructorHeadPhase) { "378" },
+                            methodDescriptor = hookMethodDescriptor,
+                            phase = kspRequireNotNull(atConstructorHeadPhase) { "386" },
                             parameters = parameters(),
                         )
                     }
 
-                    is MethodDescriptor -> {
-                        MethodHeadHook(
-                            jvmName = jvmName,
-                            descriptor = hookDescriptor,
-                            parameters = parameters(),
-                        )
-                    }
+                    is MethodDescriptor -> MethodHeadHook(
+                        jvmName = jvmName,
+                        methodDescriptor = hookMethodDescriptor,
+                        parameters = parameters(),
+                    )
                 }
             }
 
             At.Body -> {
-                kspRequire(hookDescriptor is MethodDescriptor) { "394" }
-                kspRequire(returnType == hookDescriptor.returnType) { "395" }
+                kspRequire(hookMethodDescriptor is MethodDescriptor) { "400" }
+                kspRequire(returnType == hookMethodDescriptor.returnType) { "401" }
                 BodyHook(
                     jvmName = jvmName,
-                    targetDescriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     returnType = returnType,
                     parameters = parameters(),
                 )
             }
 
             At.Tail -> {
-                kspRequire(returnType == null) { "405" }
+                kspRequire(returnType == null) { "411" }
                 TailHook(
                     jvmName = jvmName,
-                    descriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     parameters = parameters(),
                 )
             }
 
             At.Local -> {
-                kspRequire(hasAtLocalAnnotation) { "414" }
-                kspRequireNotNull(atLocalOp) { "415" }
-                kspRequireNotNull(atLocalType) { "416" }
-                kspRequire(returnType == atLocalType) { "417" }
+                kspRequire(hasAtLocalAnnotation) { "420" }
+                kspRequireNotNull(atLocalOp) { "421" }
+                kspRequireNotNull(atLocalType) { "422" }
+                kspRequire(returnType == atLocalType) { "423" }
                 LocalHook(
                     jvmName = jvmName,
-                    descriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     type = atLocalType,
                     ordinals = ordinals(atLocalOpOrdinals),
                     local = resolveLocal(atLocalExplicitOrdinal, atLocalExplicitName, null),
@@ -427,12 +433,12 @@ class FrontendValidator(
             }
 
             At.Instanceof -> {
-                kspRequire(hasAtInstanceofAnnotation) { "430" }
-                kspRequire(atInstanceofTypeClassDeclaration?.isValid == true) { "431" }
-                kspRequire(returnType?.toClassName()?.asIrTypeName() == KPBoolean.asIrTypeName()) { "432" }
+                kspRequire(hasAtInstanceofAnnotation) { "436" }
+                kspRequire(atInstanceofTypeClassDeclaration?.isValid == true) { "437" }
+                kspRequire(returnType?.toClassName()?.asIrTypeName() == KPBoolean.asIrTypeName()) { "438" }
                 InstanceofHook(
                     jvmName = jvmName,
-                    descriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     typeClassDeclaration = atInstanceofTypeClassDeclaration,
                     returnType = returnType,
                     ordinals = ordinals(atInstanceofOrdinals),
@@ -441,11 +447,11 @@ class FrontendValidator(
             }
 
             At.Return -> {
-                kspRequire(hasAtReturnAnnotation) { "444" }
-                kspRequire(returnType == hookDescriptor.returnType) { "445" }
+                kspRequire(hasAtReturnAnnotation) { "450" }
+                kspRequire(returnType == hookMethodDescriptor.returnType) { "451" }
                 ReturnHook(
                     jvmName = jvmName,
-                    descriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     type = returnType,
                     ordinals = ordinals(atReturnOrdinals),
                     parameters = parameters(),
@@ -453,18 +459,18 @@ class FrontendValidator(
             }
 
             At.Literal -> {
-                kspRequire(hasAtLiteralAnnotation) { "456" }
+                kspRequire(hasAtLiteralAnnotation) { "462" }
                 val literal = resolveLiteral(this@validateAsHook)
                 val type = literal.getType(types)
-                if (literal !is NullLiteral) {
-                    if (literal !is StringLiteral && literal !is ClassLiteral) {
-                        kspRequire(returnType?.isMarkedNullable == false) { "461" }
+                if (literal !is NullHookLiteral) {
+                    if (literal !is StringHookLiteral && literal !is ClassHookLiteral) {
+                        kspRequire(returnType?.isMarkedNullable == false) { "467" }
                     }
-                    kspRequire(returnType == type) { "463" }
+                    kspRequire(returnType == type) { "469" }
                 }
                 LiteralHook(
                     jvmName = jvmName,
-                    descriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     type = type,
                     literal = literal,
                     ordinals = ordinals(atLiteralOrdinals),
@@ -473,16 +479,16 @@ class FrontendValidator(
             }
 
             At.Field -> {
-                kspRequire(hasAtFieldAnnotation) { "476" }
-                kspRequireNotNull(atFieldOp) { "477" }
-                val targetDescriptor = resolveDescriptorReference(atFieldDescriptorClassDeclaration)
-                kspRequire(targetDescriptor is FieldDescriptor) { "479" }
+                kspRequire(hasAtFieldAnnotation) { "482" }
+                kspRequireNotNull(atFieldOp) { "483" }
+                val targetDescriptor = resolveDescriptorReference(atFieldDescClassDeclaration)
+                kspRequire(targetDescriptor is FieldDescriptor) { "485" }
                 when (atFieldOp) {
                     Op.Get -> {
-                        kspRequire(returnType?.makeNotNullable() == targetDescriptor.fieldType) { "482" }
+                        kspRequire(returnType?.makeNotNullable() == targetDescriptor.fieldType) { "488" }
                         FieldGetHook(
                             jvmName = jvmName,
-                            descriptor = hookDescriptor,
+                            methodDescriptor = hookMethodDescriptor,
                             type = targetDescriptor.fieldType,
                             ordinals = ordinals(atFieldOrdinals),
                             targetDescriptor = targetDescriptor,
@@ -491,10 +497,10 @@ class FrontendValidator(
                     }
 
                     Op.Set -> {
-                        kspRequire(returnType == null) { "494" }
+                        kspRequire(returnType == null) { "500" }
                         FieldSetHook(
                             jvmName = jvmName,
-                            descriptor = hookDescriptor,
+                            methodDescriptor = hookMethodDescriptor,
                             type = targetDescriptor.fieldType,
                             ordinals = ordinals(atFieldOrdinals),
                             targetDescriptor = targetDescriptor,
@@ -505,18 +511,18 @@ class FrontendValidator(
             }
 
             At.Array -> {
-                kspRequire(hasAtArrayAnnotation) { "508" }
-                kspRequireNotNull(atArrayOp) { "509" }
-                val targetDescriptor = resolveDescriptorReference(atArrayDescriptorClassDeclaration)
-                kspRequire(targetDescriptor is FieldDescriptor) { "511" }
-                kspRequireNotNull(targetDescriptor.arrayComponentType) { "512" }
+                kspRequire(hasAtArrayAnnotation) { "514" }
+                kspRequireNotNull(atArrayOp) { "515" }
+                val targetDescriptor = resolveDescriptorReference(atArrayDescClassDeclaration)
+                kspRequire(targetDescriptor is FieldDescriptor) { "517" }
+                kspRequireNotNull(targetDescriptor.arrayComponentType) { "518" }
                 when (atArrayOp) {
-                    Op.Get -> kspRequire(returnType == targetDescriptor.arrayComponentType) { "514" }
-                    Op.Set -> kspRequire(returnType == null) { "515" }
+                    Op.Get -> kspRequire(returnType == targetDescriptor.arrayComponentType) { "520" }
+                    Op.Set -> kspRequire(returnType == null) { "521" }
                 }
                 ArrayHook(
                     jvmName = jvmName,
-                    descriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     op = atArrayOp,
                     type = targetDescriptor.fieldType,
                     componentType = targetDescriptor.arrayComponentType,
@@ -527,13 +533,13 @@ class FrontendValidator(
             }
 
             At.Call -> {
-                kspRequire(hasAtCallAnnotation) { "530" }
-                val targetDescriptor = resolveDescriptorReference(atCallDescriptorClassDeclaration)
-                kspRequire(targetDescriptor is MethodDescriptor) { "532" }
-                kspRequire(returnType?.makeNotNullable() == targetDescriptor.returnType) { "533" }
+                kspRequire(hasAtCallAnnotation) { "536" }
+                val targetDescriptor = resolveDescriptorReference(atCallDescClassDeclaration)
+                kspRequire(targetDescriptor is MethodDescriptor) { "538" }
+                kspRequire(returnType?.makeNotNullable() == targetDescriptor.returnType) { "539" }
                 CallHook(
                     jvmName = jvmName,
-                    descriptor = hookDescriptor,
+                    methodDescriptor = hookMethodDescriptor,
                     returnType = returnType,
                     targetDescriptor = targetDescriptor,
                     ordinals = ordinals(atCallOrdinals),
@@ -548,68 +554,68 @@ class FrontendValidator(
         at: At,
         hookDescriptor: InvokableDescriptor,
     ): HookParameter {
-        kspRequireNotNull(name) { "551" }
-        kspRequireNotNull(type) { "552" }
-        kspRequire(!hasDefaultArgument) { "553" }
+        kspRequireNotNull(name) { "557" }
+        kspRequireNotNull(type) { "558" }
+        kspRequire(!hasDefaultArgument) { "559" }
         return when {
             hasOriginAnnotation -> when (at) {
-                At.Head, At.Tail -> skipWithError { "556" }
+                At.Head, At.Tail -> skipWithError { "562" }
 
                 At.Body -> {
                     val originDescriptor = resolveDescriptorReference(originGenericTypeClassDeclaration)
-                    kspRequire(originDescriptor is InvokableDescriptor) { "560" }
-                    kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Body)) { "561" }
+                    kspRequire(originDescriptor is MethodDescriptor) { "566" }
+                    kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Body)) { "567" }
                     HookOriginBodyDescriptorWrapperParameter(originDescriptor)
                 }
 
                 At.Local -> {
-                    kspRequire(type == function.returnType) { "566" }
+                    kspRequire(type == function.returnType) { "572" }
                     HookOriginValueParameter
                 }
 
                 At.Instanceof -> {
-                    kspRequire(type.declaration.isBuiltin(SimpleBuiltin.Instanceof)) { "571" }
+                    kspRequire(type.declaration.isBuiltin(SimpleBuiltin.Instanceof)) { "577" }
                     HookOriginInstanceofWrapperParameter
                 }
 
                 At.Return -> {
-                    kspRequireNotNull(hookDescriptor.returnType) { "576" }
-                    kspRequire(type == hookDescriptor.returnType) { "577" }
+                    kspRequireNotNull(hookDescriptor.returnType) { "582" }
+                    kspRequire(type == hookDescriptor.returnType) { "583" }
                     HookOriginValueParameter
                 }
 
                 At.Literal -> {
                     val literal = resolveLiteral(function)
-                    kspRequire(literal !is NullLiteral) { "583" }
-                    kspRequire(type == literal.getType(types)) { "584" }
+                    kspRequire(literal !is NullHookLiteral) { "589" }
+                    kspRequire(type == literal.getType(types)) { "590" }
                     HookOriginValueParameter
                 }
 
                 At.Field -> {
-                    kspRequireNotNull(function.atFieldOp) { "589" }
+                    kspRequireNotNull(function.atFieldOp) { "595" }
                     val originDescriptor = resolveDescriptorReference(originGenericTypeClassDeclaration)
-                    kspRequire(originDescriptor is FieldDescriptor) { "591" }
+                    kspRequire(originDescriptor is FieldDescriptor) { "597" }
                     when (function.atFieldOp) {
                         Op.Get -> {
-                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.FieldGet)) { "594" }
+                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.FieldGet)) { "600" }
                             HookOriginFieldGetDescriptorWrapperParameter(originDescriptor)
                         }
 
                         Op.Set -> {
-                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.FieldSet)) { "599" }
+                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.FieldSet)) { "605" }
                             HookOriginFieldSetDescriptorWrapperParameter(originDescriptor)
                         }
                     }
                 }
 
                 At.Array -> {
-                    kspRequireNotNull(function.atArrayOp) { "606" }
+                    kspRequireNotNull(function.atArrayOp) { "612" }
                     val originDescriptor = resolveDescriptorReference(originGenericTypeClassDeclaration)
-                    kspRequire(originDescriptor is FieldDescriptor) { "608" }
-                    kspRequireNotNull(originDescriptor.arrayComponentType) { "609" }
+                    kspRequire(originDescriptor is FieldDescriptor) { "614" }
+                    kspRequireNotNull(originDescriptor.arrayComponentType) { "615" }
                     when (function.atArrayOp) {
                         Op.Get -> {
-                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.ArrayGet)) { "612" }
+                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.ArrayGet)) { "618" }
                             HookOriginArrayGetDescriptorWrapperParameter(
                                 originDescriptor,
                                 originDescriptor.arrayComponentType
@@ -617,7 +623,7 @@ class FrontendValidator(
                         }
 
                         Op.Set -> {
-                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.ArraySet)) { "620" }
+                            kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.ArraySet)) { "626" }
                             HookOriginArraySetDescriptorWrapperParameter(
                                 originDescriptor,
                                 originDescriptor.arrayComponentType
@@ -628,40 +634,41 @@ class FrontendValidator(
 
                 At.Call -> {
                     val originDescriptor = resolveDescriptorReference(originGenericTypeClassDeclaration)
-                    kspRequire(originDescriptor is InvokableDescriptor) { "631" }
-                    kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Call)) { "632" }
+                    kspRequire(originDescriptor is InvokableDescriptor) { "637" }
+                    kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Call)) { "638" }
                     HookOriginCallDescriptorWrapperParameter(originDescriptor)
                 }
             }
 
             hasCancelAnnotation -> {
-                kspRequire(at != At.Body) { "638" }
-                kspRequire(hookDescriptor is MethodDescriptor) { "639" }
+                kspRequire(at != At.Body) { "644" }
+                kspRequire(hookDescriptor is MethodDescriptor) { "645" }
                 val cancelDescriptor = resolveDescriptorReference(cancelGenericTypeClassDeclaration)
-                kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Cancel)) { "641" }
-                kspRequire(cancelDescriptor == hookDescriptor) { "642" }
+                kspRequire(type.declaration.isBuiltin(DescriptorWrapperBuiltin.Cancel)) { "647" }
+                kspRequire(cancelDescriptor == hookDescriptor) { "648" }
                 HookCancelDescriptorWrapperParameter(hookDescriptor)
             }
 
             hasOrdinalAnnotation -> {
-                kspRequire(type == types.int) { "647" }
-                kspRequire(function.hasOrdinals()) { "648" }
+                kspRequire(type == types.int) { "653" }
+                kspRequire(function.hasOrdinals()) { "654" }
                 HookOrdinalParameter
             }
 
             hasParamAnnotation -> {
-                kspRequire(at != At.Body) { "653" }
-                explicitParamName?.let { kspRequire(it.isNotEmpty()) { "654" } }
+                kspRequire(at != At.Body) { "659" }
+                explicitParamName?.let { kspRequire(it.isNotEmpty()) { "660" } }
                 val parameterName = explicitParamName ?: name
-                val parameterIndex = hookDescriptor.parameters.indexOfFirstOrNull { it.name == parameterName }
-                kspRequireNotNull(parameterIndex) { "657" }
+                val parameterIndex =
+                    hookDescriptor.functionTypeParameters.indexOfFirstOrNull { it.name == parameterName }
+                kspRequireNotNull(parameterIndex) { "664" }
                 val (paramLocalType, isLocalVar) = resolveLocalType(type)
-                kspRequire(hookDescriptor.parameters[parameterIndex].type == paramLocalType) { "659" }
+                kspRequire(hookDescriptor.functionTypeParameters[parameterIndex].type == paramLocalType) { "666" }
                 HookParamLocalParameter(parameterName, paramLocalType, parameterIndex, isLocalVar)
             }
 
             hasLocalAnnotation -> {
-                kspRequire(at != At.Body) { "664" }
+                kspRequire(at != At.Body) { "671" }
                 val (bodyLocalType, isLocalVar) = resolveLocalType(type)
                 HookBodyLocalParameter(
                     name,
@@ -672,37 +679,37 @@ class FrontendValidator(
             }
 
             hasShareAnnotation -> {
-                kspRequire(type.declaration.isBuiltin(SimpleBuiltin.LocalVar)) { "675" }
-                val type = kspRequireNotNull(type.findGenericType()) { "676" }
-                explicitShareKey?.let { kspRequire(it.isNotEmpty()) { "677" } }
+                kspRequire(type.declaration.isBuiltin(SimpleBuiltin.LocalVar)) { "682" }
+                val type = kspRequireNotNull(type.findGenericType()) { "683" }
+                explicitShareKey?.let { kspRequire(it.isNotEmpty()) { "684" } }
                 HookShareLocalParameter(name, type, explicitShareKey ?: name, isShareExported)
             }
 
-            else -> skipWithError { "681" }
+            else -> skipWithError { "688" }
         }
     }
 
-    private fun SymbolSource.resolveLiteral(function: ParsedPatchFunction): Literal =
+    private fun SymbolSource.resolveLiteral(function: ParsedPatchFunction): HookLiteral =
         kspRequireNotNull(
             with(function) {
                 listOfNotNull(
-                    atLiteralExplicitZero?.let { ZeroLiteral(atLiteralZeroConditions) },
+                    atLiteralExplicitZero?.let { ZeroHookLiteral(atLiteralZeroConditions) },
                     atLiteralExplicitInt?.let {
-                        kspRequire(it != 0) { "691" }
-                        IntLiteral(it)
+                        kspRequire(it != 0) { "698" }
+                        IntHookLiteral(it)
                     },
-                    atLiteralExplicitFloat?.let(::FloatLiteral),
-                    atLiteralExplicitLong?.let(::LongLiteral),
-                    atLiteralExplicitDouble?.let(::DoubleLiteral),
-                    atLiteralExplicitString?.let(::StringLiteral),
+                    atLiteralExplicitFloat?.let(::FloatHookLiteral),
+                    atLiteralExplicitLong?.let(::LongHookLiteral),
+                    atLiteralExplicitDouble?.let(::DoubleHookLiteral),
+                    atLiteralExplicitString?.let(::StringHookLiteral),
                     atLiteralExplicitClassType?.let {
-                        kspRequire(atLiteralExplicitClassDeclaration?.isValid == true) { "699" }
-                        ClassLiteral(atLiteralExplicitClassDeclaration)
+                        kspRequire(atLiteralExplicitClassDeclaration?.isValid == true) { "706" }
+                        ClassHookLiteral(atLiteralExplicitClassDeclaration)
                     },
-                    atLiteralExplicitNull?.let { NullLiteral },
+                    atLiteralExplicitNull?.let { NullHookLiteral },
                 ).singleOrNull()
             }
-        ) { "705" }
+        ) { "712" }
 
     private fun SymbolSource.resolveOrdinals(ordinals: List<Int>): List<Int> {
         val invalidOrdinals = ordinals.filter { it < 0 }
@@ -715,52 +722,71 @@ class FrontendValidator(
         return ordinals.toSet().toList()
     }
 
+    private enum class AccessRequestSource { SCHEMA, FIELD, INVOKABLE }
+
     private fun SymbolSource.resolveAccessRequest(
+        source: AccessRequestSource,
         hasAccessAnnotation: Boolean,
-        isSchema: Boolean,
-        isResolvable: Boolean,
-        strategy: AccessStrategy?,
-        unfinal: Boolean,
+        accessStrategy: AccessStrategy?,
+        isAccessUnfinal: Boolean,
+        isAccessibleSchema: Boolean,
         fieldOps: List<Op>,
+        functionTypeParameters: List<FunctionTypeParameter>,
     ): AccessRequest? {
         if (!hasAccessAnnotation) return null
-        kspRequireNotNull(strategy) { "727" }
-        if (isSchema) {
-            kspRequire(strategy == AccessStrategy.Tweak) { "729" }
+        kspRequireNotNull(accessStrategy) { "737" }
+        if (source == AccessRequestSource.SCHEMA) {
+            kspRequire(accessStrategy == AccessStrategy.Tweak) { "739" }
         }
-        if (strategy == AccessStrategy.Tweak) {
-            kspRequire(isResolvable) { "732" }
-            kspRequire(options.accessWidenerConfig != null || options.accessTransformerConfig != null) { "733" }
-            return TweakAccessRequest(unfinal)
+        if (accessStrategy == AccessStrategy.Tweak) {
+            kspRequire(isAccessibleSchema) { "742" }
+            kspRequire(options.accessWidenerConfig != null || options.accessTransformerConfig != null) { "743" }
+            return TweakAccessRequest(isAccessUnfinal)
         }
-        return MixinAccessRequest(unfinal, fieldOps)
+        if (source == AccessRequestSource.FIELD) {
+            kspRequire(fieldOps.isNotEmpty()) { "747" }
+            return MixinFieldAccessRequest(isAccessUnfinal, fieldOps)
+        }
+        kspRequire(!isAccessUnfinal) { "750" }
+        val parameters = mutableListOf<IrParameter>()
+        val anonymousParameterIndices = mutableListOf<Int>()
+        functionTypeParameters.forEachIndexed { index, functionTypeParameter ->
+            if (functionTypeParameter.name != null) {
+                parameters += IrParameter(functionTypeParameter.name, functionTypeParameter.typeName)
+            } else {
+                anonymousParameterIndices += index
+            }
+        }
+        kspRequire(anonymousParameterIndices.isEmpty()) { "760" }
+        return MixinInvokableAccessRequest(parameters)
     }
 
-    private fun SymbolSource.resolveModifiers(modifiers: Set<JPModifier>, isMethod: Boolean): List<JPModifier> {
+    private fun SymbolSource.resolveModifiers(modifiers: List<JPModifier>, isMethod: Boolean): List<JPModifier> {
+        val set = modifiers.toSet()
         val allowed = if (isMethod) JavaModifiers.methodAllowed else JavaModifiers.fieldAllowed
-        kspRequire(allowed.containsAll(modifiers)) { "741" }
-        kspRequire(modifiers.count { it in JavaModifiers.visibilities } <= 1) { "742" }
+        kspRequire(allowed.containsAll(set)) { "767" }
+        kspRequire(set.count { it in JavaModifiers.visibilities } <= 1) { "768" }
         if (isMethod) {
-            kspRequire(modifiers.count { it in JavaModifiers.methodConflicts } <= 1) { "744" }
-            if (JPModifier.ABSTRACT in modifiers) {
-                kspRequire(modifiers.none { it in JavaModifiers.abstractIllegals }) { "746" }
+            kspRequire(set.count { it in JavaModifiers.methodConflicts } <= 1) { "770" }
+            if (JPModifier.ABSTRACT in set) {
+                kspRequire(set.none { it in JavaModifiers.abstractIllegals }) { "772" }
             }
-            if (JPModifier.NATIVE in modifiers) {
-                kspRequire(JPModifier.DEFAULT !in modifiers) { "749" }
+            if (JPModifier.NATIVE in set) {
+                kspRequire(JPModifier.DEFAULT !in set) { "775" }
             }
         } else {
-            if (JPModifier.FINAL in modifiers) {
-                kspRequire(JPModifier.VOLATILE !in modifiers) { "753" }
+            if (JPModifier.FINAL in set) {
+                kspRequire(JPModifier.VOLATILE !in set) { "779" }
             }
         }
-        return modifiers.toList()
+        return set.toList()
     }
 
     private fun SymbolSource.resolveDescriptorReference(classDeclaration: KSClassDeclaration?): Descriptor {
-        kspRequire(classDeclaration?.isValid == true) { "760" }
+        kspRequire(classDeclaration?.isValid == true) { "786" }
         val qualifiedName = classDeclaration.qualifiedName?.asString()
         if (qualifiedName in invalidDescriptors) {
-            skipWithError { "763" }
+            skipWithError { "789" }
         }
         return validDescriptors[qualifiedName] ?: lapisError("Descriptor cannot be null")
     }
@@ -768,34 +794,34 @@ class FrontendValidator(
     private fun SymbolSource.resolveLocalType(type: KSType): Pair<KSType, Boolean> {
         val isLocalVar = type.declaration.isBuiltin(SimpleBuiltin.LocalVar)
         val localType = if (isLocalVar) {
-            kspRequireNotNull(type.findGenericType()) { "771" }
+            kspRequireNotNull(type.findGenericType()) { "797" }
         } else {
-            kspRequireNotNull(type) { "773" }
+            kspRequireNotNull(type) { "799" }
         }
         return localType to isLocalVar
     }
 
-    private fun SymbolSource.resolveLocal(ordinal: Int?, explicitName: String?, fallbackName: String?): DomainLocal =
+    private fun SymbolSource.resolveLocal(ordinal: Int?, explicitName: String?, fallbackName: String?): HookLocal =
         kspRequireNotNull(
             when {
                 ordinal != null -> ordinal.takeIf { explicitName == null }?.let {
-                    kspRequire(it >= 0) { "782" }
+                    kspRequire(it >= 0) { "808" }
                     PositionalLocal(it)
                 }
 
                 explicitName != null -> {
-                    kspRequire(explicitName.isNotEmpty()) { "787" }
+                    kspRequire(explicitName.isNotEmpty()) { "813" }
                     NamedLocal(explicitName)
                 }
 
                 fallbackName != null -> NamedLocal(fallbackName)
                 else -> null
             }
-        ) { "794" }
+        ) { "820" }
 
     private fun SymbolSource.resolveMappingName(explicitName: String?, fallbackName: String): String =
         if (explicitName != null) {
-            kspRequire(explicitName.isNotEmpty()) { "798" }
+            kspRequire(explicitName.isNotEmpty()) { "824" }
             explicitName
         } else {
             fallbackName
