@@ -74,7 +74,7 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
         }
 
         operator fun Long.invoke() {
-            arguments += this
+            arguments += "${this}L"
         }
 
         operator fun Char.unaryPlus() {
