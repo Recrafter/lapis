@@ -108,6 +108,10 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
             arguments += this
         }
 
+        operator fun JPParameter.unaryPlus() {
+            arguments += this
+        }
+
         operator fun JPMethod.unaryPlus() {
             arguments += this
         }
@@ -165,6 +169,7 @@ fun IrTypeName.toJavaCodeBlock(asClassType: Boolean = false): JPCodeBlock =
     buildJavaCodeBlock(if (asClassType) "%T.class" else "%T") { +this@toJavaCodeBlock }
 
 fun JPField.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%N") { +this@toCodeBlock }
+fun JPParameter.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%N") { +this@toCodeBlock }
 fun JPAnnotation.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { +this@toCodeBlock }
 fun GenJavaEntity.toCodeBlock(asCall: Boolean = true): JPCodeBlock = buildJavaCodeBlock("%N") {
     if (asCall) this@toCodeBlock()

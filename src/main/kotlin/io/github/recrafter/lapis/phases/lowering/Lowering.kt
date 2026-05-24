@@ -204,7 +204,7 @@ class Lowering(
             originatingFiles = listOfNotNull(patch.containingFile),
             className = resolveMixinRelatedClassName(patch.className, sourcePackageLCP, "Mixin"),
             side = patch.side,
-            injections = patch.hooks.flatMap(::lowerInjections),
+            injections = patch.injections.flatMap(::lowerInjections),
             externalBridge = lowerMixinExternalBridge(patch),
             internalBridge = lowerMixinInternalBridge(patch),
             targetInternalName = patch.targetJvmClassName?.internalName,
@@ -297,256 +297,277 @@ class Lowering(
             }
         }
 
-    private fun lowerInjections(hook: PatchHook): List<IrInjection> {
-        val parameters = buildList {
-            when {
-                hook.isInjectBased -> {
-                    addAll(hook.methodDescriptor.functionTypeParameters.mapIndexed { index, parameter ->
-                        val name = parameter.name ?: index.toString()
-                        IrInjectionArgumentParameter(name, parameter.typeName)
-                    })
-                    add(
-                        IrInjectionCallbackParameter(
-                            if (hook.methodDescriptor is ConstructorDescriptor) null
-                            else hook.methodDescriptor.returnTypeName
-                        )
-                    )
-                }
-
-                hook is HookWithTarget -> {
-                    if (hook !is BodyHook && !hook.targetDescriptor.isStatic) {
-                        add(
-                            IrInjectionReceiverParameter(
-                                typeName = hook.targetDescriptor.receiverTypeName,
-                                isCoerce = hook.targetDescriptor.inaccessibleReceiverJvmClassName != null,
+    private fun lowerInjections(hook: PatchInjection): List<IrInjection> =
+        when (hook) {
+            is PatchNativeInjection -> {
+                listOf(
+                    IrNativeInjection(
+                        jvmName = hook.jvmName,
+                        mixinAnnotations = hook.mixinAnnotations.map(::lowerMixinAnnotation),
+                        isStatic = hook.isStatic,
+                        parameters = hook.parameters.map { parameter ->
+                            IrNativeInjectionParameter(
+                                parameter.name,
+                                parameter.type.asIrTypeName(),
+                                parameter.mixinAnnotations.map(::lowerMixinAnnotation),
                             )
-                        )
-                    }
-                    if (hook is FieldSetHook) {
-                        add(IrInjectionArgumentParameter("value", hook.typeName))
-                    }
-                    addAll(hook.targetDescriptor.functionTypeParameters.mapIndexed { index, parameter ->
-                        val name = parameter.name ?: index.toString()
-                        IrInjectionArgumentParameter(name, parameter.typeName)
-                    })
-                    add(
-                        IrInjectionOperationParameter(
-                            if (hook is FieldSetHook) IrTypeName.VOID
-                            else hook.targetDescriptor.returnTypeName
-                        )
+                        },
+                        returnTypeName = hook.returnType?.asIrTypeName(),
                     )
-                }
-
-                hook is LiteralHook -> {
-                    add(IrInjectionValueParameter(hook.typeName))
-                }
-
-                hook is ArrayHook -> {
-                    add(IrInjectionArgumentParameter("array", hook.typeName))
-                    add(IrInjectionArgumentParameter("index", KPInt.asIrTypeName()))
-                    if (hook.op == Op.Set) {
-                        add(IrInjectionArgumentParameter("value", hook.componentTypeName))
-                    }
-                }
-
-                hook is ReturnHook && !hook.isInjectBased -> {
-                    val returnTypeName = hook.returnTypeName ?: lapisError("Return type cannot be null")
-                    add(IrInjectionValueParameter(returnTypeName))
-                }
-
-                hook is LocalHook -> {
-                    add(IrInjectionValueParameter(hook.typeName))
-                }
-
-                hook is InstanceofHook -> {
-                    add(IrInjectionValueParameter(Object::class.asIrTypeName()))
-                    add(IrInjectionOperationParameter(KPBoolean.asIrClassName()))
-                }
-            }
-            if (!hook.isInjectBased && hook.parameters.any { it is HookCancelDescriptorWrapperParameter }) {
-                add(IrInjectionCallbackParameter(hook.methodDescriptor.returnTypeName))
-            }
-            addAll(hook.parameters.mapNotNull { lowerInjectionLocalParameter(it, hook) })
-        }
-        val hookArguments = hook.parameters.map(::lowerHookArgument)
-        return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
-            val methodMixinReference = hook.methodDescriptor.getMixinReference()
-            when (hook) {
-                is MethodHeadHook -> IrMethodHeadInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    isStatic = hook.methodDescriptor.isStatic,
                 )
+            }
 
-                is ConstructorHeadHook -> IrConstructorHeadInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    atArgs = listOf(
-                        "enforce" to when (hook.phase) {
-                            ConstructorHeadPhase.PreBody -> "PRE_BODY"
-                            ConstructorHeadPhase.PostDelegate -> "POST_DELEGATE"
-                            ConstructorHeadPhase.PostInit -> "POST_INIT"
+            is PatchHook -> {
+                val parameters = buildList {
+                    when {
+                        hook.isInjectBased -> {
+                            addAll(hook.methodDescriptor.functionTypeParameters.mapIndexed { index, parameter ->
+                                val name = parameter.name ?: index.toString()
+                                IrInjectionArgumentParameter(name, parameter.typeName)
+                            })
+                            add(
+                                IrInjectionCallbackParameter(
+                                    if (hook.methodDescriptor is ConstructorDescriptor) null
+                                    else hook.methodDescriptor.returnTypeName
+                                )
+                            )
                         }
-                    ),
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
 
-                is BodyHook -> IrWrapMethodInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    isStaticTarget = hook.targetDescriptor.isStatic,
-                    returnTypeName = hook.returnTypeName,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
+                        hook is HookWithTarget -> {
+                            if (hook !is BodyHook && !hook.targetDescriptor.isStatic) {
+                                add(
+                                    IrInjectionReceiverParameter(
+                                        typeName = hook.targetDescriptor.receiverTypeName,
+                                        isCoerce = hook.targetDescriptor.inaccessibleReceiverJvmClassName != null,
+                                    )
+                                )
+                            }
+                            if (hook is FieldSetHook) {
+                                add(IrInjectionArgumentParameter("value", hook.typeName))
+                            }
+                            addAll(hook.targetDescriptor.functionTypeParameters.mapIndexed { index, parameter ->
+                                val name = parameter.name ?: index.toString()
+                                IrInjectionArgumentParameter(name, parameter.typeName)
+                            })
+                            add(
+                                IrInjectionOperationParameter(
+                                    if (hook is FieldSetHook) IrTypeName.VOID
+                                    else hook.targetDescriptor.returnTypeName
+                                )
+                            )
+                        }
 
-                is TailHook -> IrReturnInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    ordinal = null,
-                    isTail = true,
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
+                        hook is LiteralHook -> {
+                            add(IrInjectionValueParameter(hook.typeName))
+                        }
 
-                is LocalHook -> IrModifyVariableInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    returnTypeName = hook.returnTypeName,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    local = lowerLocal(hook.local, hook.methodDescriptor, hook.typeName),
-                    op = hook.op,
-                    ordinal = ordinal,
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
+                        hook is ArrayHook -> {
+                            add(IrInjectionArgumentParameter("array", hook.typeName))
+                            add(IrInjectionArgumentParameter("index", KPInt.asIrTypeName()))
+                            if (hook.op == Op.Set) {
+                                add(IrInjectionArgumentParameter("value", hook.componentTypeName))
+                            }
+                        }
 
-                is InstanceofHook -> IrInstanceofInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    className = hook.typeClassName,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    ordinal = ordinal,
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
+                        hook is ReturnHook && !hook.isInjectBased -> {
+                            val returnTypeName = hook.returnTypeName ?: lapisError("Return type cannot be null")
+                            add(IrInjectionValueParameter(returnTypeName))
+                        }
 
-                is ReturnHook -> {
-                    if (hook.isInjectBased) {
-                        IrReturnInjection(
+                        hook is LocalHook -> {
+                            add(IrInjectionValueParameter(hook.typeName))
+                        }
+
+                        hook is InstanceofHook -> {
+                            add(IrInjectionValueParameter(Object::class.asIrTypeName()))
+                            add(IrInjectionOperationParameter(KPBoolean.asIrClassName()))
+                        }
+                    }
+                    if (!hook.isInjectBased && hook.parameters.any { it is HookCancelDescriptorWrapperParameter }) {
+                        add(IrInjectionCallbackParameter(hook.methodDescriptor.returnTypeName))
+                    }
+                    addAll(hook.parameters.mapNotNull { lowerInjectionLocalParameter(it, hook) })
+                }
+                val hookArguments = hook.parameters.map(::lowerHookArgument)
+                return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
+                    val methodMixinReference = hook.methodDescriptor.getMixinReference()
+                    when (hook) {
+                        is MethodHeadHook -> IrMethodHeadHookInjection(
                             jvmName = hook.jvmName,
                             methodMixinReference = methodMixinReference,
                             parameters = parameters,
                             hookArguments = hookArguments,
-                            ordinal = ordinal,
-                            isTail = false,
                             isStatic = hook.methodDescriptor.isStatic,
                         )
-                    } else {
-                        IrModifyReturnValueInjection(
+
+                        is ConstructorHeadHook -> IrConstructorHeadHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            atArgs = listOf(
+                                "enforce" to when (hook.phase) {
+                                    ConstructorHeadPhase.PreBody -> "PRE_BODY"
+                                    ConstructorHeadPhase.PostDelegate -> "POST_DELEGATE"
+                                    ConstructorHeadPhase.PostInit -> "POST_INIT"
+                                }
+                            ),
+                            isStatic = hook.methodDescriptor.isStatic,
+                        )
+
+                        is BodyHook -> IrWrapMethodHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            isStaticTarget = hook.targetDescriptor.isStatic,
+                            returnTypeName = hook.returnTypeName,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            isStatic = hook.methodDescriptor.isStatic,
+                        )
+
+                        is TailHook -> IrReturnHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            ordinal = null,
+                            isTail = true,
+                            isStatic = hook.methodDescriptor.isStatic,
+                        )
+
+                        is LocalHook -> IrModifyVariableHookInjection(
                             jvmName = hook.jvmName,
                             methodMixinReference = methodMixinReference,
                             returnTypeName = hook.returnTypeName,
                             parameters = parameters,
                             hookArguments = hookArguments,
+                            local = lowerLocal(hook.local, hook.methodDescriptor, hook.typeName),
+                            op = hook.op,
+                            ordinal = ordinal,
+                            isStatic = hook.methodDescriptor.isStatic,
+                        )
+
+                        is InstanceofHook -> IrInstanceofHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            className = hook.typeClassName,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            ordinal = ordinal,
+                            isStatic = hook.methodDescriptor.isStatic,
+                        )
+
+                        is ReturnHook -> {
+                            if (hook.isInjectBased) {
+                                IrReturnHookInjection(
+                                    jvmName = hook.jvmName,
+                                    methodMixinReference = methodMixinReference,
+                                    parameters = parameters,
+                                    hookArguments = hookArguments,
+                                    ordinal = ordinal,
+                                    isTail = false,
+                                    isStatic = hook.methodDescriptor.isStatic,
+                                )
+                            } else {
+                                IrModifyReturnValueHookInjection(
+                                    jvmName = hook.jvmName,
+                                    methodMixinReference = methodMixinReference,
+                                    returnTypeName = hook.returnTypeName,
+                                    parameters = parameters,
+                                    hookArguments = hookArguments,
+                                    ordinal = ordinal,
+                                    isStatic = hook.methodDescriptor.isStatic,
+                                )
+                            }
+                        }
+
+                        is LiteralHook -> {
+                            val args = when (val literal = hook.literal) {
+                                is ZeroHookLiteral -> {
+                                    val expandZeroConditions = literal.conditions.map {
+                                        Constant.Condition.entries[it.ordinal]
+                                    }
+                                    buildList {
+                                        add("intValue" to "0")
+                                        if (expandZeroConditions.isNotEmpty()) {
+                                            add("expandZeroConditions" to expandZeroConditions.joinToString(","))
+                                        }
+                                    }
+                                }
+
+                                is IntHookLiteral -> listOf("intValue" to literal.value.toString())
+                                is LongHookLiteral -> listOf("longValue" to literal.value.toString())
+                                is FloatHookLiteral -> listOf("floatValue" to literal.value.toString())
+                                is DoubleHookLiteral -> listOf("doubleValue" to literal.value.toString())
+                                is StringHookLiteral -> listOf("stringValue" to literal.value)
+                                is ClassHookLiteral -> listOf("classValue" to literal.typeClassName.internalName)
+                                NullHookLiteral -> listOf("nullValue" to "true")
+                            }
+                            IrModifyExpressionValueHookInjection(
+                                jvmName = hook.jvmName,
+                                methodMixinReference = methodMixinReference,
+                                parameters = parameters,
+                                hookArguments = hookArguments,
+                                constantTypeName = hook.typeName,
+                                atArgs = args,
+                                ordinal = ordinal,
+                                isStatic = hook.methodDescriptor.isStatic,
+                            )
+                        }
+
+                        is FieldGetHook -> IrFieldGetHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
+                            isStaticTarget = hook.targetDescriptor.isStatic,
+                            fieldTypeName = hook.typeName,
+                            ordinal = ordinal,
+                            isStatic = hook.methodDescriptor.isStatic,
+                        )
+
+                        is FieldSetHook -> IrFieldSetHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
+                            isStaticTarget = hook.targetDescriptor.isStatic,
+                            ordinal = ordinal,
+                            isStatic = hook.methodDescriptor.isStatic,
+                        )
+
+                        is ArrayHook -> IrArrayHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
+                            isStaticTarget = hook.targetDescriptor.isStatic,
+                            ordinal = ordinal,
+                            componentTypeName = hook.componentTypeName,
+                            isStatic = hook.methodDescriptor.isStatic,
+                            op = hook.op,
+                            atArgs = listOf("array" to hook.op.name.lowercase()),
+                        )
+
+                        is CallHook -> IrWrapOperationHookInjection(
+                            jvmName = hook.jvmName,
+                            methodMixinReference = methodMixinReference,
+                            returnTypeName = hook.returnTypeName,
+                            parameters = parameters,
+                            hookArguments = hookArguments,
+                            targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
+                            isStaticTarget = hook.targetDescriptor.isStatic,
+                            isConstructorCall = hook.targetDescriptor is ConstructorDescriptor,
                             ordinal = ordinal,
                             isStatic = hook.methodDescriptor.isStatic,
                         )
                     }
                 }
-
-                is LiteralHook -> {
-                    val args = when (val literal = hook.literal) {
-                        is ZeroHookLiteral -> {
-                            val expandZeroConditions = literal.conditions.map {
-                                Constant.Condition.entries[it.ordinal]
-                            }
-                            buildList {
-                                add("intValue" to "0")
-                                if (expandZeroConditions.isNotEmpty()) {
-                                    add("expandZeroConditions" to expandZeroConditions.joinToString(","))
-                                }
-                            }
-                        }
-
-                        is IntHookLiteral -> listOf("intValue" to literal.value.toString())
-                        is LongHookLiteral -> listOf("longValue" to literal.value.toString())
-                        is FloatHookLiteral -> listOf("floatValue" to literal.value.toString())
-                        is DoubleHookLiteral -> listOf("doubleValue" to literal.value.toString())
-                        is StringHookLiteral -> listOf("stringValue" to literal.value)
-                        is ClassHookLiteral -> listOf("classValue" to literal.typeClassName.internalName)
-                        NullHookLiteral -> listOf("nullValue" to "true")
-                    }
-                    IrModifyExpressionValueInjection(
-                        jvmName = hook.jvmName,
-                        methodMixinReference = methodMixinReference,
-                        parameters = parameters,
-                        hookArguments = hookArguments,
-                        constantTypeName = hook.typeName,
-                        atArgs = args,
-                        ordinal = ordinal,
-                        isStatic = hook.methodDescriptor.isStatic,
-                    )
-                }
-
-                is FieldGetHook -> IrFieldGetInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
-                    isStaticTarget = hook.targetDescriptor.isStatic,
-                    fieldTypeName = hook.typeName,
-                    ordinal = ordinal,
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
-
-                is FieldSetHook -> IrFieldSetInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
-                    isStaticTarget = hook.targetDescriptor.isStatic,
-                    ordinal = ordinal,
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
-
-                is ArrayHook -> IrArrayInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
-                    isStaticTarget = hook.targetDescriptor.isStatic,
-                    ordinal = ordinal,
-                    componentTypeName = hook.componentTypeName,
-                    isStatic = hook.methodDescriptor.isStatic,
-                    op = hook.op,
-                    atArgs = listOf("array" to hook.op.name.lowercase()),
-                )
-
-                is CallHook -> IrWrapOperationInjection(
-                    jvmName = hook.jvmName,
-                    methodMixinReference = methodMixinReference,
-                    returnTypeName = hook.returnTypeName,
-                    parameters = parameters,
-                    hookArguments = hookArguments,
-                    targetMixinReference = hook.targetDescriptor.getMixinReference(isTarget = true),
-                    isStaticTarget = hook.targetDescriptor.isStatic,
-                    isConstructorCall = hook.targetDescriptor is ConstructorDescriptor,
-                    ordinal = ordinal,
-                    isStatic = hook.methodDescriptor.isStatic,
-                )
             }
         }
-    }
 
     private fun lowerInjectionLocalParameter(parameter: HookParameter, hook: PatchHook): IrInjectionLocalParameter? =
         when (parameter) {
@@ -752,6 +773,7 @@ class Lowering(
     ): T? =
         patches.asSequence()
             .flatMap { it.mixin.injections }
+            .filterIsInstance<IrHookInjection>()
             .flatMap { it.hookArguments }
             .filterIsInstance<IrHookOriginDescriptorWrapperImplArgument<*>>()
             .map { it.wrapperImpl }
@@ -761,6 +783,7 @@ class Lowering(
     private fun findCancelDescriptorWrapperImpl(descriptorClassName: IrClassName): IrCancelDescriptorWrapperImpl? =
         patches.asSequence()
             .flatMap { it.mixin.injections }
+            .filterIsInstance<IrHookInjection>()
             .flatMap { it.hookArguments }
             .filterIsInstance<IrHookCancelDescriptorWrapperImplArgument>()
             .map { it.wrapperImpl }

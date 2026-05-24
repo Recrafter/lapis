@@ -466,283 +466,311 @@ class Generator(
         patchClassName: IrClassName,
         patchImplMember: GenJavaEntity?,
         syncStaticBridgeMethod: JPMethod?,
-    ): JPMethod =
-        buildJavaMethod(
-            name = injection.jvmName + injection.ordinal?.let { "_ordinal${it}" }.orEmpty(),
-            visibility = IrVisibilityModifier.PRIVATE
-        ) {
-            val hasCancelArgument = injection.hookArguments.any { it is IrHookCancelDescriptorWrapperImplArgument }
-            when (injection) {
-                is IrWrapMethodInjection -> addAnnotation<WrapMethod> {
-                    setArgumentValue(WrapMethod::method, listOf(injection.methodMixinReference))
-                }
-
-                is IrInjectInjection -> addAnnotation<Inject> {
-                    setArgumentValue(Inject::method, listOf(injection.methodMixinReference))
-                    setArgumentValue<Inject, At>(Inject::at) {
-                        setArgumentValue(
-                            At::value,
-                            when (injection) {
-                                is IrConstructorHeadInjection -> "CTOR_HEAD"
-                                is IrMethodHeadInjection -> "HEAD"
-                                is IrReturnInjection -> if (injection.isTail) "TAIL" else "RETURN"
-                            }
-                        )
-                        if (injection is IrConstructorHeadInjection) {
-                            setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
-                        }
-                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                        setArgumentValue(At::unsafe, true)
-                    }
-                    if (hasCancelArgument) {
-                        setArgumentValue(Inject::cancellable, true)
-                    }
-                }
-
-                is IrModifyVariableInjection -> addAnnotation<ModifyVariable> {
-                    setArgumentValue(ModifyVariable::method, listOf(injection.methodMixinReference))
-                    when (val local = injection.local) {
-                        is IrNamedLocal -> setArgumentValue(ModifyVariable::name, listOf(local.name))
-                        is IrPositionalLocal -> setArgumentValue(ModifyVariable::ordinal, local.ordinal)
-                    }
-                    setArgumentValue<ModifyVariable, At>(ModifyVariable::at) {
-                        val atCode = when (injection.op) {
-                            Op.Get -> "LOAD"
-                            Op.Set -> "STORE"
-                        }
-                        setArgumentValue(At::value, atCode)
-                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                        setArgumentValue(At::unsafe, true)
-                    }
-                }
-
-                is IrModifyReturnValueInjection -> addAnnotation<ModifyReturnValue> {
-                    setArgumentValue(ModifyReturnValue::method, listOf(injection.methodMixinReference))
-                    setArgumentValue<ModifyReturnValue, At>(ModifyReturnValue::at) {
-                        setArgumentValue(At::value, "RETURN")
-                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                        setArgumentValue(At::unsafe, true)
-                    }
-                }
-
-                is IrWrapOperationInjection -> addAnnotation<WrapOperation> {
-                    setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
-                    setArgumentValue<WrapOperation, At>(WrapOperation::at) {
-                        setArgumentValue(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
-                        setArgumentValue(At::target, injection.targetMixinReference)
-                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                        setArgumentValue(At::unsafe, true)
-                    }
-                }
-
-                is IrModifyExpressionValueInjection -> addAnnotation<ModifyExpressionValue> {
-                    setArgumentValue(ModifyExpressionValue::method, listOf(injection.methodMixinReference))
-                    setArgumentValue<ModifyExpressionValue, At>(ModifyExpressionValue::at) {
-                        setArgumentValue(At::value, "CONSTANT")
-                        setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
-                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                        setArgumentValue(At::unsafe, true)
-                    }
-                }
-
-                is IrFieldGetInjection, is IrFieldSetInjection -> addAnnotation<WrapOperation> {
-                    setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
-                    setArgumentValue<WrapOperation, At>(WrapOperation::at) {
-                        setArgumentValue(At::value, "FIELD")
-                        setArgumentValue(At::target, injection.targetMixinReference)
-                        val opcode = when (injection) {
-                            is IrFieldGetInjection -> {
-                                if (injection.isStaticTarget) Opcodes.GETSTATIC
-                                else Opcodes.GETFIELD
-                            }
-
-                            is IrFieldSetInjection -> {
-                                if (injection.isStaticTarget) Opcodes.PUTSTATIC
-                                else Opcodes.PUTFIELD
-                            }
-                        }
-                        setArgumentValue(At::opcode, opcode)
-                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                        setArgumentValue(At::unsafe, true)
-                    }
-                }
-
-                is IrArrayInjection -> addAnnotation<Redirect> {
-                    setArgumentValue(Redirect::method, listOf(injection.methodMixinReference))
-                    setArgumentValue<Redirect, At>(Redirect::at) {
-                        setArgumentValue(At::value, "FIELD")
-                        setArgumentValue(At::target, injection.targetMixinReference)
-                        setArgumentValue(
-                            At::opcode,
-                            if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD
-                        )
-                        setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
-                        injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                        setArgumentValue(At::unsafe, true)
-                    }
-                }
-
-                is IrInstanceofInjection -> addAnnotation<WrapOperation> {
-                    setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
-                    setArgumentValue<WrapOperation, Constant>(WrapOperation::constant) {
-                        setArgumentValue(Constant::classValue, injection.className)
-                        injection.ordinal?.let { setArgumentValue(Constant::ordinal, it) }
-                    }
-                }
-            }
+    ): JPMethod {
+        val name = when (injection) {
+            is IrNativeInjection -> injection.jvmName
+            is IrHookInjection -> injection.jvmName + injection.ordinal?.let { "_ordinal${it}" }.orEmpty()
+        }
+        return buildJavaMethod(name, IrVisibilityModifier.PRIVATE) {
+            val hasCancelArgument = injection is IrHookInjection
+                && injection.hookArguments.any { it is IrHookCancelDescriptorWrapperImplArgument }
             if (injection.isStatic) {
                 addModifiers(JPModifier.STATIC)
             }
-            val receiverParameterName = "receiver".withInternalPrefix()
-            val valueParameterName = "value".withInternalPrefix()
-            val originalParameterName = "original".withInternalPrefix()
-            val callbackParameterName = "callback".withInternalPrefix()
-            addParameters(injection.parameters.map { parameter ->
-                when (parameter) {
-                    is IrInjectionReceiverParameter -> {
-                        buildJavaParameter(receiverParameterName, parameter.typeName) {
-                            if (parameter.isCoerce) {
-                                addAnnotation<Coerce>()
-                            }
+            val (annotations, parameters, argumentCodeBlocks) = when (injection) {
+                is IrNativeInjection -> {
+                    val parameters = injection.parameters.map { parameter ->
+                        buildJavaParameter(parameter.name, parameter.typeName) {
+                            addAnnotations(parameter.mixinAnnotations.map { buildMixinAnnotation(it) })
                         }
                     }
+                    Triple(
+                        injection.mixinAnnotations.map { buildMixinAnnotation(it) },
+                        parameters,
+                        parameters.map { it.toCodeBlock() },
+                    )
+                }
 
-                    is IrInjectionArgumentParameter -> {
-                        buildJavaParameter(parameter.name.withInternalPrefix(ARGUMENT), parameter.typeName)
-                    }
+                is IrHookInjection -> {
+                    val receiverParameterName = "receiver".withInternalPrefix()
+                    val valueParameterName = "value".withInternalPrefix()
+                    val originalParameterName = "original".withInternalPrefix()
+                    val callbackParameterName = "callback".withInternalPrefix()
+                    val annotations = listOf(
+                        when (injection) {
+                        is IrWrapMethodHookInjection -> buildJavaAnnotation<WrapMethod> {
+                            setArgumentValue(WrapMethod::method, listOf(injection.methodMixinReference))
+                        }
 
-                    is IrInjectionOperationParameter -> {
-                        buildJavaParameter(
-                            originalParameterName,
-                            Operation::class.asIrParameterizedTypeName(parameter.returnTypeName.orVoid())
-                        )
-                    }
-
-                    is IrInjectionValueParameter -> buildJavaParameter(valueParameterName, parameter.typeName)
-
-                    is IrInjectionLocalParameter -> {
-                        val typeName = parameter.varImplBuiltin?.let {
-                            if (it == LocalVarImplBuiltin.ObjectLocalVar) {
-                                it.referenceTypeName.parameterizedBy(parameter.typeName)
-                            } else {
-                                it.referenceTypeName
+                        is IrInjectHookInjection -> buildJavaAnnotation<Inject> {
+                            setArgumentValue(Inject::method, listOf(injection.methodMixinReference))
+                            setArgumentValue<Inject, At>(Inject::at) {
+                                setArgumentValue(
+                                    At::value,
+                                    when (injection) {
+                                        is IrConstructorHeadHookInjection -> "CTOR_HEAD"
+                                        is IrMethodHeadHookInjection -> "HEAD"
+                                        is IrReturnHookInjection -> if (injection.isTail) "TAIL" else "RETURN"
+                                    }
+                                )
+                                if (injection is IrConstructorHeadHookInjection) {
+                                    setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
+                                }
+                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                setArgumentValue(At::unsafe, true)
                             }
-                        } ?: parameter.typeName
+                            if (hasCancelArgument) {
+                                setArgumentValue(Inject::cancellable, true)
+                            }
+                        }
+
+                        is IrModifyVariableHookInjection -> buildJavaAnnotation<ModifyVariable> {
+                            setArgumentValue(ModifyVariable::method, listOf(injection.methodMixinReference))
+                            when (val local = injection.local) {
+                                is IrNamedLocal -> setArgumentValue(ModifyVariable::name, listOf(local.name))
+                                is IrPositionalLocal -> setArgumentValue(ModifyVariable::ordinal, local.ordinal)
+                            }
+                            setArgumentValue<ModifyVariable, At>(ModifyVariable::at) {
+                                val atCode = when (injection.op) {
+                                    Op.Get -> "LOAD"
+                                    Op.Set -> "STORE"
+                                }
+                                setArgumentValue(At::value, atCode)
+                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                setArgumentValue(At::unsafe, true)
+                            }
+                        }
+
+                        is IrModifyReturnValueHookInjection -> buildJavaAnnotation<ModifyReturnValue> {
+                            setArgumentValue(ModifyReturnValue::method, listOf(injection.methodMixinReference))
+                            setArgumentValue<ModifyReturnValue, At>(ModifyReturnValue::at) {
+                                setArgumentValue(At::value, "RETURN")
+                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                setArgumentValue(At::unsafe, true)
+                            }
+                        }
+
+                        is IrWrapOperationHookInjection -> buildJavaAnnotation<WrapOperation> {
+                            setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
+                            setArgumentValue<WrapOperation, At>(WrapOperation::at) {
+                                setArgumentValue(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
+                                setArgumentValue(At::target, injection.targetMixinReference)
+                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                setArgumentValue(At::unsafe, true)
+                            }
+                        }
+
+                        is IrModifyExpressionValueHookInjection -> buildJavaAnnotation<ModifyExpressionValue> {
+                            setArgumentValue(ModifyExpressionValue::method, listOf(injection.methodMixinReference))
+                            setArgumentValue<ModifyExpressionValue, At>(ModifyExpressionValue::at) {
+                                setArgumentValue(At::value, "CONSTANT")
+                                setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
+                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                setArgumentValue(At::unsafe, true)
+                            }
+                        }
+
+                        is IrFieldGetHookInjection, is IrFieldSetHookInjection -> buildJavaAnnotation<WrapOperation> {
+                            setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
+                            setArgumentValue<WrapOperation, At>(WrapOperation::at) {
+                                setArgumentValue(At::value, "FIELD")
+                                setArgumentValue(At::target, injection.targetMixinReference)
+                                val opcode = when (injection) {
+                                    is IrFieldGetHookInjection -> {
+                                        if (injection.isStaticTarget) Opcodes.GETSTATIC
+                                        else Opcodes.GETFIELD
+                                    }
+
+                                    is IrFieldSetHookInjection -> {
+                                        if (injection.isStaticTarget) Opcodes.PUTSTATIC
+                                        else Opcodes.PUTFIELD
+                                    }
+                                }
+                                setArgumentValue(At::opcode, opcode)
+                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                setArgumentValue(At::unsafe, true)
+                            }
+                        }
+
+                        is IrArrayHookInjection -> buildJavaAnnotation<Redirect> {
+                            setArgumentValue(Redirect::method, listOf(injection.methodMixinReference))
+                            setArgumentValue<Redirect, At>(Redirect::at) {
+                                setArgumentValue(At::value, "FIELD")
+                                setArgumentValue(At::target, injection.targetMixinReference)
+                                setArgumentValue(
+                                    At::opcode,
+                                    if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD
+                                )
+                                setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
+                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                setArgumentValue(At::unsafe, true)
+                            }
+                        }
+
+                        is IrInstanceofHookInjection -> buildJavaAnnotation<WrapOperation> {
+                            setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
+                            setArgumentValue<WrapOperation, Constant>(WrapOperation::constant) {
+                                setArgumentValue(Constant::classValue, injection.className)
+                                injection.ordinal?.let { setArgumentValue(Constant::ordinal, it) }
+                            }
+                        }
+                    })
+                    val parameters = injection.parameters.map { parameter ->
                         when (parameter) {
-                            is IrInjectionBodyLocalParameter -> {
-                                buildJavaParameter(parameter.name.withInternalPrefix(LOCAL), typeName) {
-                                    addAnnotation<Local> {
-                                        when (val local = parameter.local) {
-                                            is IrNamedLocal -> setArgumentValue(Local::name, listOf(local.name))
-                                            is IrPositionalLocal -> setArgumentValue(Local::ordinal, local.ordinal)
+                            is IrInjectionReceiverParameter -> {
+                                buildJavaParameter(receiverParameterName, parameter.typeName) {
+                                    if (parameter.isCoerce) {
+                                        addAnnotation<Coerce>()
+                                    }
+                                }
+                            }
+
+                            is IrInjectionArgumentParameter -> {
+                                buildJavaParameter(parameter.name.withInternalPrefix(ARGUMENT), parameter.typeName)
+                            }
+
+                            is IrInjectionOperationParameter -> {
+                                buildJavaParameter(
+                                    originalParameterName,
+                                    Operation::class.asIrParameterizedTypeName(parameter.returnTypeName.orVoid())
+                                )
+                            }
+
+                            is IrInjectionValueParameter -> buildJavaParameter(valueParameterName, parameter.typeName)
+
+                            is IrInjectionLocalParameter -> {
+                                val typeName = parameter.varImplBuiltin?.let {
+                                    if (it == LocalVarImplBuiltin.ObjectLocalVar) {
+                                        it.referenceTypeName.parameterizedBy(parameter.typeName)
+                                    } else {
+                                        it.referenceTypeName
+                                    }
+                                } ?: parameter.typeName
+                                when (parameter) {
+                                    is IrInjectionBodyLocalParameter -> {
+                                        buildJavaParameter(parameter.name.withInternalPrefix(LOCAL), typeName) {
+                                            addAnnotation<Local> {
+                                                when (val local = parameter.local) {
+                                                    is IrNamedLocal -> setArgumentValue(Local::name, listOf(local.name))
+                                                    is IrPositionalLocal -> setArgumentValue(
+                                                        Local::ordinal,
+                                                        local.ordinal
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    is IrInjectionParamLocalParameter -> {
+                                        buildJavaParameter(parameter.name.withInternalPrefix(PARAM), typeName) {
+                                            addAnnotation<Local> {
+                                                setArgumentValue(Local::index, parameter.localIndex)
+                                                setArgumentValue(Local::argsOnly, true)
+                                            }
+                                        }
+                                    }
+
+                                    is IrInjectionShareParameter -> {
+                                        buildJavaParameter(parameter.name.withInternalPrefix(SHARE), typeName) {
+                                            addAnnotation<Share> {
+                                                setArgumentValue(Share::value, parameter.key)
+                                                parameter.namespace?.let { setArgumentValue(Share::namespace, it) }
+                                            }
                                         }
                                     }
                                 }
                             }
 
-                            is IrInjectionParamLocalParameter -> {
-                                buildJavaParameter(parameter.name.withInternalPrefix(PARAM), typeName) {
-                                    addAnnotation<Local> {
-                                        setArgumentValue(Local::index, parameter.localIndex)
-                                        setArgumentValue(Local::argsOnly, true)
-                                    }
-                                }
-                            }
-
-                            is IrInjectionShareParameter -> {
-                                buildJavaParameter(parameter.name.withInternalPrefix(SHARE), typeName) {
-                                    addAnnotation<Share> {
-                                        setArgumentValue(Share::value, parameter.key)
-                                        parameter.namespace?.let { setArgumentValue(Share::namespace, it) }
+                            is IrInjectionCallbackParameter -> {
+                                buildJavaParameter(
+                                    callbackParameterName,
+                                    parameter.returnTypeName
+                                        ?.let { CallbackInfoReturnable::class.asIrParameterizedTypeName(it) }
+                                        ?: CallbackInfo::class.asIrTypeName()
+                                ) {
+                                    if (injection !is IrInjectHookInjection) {
+                                        addAnnotation<Cancellable>()
                                     }
                                 }
                             }
                         }
                     }
-
-                    is IrInjectionCallbackParameter -> {
-                        buildJavaParameter(
-                            callbackParameterName,
-                            parameter.returnTypeName
-                                ?.let { CallbackInfoReturnable::class.asIrParameterizedTypeName(it) }
-                                ?: CallbackInfo::class.asIrTypeName()
-                        ) {
-                            if (injection !is IrInjectInjection) {
-                                addAnnotation<Cancellable>()
-                            }
-                        }
-                    }
-                }
-            })
-            setReturnType(injection.returnTypeName)
-            val hookArgumentCodeBlocks = injection.hookArguments.map { argument ->
-                when (argument) {
-                    is IrHookOriginValueArgument -> valueParameterName.toJavaCodeBlock()
-                    is IrHookOriginDescriptorWrapperImplArgument<*> -> {
-                        val constructorArgumentCodeBlocks = buildList {
-                            if (injection is IrTargetInjection
-                                && injection !is IrWrapMethodInjection
-                                && injection !is IrArrayInjection
-                                && !injection.isStaticTarget
-                            ) {
-                                add(receiverParameterName.toJavaCodeBlock())
-                            }
-                            if (injection is IrFieldSetInjection) {
-                                add("value".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
-                            }
-                            if (injection is IrArrayInjection) {
-                                add("array".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
-                                add("index".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
-                                if (injection.op == Op.Set) {
-                                    add("value".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
+                    val argumentCodeBlocks = injection.hookArguments.map { argument ->
+                        when (argument) {
+                            is IrHookOriginValueArgument -> valueParameterName.toJavaCodeBlock()
+                            is IrHookOriginDescriptorWrapperImplArgument<*> -> {
+                                val constructorArgumentCodeBlocks = buildList {
+                                    if (injection is IrTargetInjection
+                                        && injection !is IrWrapMethodHookInjection
+                                        && injection !is IrArrayHookInjection
+                                        && !injection.isStaticTarget
+                                    ) {
+                                        add(receiverParameterName.toJavaCodeBlock())
+                                    }
+                                    if (injection is IrFieldSetHookInjection) {
+                                        add("value".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
+                                    }
+                                    if (injection is IrArrayHookInjection) {
+                                        add("array".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
+                                        add("index".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
+                                        if (injection.op == Op.Set) {
+                                            add("value".withInternalPrefix(ARGUMENT).toJavaCodeBlock())
+                                        }
+                                    }
+                                    val impl = argument.wrapperImpl
+                                    if (impl is IrInvokableDescriptorWrapperImpl) {
+                                        addAll(impl.functionTypeParameters.mapIndexed { index, parameter ->
+                                            (parameter.name ?: index.toString())
+                                                .withInternalPrefix(ARGUMENT)
+                                                .toJavaCodeBlock()
+                                        })
+                                    }
+                                    if (injection !is IrArrayHookInjection) {
+                                        add(originalParameterName.toJavaCodeBlock())
+                                    }
+                                }
+                                buildJavaCodeBlock("new %T(${constructorArgumentCodeBlocks.format})") {
+                                    +argument.wrapperImpl.className; constructorArgumentCodeBlocks.forEach { +it }
                                 }
                             }
-                            val impl = argument.wrapperImpl
-                            if (impl is IrInvokableDescriptorWrapperImpl) {
-                                addAll(impl.functionTypeParameters.mapIndexed { index, parameter ->
-                                    (parameter.name ?: index.toString()).withInternalPrefix(ARGUMENT).toJavaCodeBlock()
-                                })
+
+                            is IrHookCancelDescriptorWrapperImplArgument -> {
+                                buildJavaCodeBlock("new %T(%L)") {
+                                    +argument.wrapperImpl.className; +callbackParameterName
+                                }
                             }
-                            if (injection !is IrArrayInjection) {
-                                add(originalParameterName.toJavaCodeBlock())
+
+                            is IrHookOriginInstanceofWrapperImplArgument -> {
+                                buildJavaCodeBlock("new %T(%L, %L)") {
+                                    +builtins[SimpleBuiltin.Instanceof]; +valueParameterName; +originalParameterName
+                                }
+                            }
+
+                            is IrHookOrdinalArgument -> injection.ordinal?.toJavaCodeBlock()
+                                ?: lapisError("Ordinal cannot be null")
+
+                            is IrHookLocalArgument -> {
+                                val localName = argument.name.withInternalPrefix(
+                                    when {
+                                        argument.isBody -> LOCAL
+                                        argument.isShare -> SHARE
+                                        injection is IrInjectHookInjection -> ARGUMENT
+                                        else -> PARAM
+                                    }
+                                )
+                                argument.varBuiltin?.let {
+                                    val typeFormat = if (it == LocalVarImplBuiltin.ObjectLocalVar) "%T<>" else "%T"
+                                    buildJavaCodeBlock("new $typeFormat(%L)") { +builtins[it]; +localName }
+                                } ?: localName.toJavaCodeBlock()
                             }
                         }
-                        buildJavaCodeBlock("new %T(${constructorArgumentCodeBlocks.format})") {
-                            +argument.wrapperImpl.className; constructorArgumentCodeBlocks.forEach { +it }
-                        }
                     }
-
-                    is IrHookCancelDescriptorWrapperImplArgument -> {
-                        buildJavaCodeBlock("new %T(%L)") {
-                            +argument.wrapperImpl.className; +callbackParameterName
-                        }
-                    }
-
-                    is IrHookOriginInstanceofWrapperImplArgument -> {
-                        buildJavaCodeBlock("new %T(%L, %L)") {
-                            +builtins[SimpleBuiltin.Instanceof]; +valueParameterName; +originalParameterName
-                        }
-                    }
-
-                    is IrHookOrdinalArgument -> injection.ordinal?.toJavaCodeBlock()
-                        ?: lapisError("Ordinal cannot be null")
-
-                    is IrHookLocalArgument -> {
-                        val localName = argument.name.withInternalPrefix(
-                            when {
-                                argument.isBody -> LOCAL
-                                argument.isShare -> SHARE
-                                injection is IrInjectInjection -> ARGUMENT
-                                else -> PARAM
-                            }
-                        )
-                        argument.varBuiltin?.let {
-                            val builtinTypeFormat = if (it == LocalVarImplBuiltin.ObjectLocalVar) "%T<>" else "%T"
-                            buildJavaCodeBlock("new $builtinTypeFormat(%L)") { +builtins[it]; +localName }
-                        } ?: localName.toJavaCodeBlock()
-                    }
+                    Triple(annotations, parameters, argumentCodeBlocks)
                 }
             }
+            addAnnotations(annotations)
+            addParameters(parameters)
+            setReturnType(injection.returnTypeName)
             setBody {
                 if (injection.isStatic) {
                     syncStaticBridgeMethod?.let {
@@ -754,9 +782,9 @@ class Generator(
                         patchImplMember ?: lapisError("Patch impl cannot be null")
                     }
                     val patchInstanceFormat = patchImplMember?.callFormat ?: "%T.Companion"
-                    code_("$patchInstanceFormat.%L(${hookArgumentCodeBlocks.format})", isReturn = injection.isReturn) {
+                    code_("$patchInstanceFormat.%L(${argumentCodeBlocks.format})", isReturn = injection.isReturn) {
                         patchImplMember?.let { it() } ?: +patchClassName
-                        +injection.jvmName; hookArgumentCodeBlocks.forEach { +it }
+                        +injection.jvmName; argumentCodeBlocks.forEach { +it }
                     }
                 }
                 if (hasCancelArgument) {
@@ -783,6 +811,7 @@ class Generator(
                 }
             }
         }
+    }
 
     private fun generateMixinExternalBridge(
         bridge: IrMixinExternalBridge,

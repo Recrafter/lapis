@@ -8,17 +8,38 @@ import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
+import io.github.recrafter.lapis.phases.validator.models.common.MixinAnnotation
 import io.github.recrafter.lapis.phases.validator.models.schemas.*
 
+sealed interface PatchInjection {
+    val jvmName: String
+    val isStatic: Boolean
+}
+
+class PatchNativeInjection(
+    override val jvmName: String,
+    val mixinAnnotations: List<MixinAnnotation>,
+    override val isStatic: Boolean,
+    val parameters: List<PatchNativeInjectionParameter>,
+    val returnType: KSType?,
+) : PatchInjection
+
+class PatchNativeInjectionParameter(
+    val name: String,
+    val type: KSType,
+    val mixinAnnotations: List<MixinAnnotation>,
+)
+
 sealed class PatchHook(
-    val jvmName: String,
+    override val jvmName: String,
     val methodDescriptor: Descriptor,
     returnType: KSType?,
     val parameters: List<HookParameter>,
     val ordinals: Set<Int>,
-) {
+) : PatchInjection {
     open val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
     open val isInjectBased: Boolean = false
+    override val isStatic: Boolean = methodDescriptor.isStatic
 }
 
 sealed interface HookWithTarget {

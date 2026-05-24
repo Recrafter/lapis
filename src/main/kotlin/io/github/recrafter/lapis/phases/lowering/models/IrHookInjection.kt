@@ -3,44 +3,67 @@ package io.github.recrafter.lapis.phases.lowering.models
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.extensions.kp.KPBoolean
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
+import io.github.recrafter.lapis.phases.lowering.models.common.IrMixinAnnotation
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
-sealed class IrInjection(
-    val jvmName: String,
+sealed interface IrInjection : IrReturnable {
+    val jvmName: String
+    val isStatic: Boolean
+    override val returnTypeName: IrTypeName?
+}
+
+class IrNativeInjection(
+    override val jvmName: String,
+    val mixinAnnotations: List<IrMixinAnnotation>,
+    override val isStatic: Boolean,
+    val parameters: List<IrNativeInjectionParameter>,
+    override val returnTypeName: IrTypeName?
+) : IrInjection
+
+class IrNativeInjectionParameter(
+    val name: String,
+    val typeName: IrTypeName,
+    val mixinAnnotations: List<IrMixinAnnotation>,
+)
+
+sealed class IrHookInjection(
+    override val jvmName: String,
     val methodMixinReference: String,
     override val returnTypeName: IrTypeName?,
     val parameters: List<IrInjectionParameter>,
     val hookArguments: List<IrHookArgument>,
-    val isStatic: Boolean,
+    override val isStatic: Boolean,
     val ordinal: Int?,
-) : IrReturnable
+) : IrInjection
 
 sealed interface IrTargetInjection {
     val targetMixinReference: String
     val isStaticTarget: Boolean
 }
 
-sealed interface IrInjectInjection
+sealed interface IrInjectHookInjection
 
-class IrMethodHeadInjection(
+class IrMethodHeadHookInjection(
     jvmName: String,
     methodMixinReference: String,
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, null), IrInjectInjection
+) : IrHookInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, null),
+    IrInjectHookInjection
 
-class IrConstructorHeadInjection(
+class IrConstructorHeadHookInjection(
     jvmName: String,
     methodMixinReference: String,
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
     val atArgs: List<Pair<String, String>>,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, null), IrInjectInjection
+) : IrHookInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, null),
+    IrInjectHookInjection
 
-class IrWrapMethodInjection(
+class IrWrapMethodHookInjection(
     jvmName: String,
     methodMixinReference: String,
     override val isStaticTarget: Boolean,
@@ -48,12 +71,12 @@ class IrWrapMethodInjection(
     parameters: List<IrInjectionParameter>,
     hookArguments: List<IrHookArgument>,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, null),
+) : IrHookInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, null),
     IrTargetInjection {
     override val targetMixinReference: String = methodMixinReference
 }
 
-class IrReturnInjection(
+class IrReturnHookInjection(
     jvmName: String,
     methodMixinReference: String,
     parameters: List<IrInjectionParameter>,
@@ -61,9 +84,10 @@ class IrReturnInjection(
     ordinal: Int?,
     val isTail: Boolean,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, ordinal), IrInjectInjection
+) : IrHookInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, ordinal),
+    IrInjectHookInjection
 
-class IrModifyVariableInjection(
+class IrModifyVariableHookInjection(
     jvmName: String,
     methodMixinReference: String,
     returnTypeName: IrTypeName?,
@@ -73,9 +97,9 @@ class IrModifyVariableInjection(
     val op: Op,
     ordinal: Int?,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, ordinal)
+) : IrHookInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, ordinal)
 
-class IrModifyReturnValueInjection(
+class IrModifyReturnValueHookInjection(
     jvmName: String,
     methodMixinReference: String,
     returnTypeName: IrTypeName?,
@@ -83,9 +107,9 @@ class IrModifyReturnValueInjection(
     hookArguments: List<IrHookArgument>,
     ordinal: Int?,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, ordinal)
+) : IrHookInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, ordinal)
 
-class IrWrapOperationInjection(
+class IrWrapOperationHookInjection(
     jvmName: String,
     methodMixinReference: String,
     returnTypeName: IrTypeName?,
@@ -96,10 +120,10 @@ class IrWrapOperationInjection(
     val isConstructorCall: Boolean,
     ordinal: Int?,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, ordinal),
+) : IrHookInjection(jvmName, methodMixinReference, returnTypeName, parameters, hookArguments, isStatic, ordinal),
     IrTargetInjection
 
-class IrModifyExpressionValueInjection(
+class IrModifyExpressionValueHookInjection(
     jvmName: String,
     methodMixinReference: String,
     parameters: List<IrInjectionParameter>,
@@ -108,9 +132,9 @@ class IrModifyExpressionValueInjection(
     val atArgs: List<Pair<String, String>>,
     ordinal: Int?,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, constantTypeName, parameters, hookArguments, isStatic, ordinal)
+) : IrHookInjection(jvmName, methodMixinReference, constantTypeName, parameters, hookArguments, isStatic, ordinal)
 
-class IrFieldGetInjection(
+class IrFieldGetHookInjection(
     jvmName: String,
     methodMixinReference: String,
     parameters: List<IrInjectionParameter>,
@@ -120,10 +144,10 @@ class IrFieldGetInjection(
     ordinal: Int?,
     fieldTypeName: IrTypeName,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, fieldTypeName, parameters, hookArguments, isStatic, ordinal),
+) : IrHookInjection(jvmName, methodMixinReference, fieldTypeName, parameters, hookArguments, isStatic, ordinal),
     IrTargetInjection
 
-class IrFieldSetInjection(
+class IrFieldSetHookInjection(
     jvmName: String,
     methodMixinReference: String,
     parameters: List<IrInjectionParameter>,
@@ -132,9 +156,10 @@ class IrFieldSetInjection(
     override val isStaticTarget: Boolean,
     ordinal: Int?,
     isStatic: Boolean,
-) : IrInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, ordinal), IrTargetInjection
+) : IrHookInjection(jvmName, methodMixinReference, null, parameters, hookArguments, isStatic, ordinal),
+    IrTargetInjection
 
-class IrArrayInjection(
+class IrArrayHookInjection(
     jvmName: String,
     methodMixinReference: String,
     parameters: List<IrInjectionParameter>,
@@ -146,13 +171,13 @@ class IrArrayInjection(
     isStatic: Boolean,
     val op: Op,
     val atArgs: List<Pair<String, String>>,
-) : IrInjection(
+) : IrHookInjection(
     jvmName, methodMixinReference,
     returnTypeName = if (op == Op.Set) null else componentTypeName,
     parameters, hookArguments, isStatic, ordinal
 ), IrTargetInjection
 
-class IrInstanceofInjection(
+class IrInstanceofHookInjection(
     jvmName: String,
     methodMixinReference: String,
     val className: IrClassName,
@@ -160,7 +185,7 @@ class IrInstanceofInjection(
     hookArguments: List<IrHookArgument>,
     ordinal: Int?,
     isStatic: Boolean,
-) : IrInjection(
+) : IrHookInjection(
     jvmName, methodMixinReference,
     returnTypeName = KPBoolean.asIrTypeName(),
     parameters, hookArguments, isStatic, ordinal
