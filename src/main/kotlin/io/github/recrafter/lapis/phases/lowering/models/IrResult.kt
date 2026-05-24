@@ -5,6 +5,7 @@ import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.annotations.Side
 import io.github.recrafter.lapis.common.JvmClassName
+import io.github.recrafter.lapis.phases.lowering.models.common.IrMixinAnnotation
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
@@ -22,7 +23,7 @@ class IrSchema(
     val mixinAccessor: IrMixinAccessor?,
 ) : IrSourceFile(className)
 
-abstract class IrMixinRelatedBlueprint(classKind: IrJavaClassKind) : IrJavaBlueprint(classKind) {
+abstract class IrMixinRelatedBlueprint(classKind: IrJavaClassKind) : IrJavaFileBlueprint(classKind) {
     abstract val side: Side
 }
 
@@ -81,16 +82,15 @@ class IrMixin(
     override val originatingFiles: List<KSFile>,
     override val className: IrClassName,
     override val side: Side,
-    val targetInstanceTypeName: IrTypeName,
-    val isInterfaceTarget: Boolean,
-    val targetInternalName: String,
     val injections: List<IrInjection>,
     val externalBridge: IrMixinExternalBridge?,
     val internalBridge: IrMixinInternalBridge?,
+    val targetInternalName: String?,
+    val mixinAnnotations: List<IrMixinAnnotation>,
 ) : IrMixinRelatedBlueprint(IrJavaClassKind.CLASS)
 
 sealed interface IrPatchConstructorArgument
-object IrPatchConstructorOriginArgument : IrPatchConstructorArgument
+class IrPatchConstructorOriginArgument(val typeName: IrTypeName) : IrPatchConstructorArgument
 
 class IrPatchImpl(
     override val originatingFiles: List<KSFile>,
@@ -100,5 +100,5 @@ class IrPatchImpl(
 ) : IrKotlinClassBlueprint(IrKotlinClassKind.CLASS)
 
 sealed interface IrPatchImplConstructorParameter
-object IrPatchImplConstructorInstanceParameter : IrPatchImplConstructorParameter
+class IrPatchImplConstructorInstanceParameter(val typeName: IrTypeName) : IrPatchImplConstructorParameter
 object IrPatchImplConstructorInternalBridgeParameter : IrPatchImplConstructorParameter

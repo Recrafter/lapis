@@ -44,8 +44,8 @@ val KSClassDeclaration.constructorDeclarations: Sequence<KSFunctionDeclaration>
 val KSClassDeclaration.functionDeclarations: Sequence<KSFunctionDeclaration>
     get() = getDeclaredFunctions().filter { !it.isConstructor() }
 
-val KSClassDeclaration.classDeclarations: Sequence<KSClassDeclaration>
+val KSClassDeclaration.innerClassDeclarations: Sequence<KSClassDeclaration>
     get() = declarations.filterIsInstance<KSClassDeclaration>()
 
 val KSClassDeclaration.companionObjectClassDeclarations: Sequence<KSClassDeclaration>
-    get() = classDeclarations.filter { it.isCompanionObject }
+    get() = innerClassDeclarations.filter { it.isCompanionObject }

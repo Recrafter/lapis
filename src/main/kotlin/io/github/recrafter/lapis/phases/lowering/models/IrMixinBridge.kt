@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.phases.lowering.models
 
 import com.google.devtools.ksp.symbol.KSFile
 import io.github.recrafter.lapis.extensions.jp.JPModifier
+import io.github.recrafter.lapis.phases.lowering.models.common.IrMixinAnnotation
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import ksp.org.jetbrains.kotlin.builtins.functions.BuiltInFunctionArity
@@ -88,13 +89,18 @@ sealed class IrMixinBridgeFunctionEntry(
 
 sealed interface IrMixinExternalBridgeEntry : IrMixinBridgeEntry
 
-class IrMixinExternalBridgePropertyEntry(
+sealed interface IrMixinExternalBridgeExtensionEntry : IrMixinExternalBridgeEntry {
+    val receiverTypeName: IrTypeName
+}
+
+class IrMixinExternalBridgeExtensionPropertyEntry(
     sourceName: String,
     typeName: IrTypeName,
     sourceGetterJvmName: String,
     sourceSetterJvmName: String?,
     getterName: String,
     setterName: String?,
+    override val receiverTypeName: IrTypeName,
 ) : IrMixinBridgePropertyEntry(
     sourceName,
     typeName,
@@ -102,21 +108,22 @@ class IrMixinExternalBridgePropertyEntry(
     sourceGetterJvmName,
     setterName,
     sourceSetterJvmName,
-), IrMixinExternalBridgeEntry
+), IrMixinExternalBridgeExtensionEntry
 
-class IrMixinExternalBridgeFunctionEntry(
+class IrMixinExternalBridgeExtensionFunctionEntry(
     sourceName: String,
     name: String,
     sourceJvmName: String,
     parameters: List<IrParameter>,
     returnTypeName: IrTypeName?,
+    override val receiverTypeName: IrTypeName,
 ) : IrMixinBridgeFunctionEntry(sourceName, name, sourceJvmName, parameters, returnTypeName),
-    IrMixinExternalBridgeEntry
+    IrMixinExternalBridgeExtensionEntry
 
 sealed interface IrMixinInternalBridgeEntry : IrMixinBridgeEntry
 
 sealed interface IrMixinInternalBridgeShadowEntry : IrMixinInternalBridgeEntry {
-    val modifiers: List<JPModifier>
+    val modifiers: Set<JPModifier>
     val isStatic: Boolean get() = JPModifier.STATIC in modifiers
 }
 
@@ -128,8 +135,9 @@ class IrMixinInternalBridgeShadowPropertyEntry(
     setterName: String?,
     sourceSetterJvmName: String?,
     val mappingName: String,
-    override val modifiers: List<JPModifier>,
+    override val modifiers: Set<JPModifier>,
     val isFinal: Boolean,
+    val mixinAnnotations: List<IrMixinAnnotation>,
 ) : IrMixinBridgePropertyEntry(
     sourceName,
     typeName,
@@ -146,6 +154,7 @@ class IrMixinInternalBridgeShadowFunctionEntry(
     parameters: List<IrParameter>,
     returnTypeName: IrTypeName?,
     val mappingName: String,
-    override val modifiers: List<JPModifier>,
+    val mixinAnnotations: List<IrMixinAnnotation>,
+    override val modifiers: Set<JPModifier>,
 ) : IrMixinBridgeFunctionEntry(sourceName, name, sourceJvmName, parameters, returnTypeName),
     IrMixinInternalBridgeShadowEntry

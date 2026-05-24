@@ -16,7 +16,7 @@ sealed class IrDescriptorWrapperImpl<T : IrDescriptorWrapperImpl<T>>(
 }
 
 sealed interface IrInvokableDescriptorWrapperImpl : IrReturnable {
-    val parameters: List<IrFunctionTypeParameter>
+    val functionTypeParameters: List<IrFunctionTypeParameter>
 }
 
 class IrFieldGetDescriptorWrapperImpl(
@@ -63,7 +63,7 @@ class IrBodyDescriptorWrapperImpl(
     originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
-    override val parameters: List<IrFunctionTypeParameter>,
+    override val functionTypeParameters: List<IrFunctionTypeParameter>,
     override val returnTypeName: IrTypeName?,
 ) : IrDescriptorWrapperImpl<IrBodyDescriptorWrapperImpl>(
     originatingFiles, descriptorClassName, DescriptorWrapperBuiltin.Body, null
@@ -74,7 +74,7 @@ class IrCallDescriptorWrapperImpl(
 
     descriptorClassName: IrClassName,
     receiverTypeName: IrTypeName?,
-    override val parameters: List<IrFunctionTypeParameter>,
+    override val functionTypeParameters: List<IrFunctionTypeParameter>,
     override val returnTypeName: IrTypeName?,
 ) : IrDescriptorWrapperImpl<IrCallDescriptorWrapperImpl>(
     originatingFiles, descriptorClassName, DescriptorWrapperBuiltin.Call, receiverTypeName
@@ -84,7 +84,7 @@ class IrCancelDescriptorWrapperImpl(
     originatingFiles: List<KSFile>,
 
     descriptorClassName: IrClassName,
-    override val parameters: List<IrFunctionTypeParameter>,
+    override val functionTypeParameters: List<IrFunctionTypeParameter>,
     override val returnTypeName: IrTypeName?,
 ) : IrDescriptorWrapperImpl<IrCancelDescriptorWrapperImpl>(
     originatingFiles, descriptorClassName, DescriptorWrapperBuiltin.Cancel, null

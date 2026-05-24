@@ -4,8 +4,8 @@ data class JvmClassName(
     val packageName: String,
     private val parts: List<String>,
 ) {
-    val nestedName: String get() = parts.joinToString(".")
-    val qualifiedName: String get() = nestedName.withPackageName()
+    val innerName: String get() = parts.joinToString(".")
+    val qualifiedName: String get() = innerName.withPackageName()
     val binaryName: String get() = parts.joinToString("$").withPackageName()
     val internalName: String get() = binaryName.replace('.', '/')
     val descriptor: String get() = "L$internalName;"

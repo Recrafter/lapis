@@ -13,14 +13,12 @@ inline fun <reified A : Annotation> KPAnnotationBuilder.setArgumentValue(
     property: KProperty1<A, Array<out String>>,
     vararg strings: String,
 ) {
-    setArrayArgumentValue<A>(property, strings, "%S", true) {
-        strings.forEach { +it }
-    }
+    setArrayArgumentValue<A>(property, strings.toList(), "%S", true) { strings.forEach { +it } }
 }
 
 inline fun <reified A : Annotation> KPAnnotationBuilder.setArrayArgumentValue(
     property: KProperty1<A, Array<*>>,
-    array: Array<*>,
+    array: List<*>,
     placeholder: String,
     isVararg: Boolean = false,
     noinline argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments> = {}

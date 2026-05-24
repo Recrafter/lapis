@@ -15,7 +15,6 @@ import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ksp.writeTo
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
-import io.github.recrafter.lapis.common.JavaModifiers
 import io.github.recrafter.lapis.common.JvmClassName
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.common.lapisError
@@ -38,6 +37,7 @@ import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrParameterizedTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.*
+import io.github.recrafter.lapis.phases.lowering.models.common.*
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrLambdaTypeName
 import io.github.recrafter.lapis.phases.lowering.types.orVoid
@@ -83,7 +83,7 @@ class Generator(
         patches.forEach { patch ->
             val extensionPackAccumulator = GenExtensionPackAccumulator()
             patch.impl?.let { generatePatchImpl(it, patch) }
-            patch.mixin.externalBridge?.let { generateMixinExternalBridge(it, patch, extensionPackAccumulator) }
+            patch.mixin.externalBridge?.let { generateMixinExternalBridge(it, extensionPackAccumulator) }
             patch.mixin.internalBridge?.let { generateMixinInternalBridge(it) }
             generateMixin(patch.mixin, patch.className, patch.impl, extensionPackAccumulator)
             if (extensionPackAccumulator.isNotEmpty()) {
@@ -118,11 +118,18 @@ class Generator(
         extensionPackAccumulator: GenExtensionPackAccumulator,
     ) {
         generateJavaFile(mixin, aggregating = false) {
-            addAnnotation<Mixin> {
-                setArgumentValue(Mixin::targets, listOf(mixin.targetInternalName))
+            if (mixin.mixinAnnotations.isNotEmpty()) {
+                addAnnotations(mixin.mixinAnnotations.map { buildMixinAnnotation(it) })
+            } else {
+                if (mixin.targetInternalName == null) {
+                    lapisError("Target internal name cannot be null")
+                }
+                addAnnotation<Mixin> {
+                    setArgumentValue(Mixin::targets, listOf(mixin.targetInternalName))
+                }
             }
             addModifiers(JPModifier.ABSTRACT)
-            val patchImplEntity = patchImpl?.let { generatePatchInitializer(this, it, mixin) }
+            val patchImplEntity = patchImpl?.let { generatePatchInitializer(this, it) }
             mixin.externalBridge?.let { bridge ->
                 addSuperInterface(bridge.className)
                 addMethods(bridge.entries.flatMap { it.kinds }.map { kind ->
@@ -147,20 +154,18 @@ class Generator(
                     val shadowMemberReference = when (entry) {
                         is IrMixinInternalBridgeShadowPropertyEntry -> {
                             buildJavaField(entry.mappingName, entry.typeName, visibility = null) {
-                                if (entry.setter != null) {
-                                    addAnnotation<Mutable>()
-                                }
-                                if (entry.isFinal) {
-                                    addAnnotation<Final>()
-                                }
-                                addAnnotation<Shadow>()
-                                val fixedModifiers = mutableListOf<JPModifier>()
-                                entry.modifiers.forEach { modifier ->
-                                    if (modifier != JPModifier.FINAL) {
-                                        fixedModifiers += modifier
+                                if (entry.mixinAnnotations.isNotEmpty()) {
+                                    addAnnotations(entry.mixinAnnotations.map { buildMixinAnnotation(it) })
+                                } else {
+                                    if (entry.setter != null) {
+                                        addAnnotation<Mutable>()
                                     }
+                                    if (entry.isFinal) {
+                                        addAnnotation<Final>()
+                                    }
+                                    addAnnotation<Shadow>()
                                 }
-                                addModifiers(*fixedModifiers.toTypedArray())
+                                addModifiers(*entry.modifiers.toTypedArray())
                             }.also(::addField).let(::GenJavaFieldEntity)
                         }
 
@@ -169,22 +174,12 @@ class Generator(
                                 name = entry.mappingName,
                                 visibility = if (entry.isStatic) IrVisibilityModifier.PUBLIC else null,
                             ) {
-                                addAnnotation<Shadow>()
-                                if (entry.isStatic) {
-                                    addModifiers(*entry.modifiers.toTypedArray())
+                                if (entry.mixinAnnotations.isNotEmpty()) {
+                                    addAnnotations(entry.mixinAnnotations.map { buildMixinAnnotation(it) })
                                 } else {
-                                    addModifiers(JPModifier.ABSTRACT)
-                                    val fixedModifiers = mutableListOf<JPModifier>()
-                                    entry.modifiers.forEach { modifier ->
-                                        if (modifier == JPModifier.PRIVATE) {
-                                            fixedModifiers += JPModifier.PROTECTED
-                                        }
-                                        if (modifier !in JavaModifiers.abstractIllegals) {
-                                            fixedModifiers += modifier
-                                        }
-                                    }
-                                    addModifiers(*fixedModifiers.toTypedArray())
+                                    addAnnotation<Shadow>()
                                 }
+                                addModifiers(*entry.modifiers.toTypedArray())
                                 setParameters(entry.parameters)
                                 setReturnType(entry.returnTypeName)
                                 if (entry.isStatic) setStubBody()
@@ -248,7 +243,7 @@ class Generator(
                                     entry.setter?.let { setter ->
                                         code_("%T.%L = %L") {
                                             val lambdaCodeBlock = buildJavaCodeBlock {
-                                                lambda_(parameters = setter.parameters, inline = true) {
+                                                lambda_(parameters = setter.parameters) {
                                                     code_("${shadowMember.callFormat} = %N") {
                                                         shadowMember(); +setter.parameter
                                                     }
@@ -268,7 +263,7 @@ class Generator(
                                                     +mixin.className; +shadowMember
                                                 }
                                             } else {
-                                                lambda_(parameters = entry.parameters, inline = true) {
+                                                lambda_(parameters = entry.parameters) {
                                                     code_(shadowMember.callFormat) { shadowMember() }
                                                     return_("%T.INSTANCE") { +KPUnit.asIrClassName() }
                                                 }
@@ -290,7 +285,7 @@ class Generator(
 
     private fun generatePatchImpl(impl: IrPatchImpl, patch: IrPatch) {
         generateKotlinFile(impl, aggregating = false) {
-            val instanceParameter = IrParameter("instance", patch.mixin.targetInstanceTypeName)
+            val instanceParameterName = "instance"
             val (internalBridgeParameter, internalBridgeEntries) = patch.mixin.internalBridge.let { bridge ->
                 val shadowEntries = bridge?.entries.orEmpty()
                 if (bridge != null && shadowEntries.isNotEmpty()) {
@@ -301,7 +296,9 @@ class Generator(
             }
             val constructorParameters = impl.constructorParameters.map { parameter ->
                 when (parameter) {
-                    is IrPatchImplConstructorInstanceParameter -> instanceParameter
+                    is IrPatchImplConstructorInstanceParameter -> {
+                        IrParameter(instanceParameterName, parameter.typeName)
+                    }
 
                     is IrPatchImplConstructorInternalBridgeParameter -> {
                         internalBridgeParameter ?: lapisError("Internal bridge parameter cannot be null")
@@ -318,7 +315,9 @@ class Generator(
                 patch.className,
                 constructorArguments = patch.constructorArguments.map { argument ->
                     when (argument) {
-                        is IrPatchConstructorOriginArgument -> instanceParameter.toKotlinCodeBlock()
+                        is IrPatchConstructorOriginArgument -> {
+                            IrParameter(instanceParameterName, argument.typeName).toKotlinCodeBlock()
+                        }
                     }
                 }
             )
@@ -364,20 +363,12 @@ class Generator(
         }
     }
 
-    private fun generatePatchInitializer(
-        destination: JPClassBuilder,
-        impl: IrPatchImpl,
-        mixin: IrMixin
-    ): GenJavaEntity {
+    private fun generatePatchInitializer(destination: JPClassBuilder, impl: IrPatchImpl): GenJavaEntity {
         val constructorArgumentCodeBlocks = impl.constructorParameters.map { parameter ->
             when (parameter) {
                 is IrPatchImplConstructorInstanceParameter -> {
-                    if (mixin.targetInstanceTypeName != KPAny.asIrClassName()) {
-                        if (!mixin.isInterfaceTarget) {
-                            buildJavaCodeBlock("(%T) (%T) this") { +mixin.targetInstanceTypeName; +Object::class }
-                        } else {
-                            buildJavaCodeBlock("(%T) this") { +mixin.targetInstanceTypeName }
-                        }
+                    if (parameter.typeName != KPAny.asIrClassName()) {
+                        buildJavaCodeBlock("(%T) (%T) this") { +parameter.typeName; +Object::class }
                     } else {
                         buildJavaCodeBlock("this")
                     }
@@ -689,7 +680,11 @@ class Generator(
                     is IrHookOriginValueArgument -> valueParameterName.toJavaCodeBlock()
                     is IrHookOriginDescriptorWrapperImplArgument<*> -> {
                         val constructorArgumentCodeBlocks = buildList {
-                            if (injection.hasReceiver) {
+                            if (injection is IrTargetInjection
+                                && injection !is IrWrapMethodInjection
+                                && injection !is IrArrayInjection
+                                && !injection.isStaticTarget
+                            ) {
                                 add(receiverParameterName.toJavaCodeBlock())
                             }
                             if (injection is IrFieldSetInjection) {
@@ -704,7 +699,7 @@ class Generator(
                             }
                             val impl = argument.wrapperImpl
                             if (impl is IrInvokableDescriptorWrapperImpl) {
-                                addAll(impl.parameters.mapIndexed { index, parameter ->
+                                addAll(impl.functionTypeParameters.mapIndexed { index, parameter ->
                                     (parameter.name ?: index.toString()).withInternalPrefix(ARGUMENT).toJavaCodeBlock()
                                 })
                             }
@@ -791,16 +786,15 @@ class Generator(
 
     private fun generateMixinExternalBridge(
         bridge: IrMixinExternalBridge,
-        patch: IrPatch,
         extensionPackAccumulator: GenExtensionPackAccumulator,
     ) {
         generateMixinBridge(bridge)
         val extensionPackEntities = mutableListOf<GenKotlinEntity>()
         bridge.entries.forEach { entry ->
             when (entry) {
-                is IrMixinExternalBridgePropertyEntry -> {
+                is IrMixinExternalBridgeExtensionPropertyEntry -> {
                     extensionPackEntities += buildKotlinProperty(entry.sourceName, entry.typeName) {
-                        setReceiverType(patch.mixin.targetInstanceTypeName)
+                        setReceiverType(entry.receiverTypeName)
                         setGetter {
                             addModifiers(KPModifier.INLINE)
                             setBody {
@@ -819,10 +813,10 @@ class Generator(
                     }.let(::GenKotlinPropertyEntity)
                 }
 
-                is IrMixinExternalBridgeFunctionEntry -> {
+                is IrMixinExternalBridgeExtensionFunctionEntry -> {
                     extensionPackEntities += buildKotlinFunction(entry.sourceName) {
                         addModifiers(KPModifier.INLINE)
-                        setReceiverType(patch.mixin.targetInstanceTypeName)
+                        setReceiverType(entry.receiverTypeName)
                         setParameters(entry.parameters)
                         setReturnType(entry.returnTypeName)
                         setBody {
@@ -1060,6 +1054,39 @@ class Generator(
         }
     }
 
+    private fun buildMixinAnnotation(annotation: IrMixinAnnotation): JPAnnotation =
+        JPAnnotation.builder(annotation.className.java).apply {
+            fun IrMixinAnnotationArgumentValue.buildValue(): JPCodeBlock = when (this) {
+                is IrMixinAnnotationBooleanArgumentValue -> boolean.toJavaCodeBlock()
+                is IrMixinAnnotationByteArgumentValue -> byte.toJavaCodeBlock()
+                is IrMixinAnnotationShortArgumentValue -> short.toJavaCodeBlock()
+                is IrMixinAnnotationIntArgumentValue -> int.toJavaCodeBlock()
+                is IrMixinAnnotationLongArgumentValue -> long.toJavaCodeBlock()
+                is IrMixinAnnotationCharArgumentValue -> char.toJavaCodeBlock()
+                is IrMixinAnnotationFloatArgumentValue -> float.toJavaCodeBlock()
+                is IrMixinAnnotationDoubleArgumentValue -> double.toJavaCodeBlock()
+                is IrMixinAnnotationStringArgumentValue -> string.toJavaCodeBlock(asValue = true)
+                is IrMixinAnnotationClassTypeArgumentValue -> typeName.toJavaCodeBlock(asClassType = true)
+                is IrMixinAnnotationEnumArgumentValue -> entryClassName.toJavaCodeBlock()
+                is IrMixinAnnotationEmbeddedAnnotationArgumentValue -> {
+                    buildMixinAnnotation(embeddedAnnotation).toCodeBlock()
+                }
+            }
+            annotation.arguments.forEach { argument ->
+                val valueCodeBlock = when (argument) {
+                    is IrMixinAnnotationSingleArgument -> {
+                        argument.value.buildValue()
+                    }
+
+                    is IrMixinAnnotationArrayArgument -> {
+                        val valueCodeBlocks = argument.values.map { it.buildValue() }
+                        buildJavaCodeBlock("{${valueCodeBlocks.format}}") { valueCodeBlocks.forEach { +it } }
+                    }
+                }
+                addMember(argument.name, valueCodeBlock)
+            }
+        }.build()
+
     private fun generateMixinConfig(mixinBlueprints: List<IrMixinRelatedBlueprint>) {
         val mixinConfig = GenMixinConfig(mixinBlueprints.flatMap { it.originatingFiles }, options.mixinConfig)
         generateResourceFile(mixinConfig, aggregating = true) {
@@ -1095,7 +1122,7 @@ class Generator(
             appendLine()
         }
         tweakAccessors.forEach { tweakAccessor ->
-            appendLine("# ${tweakAccessor.ownerJvmClassName.nestedName}")
+            appendLine("# ${tweakAccessor.ownerJvmClassName.innerName}")
             tweakAccessor.entries.forEach { entry ->
                 appendLine(buildTweak(entry, tweakAccessor.ownerJvmClassName))
             }
@@ -1135,8 +1162,8 @@ class Generator(
             }
             addType(
                 when (blueprint.classKind) {
-                    IrKotlinClassKind.CLASS -> buildKotlinClass(name, builder = builder)
                     IrKotlinClassKind.INTERFACE -> buildKotlinInterface(name, builder = builder)
+                    IrKotlinClassKind.CLASS -> buildKotlinClass(name, builder = builder)
                     IrKotlinClassKind.OBJECT -> buildKotlinObject(name, builder = builder)
                 }
             )
@@ -1145,15 +1172,24 @@ class Generator(
     }
 
     private fun generateJavaFile(
-        blueprint: IrJavaBlueprint,
+        blueprint: IrJavaFileBlueprint,
         aggregating: Boolean,
+        suppressNames: List<String> = emptyList(),
         builder: Builder<JPClassBuilder> = {}
     ) {
         val name = blueprint.className.simpleName
         val file = buildJavaFile(blueprint.className) {
+            val builder: Builder<JPClassBuilder> = {
+                if (suppressNames.isNotEmpty()) {
+                    addAnnotation<SuppressWarnings> {
+                        setArgumentValue(SuppressWarnings::value, suppressNames)
+                    }
+                }
+                builder()
+            }
             when (blueprint.classKind) {
-                IrJavaClassKind.CLASS -> buildJavaClass(name, builder = builder)
                 IrJavaClassKind.INTERFACE -> buildJavaInterface(name, builder = builder)
+                IrJavaClassKind.CLASS -> buildJavaClass(name, builder = builder)
             }
         }
         codeGenerator.createNewFile(

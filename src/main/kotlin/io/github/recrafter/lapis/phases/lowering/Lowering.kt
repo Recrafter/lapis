@@ -7,20 +7,21 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
+import io.github.recrafter.lapis.common.JavaModifiers
 import io.github.recrafter.lapis.common.binaryName
 import io.github.recrafter.lapis.common.getMixinReference
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.extensions.kp.*
-import io.github.recrafter.lapis.extensions.ks.isInterface
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.logging.Logger
 import io.github.recrafter.lapis.phases.bootstrap.Options
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
 import io.github.recrafter.lapis.phases.lowering.models.*
+import io.github.recrafter.lapis.phases.lowering.models.common.*
 import io.github.recrafter.lapis.phases.lowering.types.*
 import io.github.recrafter.lapis.phases.validator.models.ValidatorResult
-import io.github.recrafter.lapis.phases.validator.models.common.SourceFile
+import io.github.recrafter.lapis.phases.validator.models.common.*
 import io.github.recrafter.lapis.phases.validator.models.patches.*
 import io.github.recrafter.lapis.phases.validator.models.patches.hooks.*
 import io.github.recrafter.lapis.phases.validator.models.schemas.*
@@ -176,7 +177,9 @@ class Lowering(
 
     private fun lowerPatchConstructorArgument(parameter: PatchConstructorParameter): IrPatchConstructorArgument =
         when (parameter) {
-            is PatchConstructorOriginParameter -> IrPatchConstructorOriginArgument
+            is PatchConstructorOriginParameter -> {
+                IrPatchConstructorOriginArgument(parameter.instanceClassDeclaration.asIrClassName())
+            }
         }
 
     private fun lowerPatchImpl(patch: Patch, constructorArguments: List<IrPatchConstructorArgument>): IrPatchImpl? =
@@ -185,8 +188,8 @@ class Lowering(
                 originatingFiles = listOfNotNull(patch.containingFile),
                 className = patch.className.derived("Impl"),
                 constructorParameters = buildList {
-                    if (constructorArguments.any { it is IrPatchConstructorOriginArgument }) {
-                        add(IrPatchImplConstructorInstanceParameter)
+                    constructorArguments.filterIsInstance<IrPatchConstructorOriginArgument>().firstOrNull()?.let {
+                        add(IrPatchImplConstructorInstanceParameter(it.typeName))
                     }
                     if (patch.shadowSources.isNotEmpty()) {
                         add(IrPatchImplConstructorInternalBridgeParameter)
@@ -200,13 +203,12 @@ class Lowering(
         IrMixin(
             originatingFiles = listOfNotNull(patch.containingFile),
             className = resolveMixinRelatedClassName(patch.className, sourcePackageLCP, "Mixin"),
-            targetInstanceTypeName = patch.schema.originTypeName,
-            isInterfaceTarget = patch.schema.originClassDeclaration.isInterface,
-            targetInternalName = patch.schema.originJvmClassName.internalName,
             side = patch.side,
             injections = patch.hooks.flatMap(::lowerInjections),
             externalBridge = lowerMixinExternalBridge(patch),
             internalBridge = lowerMixinInternalBridge(patch),
+            targetInternalName = patch.targetJvmClassName?.internalName,
+            mixinAnnotations = patch.mixinAnnotations.map(::lowerMixinAnnotation),
         )
 
     private fun lowerMixinExternalBridge(patch: Patch): IrMixinExternalBridge? =
@@ -230,23 +232,25 @@ class Lowering(
     private fun lowerMixinExternalBridgeEntry(source: PatchExtensionSource): IrMixinExternalBridgeEntry =
         when (source) {
             is ExtensionProperty -> with(source) {
-                IrMixinExternalBridgePropertyEntry(
+                IrMixinExternalBridgeExtensionPropertyEntry(
                     typeName = typeName,
                     sourceName = name,
                     sourceGetterJvmName = getterJvmName,
                     sourceSetterJvmName = setterJvmName,
                     getterName = getterJvmName.withModIdPrefix(),
-                    setterName = source.setterJvmName?.withModIdPrefix(),
+                    setterName = setterJvmName?.withModIdPrefix(),
+                    receiverTypeName = receiverClassDeclaration.asIrClassName(),
                 )
             }
 
             is ExtensionFunction -> with(source) {
-                IrMixinExternalBridgeFunctionEntry(
+                IrMixinExternalBridgeExtensionFunctionEntry(
                     sourceName = name,
                     sourceJvmName = jvmName,
-                    name = source.jvmName.withModIdPrefix(),
+                    name = jvmName.withModIdPrefix(),
                     parameters = parameters.map { it.asIrParameter() },
                     returnTypeName = returnTypeName,
+                    receiverTypeName = receiverClassDeclaration.asIrClassName(),
                 )
             }
         }
@@ -260,10 +264,11 @@ class Lowering(
                     sourceGetterJvmName = getterJvmName,
                     sourceSetterJvmName = setterJvmName,
                     getterName = getterJvmName.withModIdPrefix(),
-                    setterName = source.setterJvmName?.withModIdPrefix(),
+                    setterName = setterJvmName?.withModIdPrefix(),
                     mappingName = mappingName,
-                    modifiers = modifiers,
+                    modifiers = modifiers.toMutableSet().apply { remove(JPModifier.FINAL) },
                     isFinal = JPModifier.FINAL in modifiers,
+                    mixinAnnotations = mixinAnnotations.map(::lowerMixinAnnotation),
                 )
             }
 
@@ -271,11 +276,23 @@ class Lowering(
                 IrMixinInternalBridgeShadowFunctionEntry(
                     sourceName = name,
                     sourceJvmName = jvmName,
-                    name = source.jvmName.withModIdPrefix(),
+                    name = jvmName.withModIdPrefix(),
                     parameters = parameters.map { it.asIrParameter() },
                     returnTypeName = returnTypeName,
                     mappingName = mappingName,
-                    modifiers = modifiers,
+                    mixinAnnotations = mixinAnnotations.map(::lowerMixinAnnotation),
+                    modifiers = if (JPModifier.STATIC in modifiers) modifiers else buildSet {
+                        add(JPModifier.ABSTRACT)
+                        addAll(modifiers.mapNotNull { modifier ->
+                            if (modifier == JPModifier.PRIVATE) {
+                                return@mapNotNull JPModifier.PROTECTED
+                            }
+                            if (modifier in JavaModifiers.abstractIllegals) {
+                                return@mapNotNull null
+                            }
+                            modifier
+                        })
+                    },
                 )
             }
         }
@@ -459,8 +476,8 @@ class Lowering(
                         }
 
                         is IntHookLiteral -> listOf("intValue" to literal.value.toString())
-                        is FloatHookLiteral -> listOf("floatValue" to literal.value.toString())
                         is LongHookLiteral -> listOf("longValue" to literal.value.toString())
+                        is FloatHookLiteral -> listOf("floatValue" to literal.value.toString())
                         is DoubleHookLiteral -> listOf("doubleValue" to literal.value.toString())
                         is StringHookLiteral -> listOf("stringValue" to literal.value)
                         is ClassHookLiteral -> listOf("classValue" to literal.typeClassName.internalName)
@@ -546,7 +563,7 @@ class Lowering(
                 IrInjectionParamLocalParameter(
                     name = descriptorParameter.name ?: parameter.index.toString(),
                     typeName = descriptorParameter.typeName,
-                    varImplBuiltin = lowerLocalVarBuiltin(parameter),
+                    varImplBuiltin = lowerLocalVarImplBuiltin(parameter),
                     localIndex = initialSlot + slotOffset,
                 )
             }
@@ -554,7 +571,7 @@ class Lowering(
             is HookBodyLocalParameter -> IrInjectionBodyLocalParameter(
                 name = parameter.name,
                 typeName = parameter.typeName,
-                varImplBuiltin = lowerLocalVarBuiltin(parameter),
+                varImplBuiltin = lowerLocalVarImplBuiltin(parameter),
                 local = when (val local = parameter.local) {
                     is NamedLocal -> IrNamedLocal(local.name)
                     is PositionalLocal -> {
@@ -597,12 +614,14 @@ class Lowering(
     private fun lowerHookArgument(parameter: HookParameter): IrHookArgument =
         when (parameter) {
             is HookOriginValueParameter -> IrHookOriginValueArgument
-            is HookOriginDescriptorWrapperParameter -> lowerHookOriginDescriptorWrapperParameter(parameter)
+            is HookOriginDescriptorWrapperParameter -> lowerHookOriginDescriptorWrapperImplArgument(parameter)
             is HookCancelDescriptorWrapperParameter -> IrHookCancelDescriptorWrapperImplArgument(
                 IrCancelDescriptorWrapperImpl(
                     originatingFiles = listOfNotNull(parameter.descriptor.containingFile),
                     descriptorClassName = parameter.descriptor.className,
-                    parameters = parameter.descriptor.functionTypeParameters.map { it.asIrFunctionTypeParameter() },
+                    functionTypeParameters = parameter.descriptor.functionTypeParameters.map {
+                        it.asIrFunctionTypeParameter()
+                    },
                     returnTypeName = parameter.descriptor.returnTypeName,
                 )
             )
@@ -613,13 +632,13 @@ class Lowering(
                 name = parameter.name,
                 isBody = parameter is HookBodyLocalParameter,
                 isShare = parameter is HookShareLocalParameter,
-                varBuiltin = lowerLocalVarBuiltin(parameter),
+                varBuiltin = lowerLocalVarImplBuiltin(parameter),
             )
         }
 
-    private fun lowerHookOriginDescriptorWrapperParameter(
+    private fun lowerHookOriginDescriptorWrapperImplArgument(
         parameter: HookOriginDescriptorWrapperParameter
-    ): IrHookArgument {
+    ): IrHookOriginDescriptorWrapperImplArgument<*> {
         val descriptor = parameter.descriptor
         val originatingFiles = listOfNotNull(descriptor.containingFile)
         return when (parameter) {
@@ -663,7 +682,7 @@ class Lowering(
                 IrBodyDescriptorWrapperImpl(
                     originatingFiles = originatingFiles,
                     descriptorClassName = descriptor.className,
-                    parameters = descriptor.functionTypeParameters.map { it.asIrFunctionTypeParameter() },
+                    functionTypeParameters = descriptor.functionTypeParameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
                 )
             )
@@ -673,21 +692,19 @@ class Lowering(
                     originatingFiles = originatingFiles,
                     descriptorClassName = descriptor.className,
                     receiverTypeName = if (descriptor.isStatic) null else descriptor.receiverTypeName,
-                    parameters = descriptor.functionTypeParameters.map { it.asIrFunctionTypeParameter() },
+                    functionTypeParameters = descriptor.functionTypeParameters.map { it.asIrFunctionTypeParameter() },
                     returnTypeName = descriptor.returnTypeName,
                 )
             )
         }
     }
 
-    private fun lowerLocalVarBuiltin(parameter: HookLocalParameter): LocalVarImplBuiltin? =
+    private fun lowerLocalVarImplBuiltin(parameter: HookLocalParameter): LocalVarImplBuiltin? =
         if (parameter.isLocalVar) LocalVarImplBuiltin.of(parameter.typeName)
         else null
 
     private fun resolveMixinRelatedClassName(
-        sourceClassName: IrClassName,
-        sourcePackageLCP: String,
-        suffix: String,
+        sourceClassName: IrClassName, sourcePackageLCP: String, suffix: String,
     ): IrClassName {
         val sourcePackageName = sourceClassName.packageName
         val mixinPackageName = buildString {
@@ -698,6 +715,36 @@ class Lowering(
             }
         }
         return IrClassName.of(mixinPackageName, sourceClassName.simpleName).derived(suffix)
+    }
+
+    private fun lowerMixinAnnotation(annotation: MixinAnnotation): IrMixinAnnotation {
+        fun MixinAnnotationArgumentValue.lowerValue(): IrMixinAnnotationArgumentValue = when (this) {
+            is MixinAnnotationBooleanArgumentValue -> IrMixinAnnotationBooleanArgumentValue(boolean)
+            is MixinAnnotationByteArgumentValue -> IrMixinAnnotationByteArgumentValue(byte)
+            is MixinAnnotationShortArgumentValue -> IrMixinAnnotationShortArgumentValue(short)
+            is MixinAnnotationIntArgumentValue -> IrMixinAnnotationIntArgumentValue(int)
+            is MixinAnnotationLongArgumentValue -> IrMixinAnnotationLongArgumentValue(long)
+            is MixinAnnotationCharArgumentValue -> IrMixinAnnotationCharArgumentValue(char)
+            is MixinAnnotationFloatArgumentValue -> IrMixinAnnotationFloatArgumentValue(float)
+            is MixinAnnotationDoubleArgumentValue -> IrMixinAnnotationDoubleArgumentValue(double)
+            is MixinAnnotationStringArgumentValue -> IrMixinAnnotationStringArgumentValue(string)
+            is MixinAnnotationClassTypeArgumentValue -> IrMixinAnnotationClassTypeArgumentValue(typeName)
+            is MixinAnnotationEnumArgumentValue -> IrMixinAnnotationEnumArgumentValue(entryClassName)
+            is MixinAnnotationEmbeddedAnnotationArgumentValue -> {
+                IrMixinAnnotationEmbeddedAnnotationArgumentValue(lowerMixinAnnotation(embeddedAnnotation))
+            }
+        }
+        return IrMixinAnnotation(annotation.className, annotation.arguments.map { argument ->
+            when (argument) {
+                is MixinAnnotationSingleArgument -> {
+                    IrMixinAnnotationSingleArgument(argument.name, argument.value.lowerValue())
+                }
+
+                is MixinAnnotationArrayArgument -> {
+                    IrMixinAnnotationArrayArgument(argument.name, argument.values.map { it.lowerValue() })
+                }
+            }
+        })
     }
 
     private inline fun <reified T : IrDescriptorWrapperImpl<T>> findOriginDescriptorWrapperImpl(
@@ -723,9 +770,7 @@ class Lowering(
         sources.map { it.className.packageName }.reduceOrNull { lcp, next ->
             val currentParts = lcp.split('.')
             val nextParts = next.split('.')
-            currentParts.zip(nextParts)
-                .takeWhile { (current, next) -> current == next }
-                .joinToString(".") { it.first }
+            currentParts.zip(nextParts).takeWhile { (current, next) -> current == next }.joinToString(".") { it.first }
         }.orEmpty()
 
     private fun String.withModIdPrefix(): String =
@@ -739,9 +784,9 @@ fun KClass<*>.asIrTypeName(): IrTypeName =
     asTypeName().asIrTypeName()
 
 fun KClass<*>.asIrParameterizedTypeName(
-    vararg argumentTypeNames: IrTypeName = arrayOf(KPStar.asIrWildcardTypeName())
+    vararg typeArguments: IrTypeName = arrayOf(KPStar.asIrWildcardTypeName())
 ): IrParameterizedTypeName =
-    asIrTypeName().parameterizedBy(*argumentTypeNames)
+    asIrTypeName().parameterizedBy(*typeArguments)
 
 fun KPTypeName.asIrTypeName(): IrTypeName =
     IrTypeName(this)

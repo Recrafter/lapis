@@ -7,11 +7,8 @@ import io.github.recrafter.lapis.extensions.common.castOrNull
 val KSType.isValid: Boolean
     get() = !isError
 
-val KSType.genericTypes: List<KSType>
+val KSType.typeArguments: List<KSType>
     get() = arguments.mapNotNull { it.type?.resolve() }
-
-fun KSType.findGenericType(): KSType? =
-    genericTypes.firstOrNull()
 
 fun KSType.toClassDeclaration(): KSClassDeclaration? =
     declaration.castOrNull<KSClassDeclaration>()

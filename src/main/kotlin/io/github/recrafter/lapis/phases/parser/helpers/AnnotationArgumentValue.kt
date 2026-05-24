@@ -1,15 +1,15 @@
-package io.github.recrafter.lapis.phases.parser
+package io.github.recrafter.lapis.phases.parser.helpers
 
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import io.github.recrafter.lapis.common.KSTypes
-import io.github.recrafter.lapis.common.isNothing
+import io.github.recrafter.lapis.common.KSBaseTypes
+import io.github.recrafter.lapis.common.isUnit
 import io.github.recrafter.lapis.extensions.common.castOrNull
 import io.github.recrafter.lapis.extensions.ks.name
 import kotlin.enums.enumEntries
 
-class KSAnnotationArgumentValue(
+class AnnotationArgumentValue(
     val rawValue: Any,
     private val keepDefault: Boolean = false,
 ) {
@@ -31,8 +31,8 @@ class KSAnnotationArgumentValue(
     fun asString(): String? =
         rawValue.castOrNull<String>()?.filterDefault { it.isEmpty() }
 
-    fun asKClass(types: KSTypes): KSType? =
-        rawValue.castOrNull<KSType>()?.filterDefault { it.isNothing(types) }
+    fun asClassType(baseTypes: KSBaseTypes): KSType? =
+        rawValue.castOrNull<KSType>()?.filterDefault { it.isUnit(baseTypes) }
 
     inline fun <reified E : Enum<E>> asEnum(default: E? = null): E? {
         val entryName = rawValue.castOrNull<KSClassDeclaration>()?.name?.filterDefault { it == default?.name }
@@ -42,9 +42,9 @@ class KSAnnotationArgumentValue(
     fun asAnnotation(): KSAnnotation? =
         rawValue.castOrNull<KSAnnotation>()
 
-    fun asArray(): Iterable<KSAnnotationArgumentValue>? =
+    fun asArray(): Iterable<AnnotationArgumentValue>? =
         rawValue.castOrNull<Iterable<Any>>()
-            ?.map { KSAnnotationArgumentValue(it, keepDefault) }
+            ?.map { AnnotationArgumentValue(it, keepDefault) }
             ?.filterDefault { it.isEmpty() }
 
     fun <T> T.filterDefault(isDefault: (T) -> Boolean): T? =

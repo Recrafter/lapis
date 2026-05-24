@@ -13,12 +13,12 @@ abstract class IrKotlinClassBlueprint(val classKind: IrKotlinClassKind) : IrBlue
 
 abstract class IrKotlinFileBlueprint(val packageName: String, val fileName: String) : IrBlueprint
 
-enum class IrKotlinClassKind { CLASS, INTERFACE, OBJECT }
+enum class IrKotlinClassKind { INTERFACE, CLASS, OBJECT }
 
-abstract class IrJavaBlueprint(val classKind: IrJavaClassKind) : IrBlueprint {
+abstract class IrJavaFileBlueprint(val classKind: IrJavaClassKind) : IrBlueprint {
     abstract val className: IrClassName
 }
 
-enum class IrJavaClassKind { CLASS, INTERFACE }
+enum class IrJavaClassKind { INTERFACE, CLASS }
 
 abstract class IrResourceBlueprint(val path: String) : IrBlueprint

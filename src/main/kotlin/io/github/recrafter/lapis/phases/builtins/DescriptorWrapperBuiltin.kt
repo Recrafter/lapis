@@ -269,7 +269,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
             )
-            extensionPackEntities += parameterSuites.mapNotNull { it.sharedProperty }.map { property ->
+            extensionPackEntities += parameterSuites.mapNotNull { it.property }.map { property ->
                 buildKotlinProperty(property.name, property.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
@@ -315,7 +315,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 "operation".withInternalPrefix(),
                 Operation::class.asIrParameterizedTypeName(impl.returnTypeName.orVoid()),
             )
-            extensionPackEntities += parameterSuites.mapNotNull { it.sharedProperty }.map { property ->
+            extensionPackEntities += parameterSuites.mapNotNull { it.property }.map { property ->
                 buildKotlinProperty(property.name, property.typeName, jvmNamespace = impl.className) {
                     setReceiverType(superClassTypeName)
                     setGetter {
@@ -334,24 +334,23 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     setBody {
                         return_("(this as %T).%N") { +impl.className; +receiverConstructorParameter }
                     }
-                }.also { extensionPackEntities += GenKotlinFunctionEntity(it) }
+                }.let(::GenKotlinFunctionEntity).also { extensionPackEntities += it }
             }
             val invokeParameters = parameterSuites.mapNotNull { it.invokeParameter }
-            val callArguments = parameterSuites.map { it.callArgument }
+            val callArgumentsWithoutReceiver = parameterSuites.map { it.callArgument }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
                 addParameters(invokeParameters)
                 setReturnType(impl.returnTypeName)
                 setBody {
-                    val receiverFunctionFormat = getReceiverFunction?.let { "%N()" }
-                    val callArgumentsFormat = if (callArguments.isNotEmpty()) {
-                        ", " + callArguments.format
-                    } else ""
-                    code_("(this as %T).%N.%L($receiverFunctionFormat$callArgumentsFormat)", isReturn = impl.isReturn) {
+                    val callArgumentsFormat = listOfNotNull(
+                        getReceiverFunction?.callFormat,
+                        callArgumentsWithoutReceiver.format,
+                    ).joinToString()
+                    code_("(this as %T).%N.%L($callArgumentsFormat)", isReturn = impl.isReturn) {
                         +impl.className; +operationConstructorParameter; +Operation<*>::call
-                        getReceiverFunction?.let { +it }
-                        callArguments.forEach { +it }
+                        getReceiverFunction?.let { +it }; callArgumentsWithoutReceiver.forEach { +it }
                     }
                 }
             }.also { extensionPackEntities += GenKotlinFunctionEntity(it) }
@@ -364,11 +363,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     addParameters(invokeParameters)
                     setReturnType(impl.returnTypeName)
                     setBody {
-                        val callArgumentsFormat = if (callArguments.isNotEmpty()) {
-                            ", " + callArguments.format
-                        } else ""
-                        code_("(this as %T).%N.%L(%N$callArgumentsFormat)", isReturn = impl.isReturn) {
-                            +impl.className; +operationConstructorParameter; +Operation<*>::call; +receiverParameter
+                        val callArguments = listOf(receiverParameter) + callArgumentsWithoutReceiver
+                        code_("(this as %T).%N.%L(${callArguments.format})", isReturn = impl.isReturn) {
+                            +impl.className; +operationConstructorParameter; +Operation<*>::call
                             callArguments.forEach { +it }
                         }
                     }
@@ -442,8 +439,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                 setBody {
                     val cancelArguments = listOfNotNull(returnValueParameter)
                     code_("(this as %T).%N.%L(${cancelArguments.format})") {
-                        +impl.className; +callbackConstructorParameter
-                        +cancelCallable; cancelArguments.forEach { +it }
+                        +impl.className; +callbackConstructorParameter; +cancelCallable; cancelArguments.forEach { +it }
                     }
                     throw_("%T") { +resolveBuiltin(SimpleBuiltin.CancelSignal) }
                 }
@@ -469,31 +465,33 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
     ): GenDescriptorWrapperImplResult
 
     companion object {
-        val entries: List<DescriptorWrapperBuiltin<*>> =
-            listOf(FieldGet, FieldSet, ArrayGet, ArraySet, Body, Call, Cancel)
+        val entries: List<DescriptorWrapperBuiltin<*>> = listOf(
+            FieldGet, FieldSet,
+            ArrayGet, ArraySet,
+            Body, Call, Cancel,
+        )
     }
 }
 
-private class GenInvokableDescriptorWrapperParameterSuite(
+private class GenFunctionTypeParameterSuite(
     val constructorParameter: IrParameter,
-    val sharedProperty: IrParameter?,
+    val property: IrParameter?,
 ) {
-    val invokeParameter: KPParameter? = sharedProperty?.let {
-        buildKotlinParameter(sharedProperty) {
-            setDefaultValue("this.%N") { +sharedProperty }
+    val invokeParameter: KPParameter? = property?.let {
+        buildKotlinParameter(property) {
+            setDefaultValue("this.%N") { +property }
         }
     }
-    val callArgument: IrParameter = sharedProperty ?: constructorParameter
+    val callArgument: IrParameter = property ?: constructorParameter
 }
 
-private fun IrInvokableDescriptorWrapperImpl.resolveParameterSuites():
-    List<GenInvokableDescriptorWrapperParameterSuite> =
-    parameters.mapIndexed { index, parameter ->
-        GenInvokableDescriptorWrapperParameterSuite(
+private fun IrInvokableDescriptorWrapperImpl.resolveParameterSuites(): List<GenFunctionTypeParameterSuite> =
+    functionTypeParameters.mapIndexed { index, parameter ->
+        GenFunctionTypeParameterSuite(
             constructorParameter = IrParameter(
                 (parameter.name ?: index.toString()).withInternalPrefix(ARGUMENT),
                 parameter.typeName,
             ),
-            sharedProperty = parameter.name?.let { IrParameter(it, parameter.typeName) },
+            property = parameter.name?.let { IrParameter(it, parameter.typeName) },
         )
     }

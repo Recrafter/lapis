@@ -4,7 +4,7 @@ import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
-import io.github.recrafter.lapis.common.KSTypes
+import io.github.recrafter.lapis.common.KSBaseTypes
 import io.github.recrafter.lapis.logging.Logger
 import io.github.recrafter.lapis.phases.LapisPhase
 import io.github.recrafter.lapis.phases.bootstrap.Options
@@ -30,8 +30,8 @@ class CoreProcessor(
     private val patches: SortedMap<String, IrPatch> = sortedMapOf()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val types = KSTypes(resolver.builtIns)
-        val parser = SymbolParser(resolver, types, logger)
+        val baseTypes = KSBaseTypes(resolver.builtIns)
+        val parser = SymbolParser(resolver, baseTypes, logger)
         if (!builtins.isExternalGenerated) {
             logger.setPhase(LapisPhase.BUILTINS)
             builtins.generateExternal()
@@ -42,7 +42,7 @@ class CoreProcessor(
         val parserResult = parser.parse()
 
         logger.setPhase(LapisPhase.VALIDATION)
-        val validatorResult = FrontendValidator(logger, options, builtins, types).validate(parserResult)
+        val validatorResult = FrontendValidator(logger, options, builtins, baseTypes).validate(parserResult)
 
         logger.setPhase(LapisPhase.TRANSFORMATION)
         val irResult = lowering.lower(validatorResult)

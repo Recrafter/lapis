@@ -14,10 +14,7 @@ sealed class IrInjection(
     val hookArguments: List<IrHookArgument>,
     val isStatic: Boolean,
     val ordinal: Int?,
-) : IrReturnable {
-    val hasReceiver: Boolean = this is IrTargetInjection && this !is IrWrapMethodInjection && this !is IrArrayInjection
-        && !isStaticTarget
-}
+) : IrReturnable
 
 sealed interface IrTargetInjection {
     val targetMixinReference: String

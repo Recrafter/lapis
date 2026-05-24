@@ -21,14 +21,14 @@ fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A
 }
 
 fun <A : Annotation> JPAnnotationBuilder.setArgumentValue(property: KProperty1<A, KClass<*>>, className: IrTypeName) {
-    addMember(property.name, className.toJavaCodeBlock(asClass = true))
+    addMember(property.name, className.toJavaCodeBlock(asClassType = true))
 }
 
-inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationBuilder.setArgumentValue(
-    property: KProperty1<A, Embedded>,
+inline fun <reified A : Annotation, reified EA : Annotation> JPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, EA>,
     crossinline builder: Builder<JPAnnotationBuilder> = {}
 ) {
-    addMember(property.name, buildJavaAnnotation<Embedded>(builder).toCodeBlock())
+    addMember(property.name, buildJavaAnnotation<EA>(builder).toCodeBlock())
 }
 
 @JvmName("setStringArrayArgumentValue")
@@ -36,20 +36,16 @@ inline fun <reified A : Annotation> JPAnnotationBuilder.setArgumentValue(
     property: KProperty1<A, Array<out String>>,
     strings: List<String>,
 ) {
-    setArrayArgumentValue(property, strings, "%S") {
-        strings.forEach { +it }
-    }
+    setArrayArgumentValue(property, strings, "%S") { strings.forEach { +it } }
 }
 
 @JvmName("setAnnotationArrayArgumentValue")
-inline fun <reified A : Annotation, reified Embedded : Annotation> JPAnnotationBuilder.setArgumentValue(
-    property: KProperty1<A, Array<out Embedded>>,
+inline fun <reified A : Annotation, reified EA : Annotation> JPAnnotationBuilder.setArgumentValue(
+    property: KProperty1<A, Array<out EA>>,
     crossinline builder: Builder<JPAnnotationBuilder> = {}
 ) {
-    val annotations = listOf(buildJavaAnnotation<Embedded>(builder))
-    setArrayArgumentValue(property, annotations, "%L") {
-        annotations.forEach { +it }
-    }
+    val annotations = listOf(buildJavaAnnotation<EA>(builder))
+    setArrayArgumentValue(property, annotations, "%L") { annotations.forEach { +it } }
 }
 
 inline fun <reified A : Annotation> JPAnnotationBuilder.setArrayArgumentValue(

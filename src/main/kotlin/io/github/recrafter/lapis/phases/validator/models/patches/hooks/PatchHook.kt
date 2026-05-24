@@ -15,7 +15,7 @@ sealed class PatchHook(
     val methodDescriptor: Descriptor,
     returnType: KSType?,
     val parameters: List<HookParameter>,
-    val ordinals: List<Int>,
+    val ordinals: Set<Int>,
 ) {
     open val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
     open val isInjectBased: Boolean = false
@@ -29,7 +29,7 @@ class MethodHeadHook(
     jvmName: String,
     methodDescriptor: MethodDescriptor,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, methodDescriptor, null, parameters, emptyList()) {
+) : PatchHook(jvmName, methodDescriptor, null, parameters, emptySet()) {
     override val isInjectBased: Boolean = true
 }
 
@@ -38,7 +38,7 @@ class ConstructorHeadHook(
     methodDescriptor: ConstructorDescriptor,
     parameters: List<HookParameter>,
     val phase: ConstructorHeadPhase,
-) : PatchHook(jvmName, methodDescriptor, null, parameters, emptyList()) {
+) : PatchHook(jvmName, methodDescriptor, null, parameters, emptySet()) {
     override val isInjectBased: Boolean = true
 }
 
@@ -47,7 +47,7 @@ class BodyHook(
     methodDescriptor: MethodDescriptor,
     returnType: KSType?,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, methodDescriptor, returnType, parameters, emptyList()), HookWithTarget {
+) : PatchHook(jvmName, methodDescriptor, returnType, parameters, emptySet()), HookWithTarget {
     override val targetDescriptor: Descriptor = methodDescriptor
 }
 
@@ -55,7 +55,7 @@ class TailHook(
     jvmName: String,
     methodDescriptor: InvokableDescriptor,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, methodDescriptor, null, parameters, emptyList()) {
+) : PatchHook(jvmName, methodDescriptor, null, parameters, emptySet()) {
     override val isInjectBased: Boolean = true
 }
 
@@ -64,7 +64,7 @@ class LocalHook(
     methodDescriptor: InvokableDescriptor,
     type: KSType,
     parameters: List<HookParameter>,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
     val local: HookLocal,
     val op: Op,
 ) : PatchHook(jvmName, methodDescriptor, type, parameters, ordinals) {
@@ -77,7 +77,7 @@ class InstanceofHook(
     typeClassDeclaration: KSClassDeclaration,
     returnType: KSType,
     parameters: List<HookParameter>,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
 ) : PatchHook(jvmName, methodDescriptor, returnType, parameters, ordinals) {
     val typeClassName: IrClassName = typeClassDeclaration.asIrClassName()
 }
@@ -87,7 +87,7 @@ class ReturnHook(
     methodDescriptor: InvokableDescriptor,
     type: KSType?,
     parameters: List<HookParameter>,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
 ) : PatchHook(jvmName, methodDescriptor, type, parameters, ordinals) {
     override val isInjectBased: Boolean = type == null
 }
@@ -98,7 +98,7 @@ class LiteralHook(
     parameters: List<HookParameter>,
     type: KSType,
     val literal: HookLiteral,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
 ) : PatchHook(jvmName, methodDescriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }
@@ -108,7 +108,7 @@ class FieldGetHook(
     methodDescriptor: InvokableDescriptor,
     type: KSType,
     override val targetDescriptor: FieldDescriptor,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
     parameters: List<HookParameter>,
 ) : PatchHook(jvmName, methodDescriptor, type, parameters, ordinals), HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
@@ -119,7 +119,7 @@ class FieldSetHook(
     methodDescriptor: InvokableDescriptor,
     type: KSType,
     override val targetDescriptor: FieldDescriptor,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
     parameters: List<HookParameter>,
 ) : PatchHook(jvmName, methodDescriptor, type, parameters, ordinals), HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
@@ -131,7 +131,7 @@ class ArrayHook(
     type: KSType,
     val componentType: KSType,
     val targetDescriptor: FieldDescriptor,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
     parameters: List<HookParameter>,
     val op: Op,
 ) : PatchHook(jvmName, methodDescriptor, type, parameters, ordinals) {
@@ -145,5 +145,5 @@ class CallHook(
     returnType: KSType?,
     parameters: List<HookParameter>,
     override val targetDescriptor: InvokableDescriptor,
-    ordinals: List<Int>,
+    ordinals: Set<Int>,
 ) : PatchHook(jvmName, methodDescriptor, returnType, parameters, ordinals), HookWithTarget

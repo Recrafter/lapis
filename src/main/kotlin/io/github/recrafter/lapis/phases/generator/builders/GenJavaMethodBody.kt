@@ -13,6 +13,13 @@ value class GenJavaMethodBody(private val builder: JPMethodBuilder) {
         builder.addStatement(codeBlock)
     }
 
+    fun GenJavaMethodBody.return_(
+        format: String? = null,
+        argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
+    ) {
+        code_(buildJavaCodeBlock("return" + format?.let { " $it" }.orEmpty(), argumentsBuilder))
+    }
+
     fun GenJavaMethodBody.code_(
         format: String,
         isReturn: Boolean = false,
@@ -23,13 +30,6 @@ value class GenJavaMethodBody(private val builder: JPMethodBuilder) {
         } else {
             code_(buildJavaCodeBlock(format, argumentsBuilder))
         }
-    }
-
-    fun GenJavaMethodBody.return_(
-        format: String? = null,
-        argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
-    ) {
-        code_(buildJavaCodeBlock("return" + format?.let { " $it" }.orEmpty(), argumentsBuilder))
     }
 
     fun GenJavaMethodBody.return_(codeBlock: JPCodeBlock) {
@@ -44,7 +44,7 @@ value class GenJavaMethodBody(private val builder: JPMethodBuilder) {
         format: String,
         argumentsBuilder: Builder<IrJavaCodeBlock.Arguments> = {}
     ) {
-        builder.addStatement(buildJavaCodeBlock("throw $format", argumentsBuilder))
+        code_(buildJavaCodeBlock("throw $format", argumentsBuilder))
     }
 
     @Suppress("LocalVariableName")

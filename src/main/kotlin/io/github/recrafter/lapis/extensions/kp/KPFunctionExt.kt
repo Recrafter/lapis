@@ -19,18 +19,6 @@ fun KPFunctionBuilder.setBody(builder: Builder<GenKotlinFunctionBody> = {}) {
     GenKotlinFunctionBody(this).builder()
 }
 
-fun KPFunctionBuilder.addStatement(codeBlock: KPCodeBlock) {
-    addStatement("%L", codeBlock)
-}
-
-fun KPFunctionBuilder.addReturnStatement(codeBlock: KPCodeBlock?) {
-    if (codeBlock != null) {
-        addStatement("return %L", codeBlock)
-    } else {
-        addStatement("return")
-    }
-}
-
 fun KPFunctionBuilder.setReturnType(typeName: IrTypeName?) {
     returns(typeName?.kotlin.orUnit())
 }

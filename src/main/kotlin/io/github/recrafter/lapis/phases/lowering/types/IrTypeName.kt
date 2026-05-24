@@ -59,7 +59,7 @@ open class IrTypeName(
             KPDoubleArray -> JPDouble
             else -> {
                 if (kotlin is KPParameterizedTypeName && kotlin.rawType == KPArray) {
-                    kotlin.typeArguments.singleOrNull()?.asIrTypeName()?.java
+                    kotlin.typeArguments.firstOrNull()?.asIrTypeName()?.java
                 } else {
                     return@lazy null
                 }
@@ -75,8 +75,8 @@ open class IrTypeName(
             else -> lapisError("Cannot get raw class")
         }
 
-    fun parameterizedBy(vararg argumentTypeNames: IrTypeName): IrParameterizedTypeName =
-        rawClassName.kotlin.parameterizedBy(argumentTypeNames.map { it.kotlin }).asIrParameterizedTypeName()
+    fun parameterizedBy(vararg typeArguments: IrTypeName): IrParameterizedTypeName =
+        rawClassName.kotlin.parameterizedBy(typeArguments.map { it.kotlin }).asIrParameterizedTypeName()
 
     fun parameterizedByStar(): IrParameterizedTypeName =
         parameterizedBy(KPStar.asIrWildcardTypeName())

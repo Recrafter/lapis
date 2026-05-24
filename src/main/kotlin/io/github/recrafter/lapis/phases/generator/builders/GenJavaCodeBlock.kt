@@ -17,19 +17,12 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
 
     fun IrJavaCodeBlock.lambda_(
         parameters: List<IrParameter> = emptyList(),
-        inline: Boolean = false,
         bodyBuilder: Builder<GenJavaMethodBody>
     ) {
         val bodyCode = buildJavaMethod("temp") { setBody(bodyBuilder) }.code().toString()
-        if (inline) {
-            add("(${parameters.format}) -> { ") { parameters.forEach { +it } }
-            builder.add(bodyCode.replace('\n', ' ').trim())
-            builder.add(" }")
-        } else {
-            beginControlFlow("(${parameters.format}) ->") { parameters.forEach { +it } }
-            builder.add(bodyCode)
-            endControlFlow()
-        }
+        beginControlFlow("(${parameters.format}) ->") { parameters.forEach { +it } }
+        builder.add(bodyCode)
+        endControlFlow()
     }
 
     fun IrJavaCodeBlock.lambda_(
@@ -66,6 +59,14 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
         }
 
         operator fun Boolean.unaryPlus() {
+            arguments += this
+        }
+
+        operator fun Byte.invoke() {
+            arguments += this
+        }
+
+        operator fun Short.invoke() {
             arguments += this
         }
 
@@ -149,6 +150,8 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
 }
 
 fun Boolean.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { +this@toJavaCodeBlock }
+fun Byte.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { this@toJavaCodeBlock() }
+fun Short.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { this@toJavaCodeBlock() }
 fun Int.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { this@toJavaCodeBlock() }
 fun Long.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { this@toJavaCodeBlock() }
 fun Char.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { +this@toJavaCodeBlock }
@@ -158,8 +161,8 @@ fun Double.toJavaCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { this@toJa
 fun String.toJavaCodeBlock(asValue: Boolean = false): JPCodeBlock =
     buildJavaCodeBlock(if (asValue) "%S" else "%L") { +this@toJavaCodeBlock }
 
-fun IrTypeName.toJavaCodeBlock(asClass: Boolean = false): JPCodeBlock =
-    buildJavaCodeBlock(if (asClass) "%T.class" else "%T") { +this@toJavaCodeBlock }
+fun IrTypeName.toJavaCodeBlock(asClassType: Boolean = false): JPCodeBlock =
+    buildJavaCodeBlock(if (asClassType) "%T.class" else "%T") { +this@toJavaCodeBlock }
 
 fun JPField.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%N") { +this@toCodeBlock }
 fun JPAnnotation.toCodeBlock(): JPCodeBlock = buildJavaCodeBlock("%L") { +this@toCodeBlock }

@@ -60,7 +60,7 @@ sealed class InvokableDescriptor(
     classDeclaration: KSClassDeclaration,
     receiverType: KSType,
     inaccessibleReceiverJvmClassName: JvmClassName?,
-    parameters: List<FunctionTypeParameter>,
+    functionTypeParameters: List<FunctionTypeParameter>,
     returnType: KSType?,
     isStatic: Boolean,
     accessRequest: AccessRequest?,
@@ -71,7 +71,7 @@ sealed class InvokableDescriptor(
     mappingName,
     receiverType,
     inaccessibleReceiverJvmClassName,
-    parameters,
+    functionTypeParameters,
     returnType,
     isStatic,
     accessRequest,
@@ -86,7 +86,7 @@ open class MethodDescriptor(
     receiverType: KSType,
     inaccessibleReceiverJvmClassName: JvmClassName?,
     returnType: KSType?,
-    parameters: List<FunctionTypeParameter>,
+    functionTypeParameters: List<FunctionTypeParameter>,
     isStatic: Boolean,
     accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
@@ -96,7 +96,7 @@ open class MethodDescriptor(
     classDeclaration,
     receiverType,
     inaccessibleReceiverJvmClassName,
-    parameters,
+    functionTypeParameters,
     returnType,
     isStatic,
     accessRequest,
@@ -108,10 +108,10 @@ class ConstructorDescriptor(
     name: String,
     classDeclaration: KSClassDeclaration,
     returnType: KSType,
-    parameters: List<FunctionTypeParameter>,
+    functionTypeParameters: List<FunctionTypeParameter>,
     accessRequest: AccessRequest?,
 ) : InvokableDescriptor(
-    symbol, name, "", classDeclaration, returnType, null, parameters, returnType, false, accessRequest,
+    symbol, name, "", classDeclaration, returnType, null, functionTypeParameters, returnType, false, accessRequest,
 )
 
 class FunctionTypeParameter(val name: String?, val type: KSType) {

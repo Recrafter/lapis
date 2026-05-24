@@ -1,10 +1,12 @@
 package io.github.recrafter.lapis.phases.validator.models.patches
 
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.validator.models.common.FunctionParameter
+import io.github.recrafter.lapis.phases.validator.models.common.MixinAnnotation
 
 sealed interface BridgeSource
 sealed class BridgeSourceProperty(
@@ -25,12 +27,16 @@ sealed class BridgeSourceFunction(
     val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
 }
 
-sealed interface PatchExtensionSource
+sealed interface PatchExtensionSource {
+    val receiverClassDeclaration: KSClassDeclaration
+}
+
 class ExtensionProperty(
     name: String,
     getterJvmName: String,
     setterJvmName: String?,
     type: KSType,
+    override val receiverClassDeclaration: KSClassDeclaration,
 ) : BridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchExtensionSource
 
 class ExtensionFunction(
@@ -38,10 +44,11 @@ class ExtensionFunction(
     jvmName: String,
     parameters: List<FunctionParameter>,
     returnType: KSType?,
+    override val receiverClassDeclaration: KSClassDeclaration,
 ) : BridgeSourceFunction(name, jvmName, parameters, returnType), PatchExtensionSource
 
 sealed interface PatchShadowSource {
-    val modifiers: List<JPModifier>
+    val modifiers: Set<JPModifier>
 }
 
 class ShadowProperty(
@@ -50,7 +57,8 @@ class ShadowProperty(
     setterJvmName: String?,
     type: KSType,
     val mappingName: String,
-    override val modifiers: List<JPModifier>,
+    val mixinAnnotations: List<MixinAnnotation>,
+    override val modifiers: Set<JPModifier>,
 ) : BridgeSourceProperty(name, getterJvmName, setterJvmName, type), PatchShadowSource
 
 class ShadowFunction(
@@ -59,5 +67,6 @@ class ShadowFunction(
     parameters: List<FunctionParameter>,
     returnType: KSType?,
     val mappingName: String,
-    override val modifiers: List<JPModifier>,
+    val mixinAnnotations: List<MixinAnnotation>,
+    override val modifiers: Set<JPModifier>,
 ) : BridgeSourceFunction(name, jvmName, parameters, returnType), PatchShadowSource
