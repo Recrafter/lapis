@@ -307,7 +307,8 @@ class SymbolParser(
 
         val atLocalAnnotation = findAnnotation<AtLocal>()
         val (explicitAtLocalName, explicitAtLocalOrdinal) = atLocalAnnotation?.getArgumentValue(AtLocal::local).let {
-            it?.getArgumentValue(Local::name, explicit = true) to it?.getArgumentValue(Local::ordinal, explicit = true)
+            it?.getArgumentValue(KLocal::name, explicit = true) to
+                it?.getArgumentValue(KLocal::ordinal, explicit = true)
         }
 
         val atInstanceofAnnotation = findAnnotation<AtInstanceof>()
@@ -402,8 +403,8 @@ class SymbolParser(
         val originAnnotation = findAnnotation<Origin>()
         val cancelAnnotation = findAnnotation<Cancel>()
         val paramAnnotation = findAnnotation<Param>()
-        val localAnnotation = findAnnotation<Local>()
-        val shareAnnotation = findAnnotation<Share>()
+        val localAnnotation = findAnnotation<KLocal>()
+        val shareAnnotation = findAnnotation<KShare>()
         return ParsedPatchFunctionParameter(
             symbol = parameter,
 
@@ -420,12 +421,12 @@ class SymbolParser(
             explicitParamName = paramAnnotation?.getArgumentValue(Param::name, explicit = true),
 
             hasLocalAnnotation = localAnnotation != null,
-            explicitLocalName = localAnnotation?.getArgumentValue(Local::name, explicit = true),
-            explicitLocalOrdinal = localAnnotation?.getArgumentValue(Local::ordinal, explicit = true),
+            explicitLocalName = localAnnotation?.getArgumentValue(KLocal::name, explicit = true),
+            explicitLocalOrdinal = localAnnotation?.getArgumentValue(KLocal::ordinal, explicit = true),
 
             hasShareAnnotation = shareAnnotation != null,
-            explicitShareKey = shareAnnotation?.getArgumentValue(Share::key, explicit = true),
-            isShareExported = shareAnnotation?.getArgumentValue(Share::exported) == true,
+            explicitShareKey = shareAnnotation?.getArgumentValue(KShare::key, explicit = true),
+            isShareExported = shareAnnotation?.getArgumentValue(KShare::exported) == true,
 
             annotations = annotations.map(::parseAnnotation).toList(),
         )
