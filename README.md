@@ -82,6 +82,7 @@ public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScree
     @Unique
     private AdvancementsScreenPatch_Impl _lapis_getOrInitPatch() {
         if (_lapis_patch == null) {
+            // Double cast and escaping out of Mixin into your patch instance!
             _lapis_patch = new AdvancementsScreenPatch_Impl((AdvancementsScreen) (Object) this, this);
         }
         return _lapis_patch;
@@ -89,12 +90,12 @@ public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScree
 
     @Override
     public boolean _advancements_fullscreen_getWasHorizontallyScrolled() {
-        return _lapis_getOrInitPatch().getWasHorizontallyScrolled();
+        return _lapis_getOrInitPatch().getWasHorizontallyScrolled(); // Bridges the custom @Extension field to the outside world
     }
 
     @Override
     public Map<AdvancementHolder, AdvancementTab> _advancements_fullscreen_getTabs() {
-        return tabs;
+        return tabs; // Automatically exposes the original @Shadow via bridge interface
     }
 
     @WrapOperation(
@@ -103,9 +104,21 @@ public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScree
     )
     private void invertScrollWhenShiftDown_ordinal0(AdvancementTab _lapis_receiver,
             double _argument_scrollX, double _argument_scrollY, Operation<Void> _lapis_original) {
+        // Automatically captures context and wraps arguments into a clean lambda-like object
         _lapis_getOrInitPatch().invertScrollWhenShiftDown(new _AdvancementTab_scroll_Call(_lapis_receiver, _argument_scrollX, _argument_scrollY, _lapis_original));
     }
 }
+```
+
+...and also some Kotlin sugar:
+
+```kotlin
+// Lapis generates a clean, public extension property for your mod.
+// No casting or bridges in your business logic — it feels like a native Minecraft property!
+public inline val AdvancementsScreen.wasHorizontallyScrolled: Boolean
+    get() {
+        return (this as AdvancementsScreenPatch_ExternalBridge)._advancements_fullscreen_getWasHorizontallyScrolled()
+    }
 ```
 
 ### 🪟 The Ultimate Escape Hatch: Raw Mixin Power
