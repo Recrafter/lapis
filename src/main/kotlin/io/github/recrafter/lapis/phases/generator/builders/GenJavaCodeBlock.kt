@@ -1,7 +1,10 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.diskria.poetesse.java.*
 import io.github.recrafter.lapis.extensions.common.Builder
-import io.github.recrafter.lapis.extensions.jp.*
+import io.github.recrafter.lapis.extensions.jp.buildJavaCodeBlock
+import io.github.recrafter.lapis.extensions.jp.buildJavaMethod
+import io.github.recrafter.lapis.extensions.jp.setBody
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.format

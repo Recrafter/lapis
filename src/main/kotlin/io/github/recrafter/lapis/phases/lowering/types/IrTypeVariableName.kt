@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.phases.lowering.types
 
-import io.github.recrafter.lapis.extensions.jp.JPTypeVariableName
-import io.github.recrafter.lapis.extensions.kp.KPTypeVariableName
+import io.github.diskria.poetesse.java.JPTypeVariableName
+import io.github.diskria.poetesse.kotlin.KPTypeVariableName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeVariableName
 

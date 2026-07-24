@@ -1,25 +1,25 @@
 package io.github.recrafter.lapis.common
 
-import io.github.recrafter.lapis.extensions.jp.JPModifier
+import javax.lang.model.element.Modifier
 
 object JavaModifiers {
-    val visibilities: List<JPModifier> = listOf(
-        JPModifier.PUBLIC, JPModifier.PROTECTED, JPModifier.PRIVATE
+    val visibilities: List<Modifier> = listOf(
+        Modifier.PUBLIC, Modifier.PROTECTED, Modifier.PRIVATE
     )
-    val fieldAllowed: List<JPModifier> = visibilities + listOf(
-        JPModifier.STATIC, JPModifier.FINAL, JPModifier.TRANSIENT,
-        JPModifier.VOLATILE,
+    val fieldAllowed: List<Modifier> = visibilities + listOf(
+        Modifier.STATIC, Modifier.FINAL, Modifier.TRANSIENT,
+        Modifier.VOLATILE,
     )
-    val methodAllowed: List<JPModifier> = visibilities + listOf(
-        JPModifier.ABSTRACT, JPModifier.STATIC, JPModifier.FINAL,
-        JPModifier.SYNCHRONIZED, JPModifier.NATIVE, JPModifier.STRICTFP,
+    val methodAllowed: List<Modifier> = visibilities + listOf(
+        Modifier.ABSTRACT, Modifier.STATIC, Modifier.FINAL,
+        Modifier.SYNCHRONIZED, Modifier.NATIVE, Modifier.STRICTFP,
     )
-    val methodConflicts: List<JPModifier> = listOf(
-        JPModifier.ABSTRACT, JPModifier.FINAL,
+    val methodConflicts: List<Modifier> = listOf(
+        Modifier.ABSTRACT, Modifier.FINAL,
     )
-    val abstractIllegals: List<JPModifier> = listOf(
-        JPModifier.PRIVATE,
-        JPModifier.STATIC, JPModifier.FINAL,
-        JPModifier.SYNCHRONIZED, JPModifier.NATIVE, JPModifier.STRICTFP,
+    val abstractIllegals: List<Modifier> = listOf(
+        Modifier.PRIVATE,
+        Modifier.STATIC, Modifier.FINAL,
+        Modifier.SYNCHRONIZED, Modifier.NATIVE, Modifier.STRICTFP,
     )
 }

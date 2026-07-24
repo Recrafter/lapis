@@ -1,6 +1,8 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
 import com.google.devtools.ksp.symbol.KSFile
+import io.github.diskria.poetesse.java.JPTypeKind
+import io.github.diskria.poetesse.kotlin.KPTypeKind
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.annotations.Side
@@ -23,7 +25,7 @@ class IrSchema(
     val mixinAccessor: IrMixinAccessor?,
 ) : IrSourceFile(className)
 
-abstract class IrMixinRelatedBlueprint(classKind: IrJavaClassKind) : IrJavaFileBlueprint(classKind) {
+abstract class IrMixinRelatedBlueprint(typeKind: JPTypeKind) : IrJavaFileBlueprint(typeKind) {
     abstract val side: Side
 }
 
@@ -37,7 +39,7 @@ class IrMixinAccessor(
     val targetInternalName: String,
     val instanceTypeName: IrTypeName,
     val members: List<IrMixinAccessorMember>,
-) : IrMixinRelatedBlueprint(IrJavaClassKind.INTERFACE), IrAccessor
+) : IrMixinRelatedBlueprint(JPTypeKind.INTERFACE), IrAccessor
 
 sealed class IrMixinAccessorMember(
     val name: String,
@@ -87,7 +89,7 @@ class IrMixin(
     val internalBridge: IrMixinInternalBridge?,
     val targetInternalName: String?,
     val mixinAnnotations: List<IrMixinAnnotation>,
-) : IrMixinRelatedBlueprint(IrJavaClassKind.CLASS)
+) : IrMixinRelatedBlueprint(JPTypeKind.CLASS)
 
 sealed interface IrPatchConstructorArgument
 class IrPatchConstructorOriginArgument(val typeName: IrTypeName) : IrPatchConstructorArgument
@@ -97,7 +99,7 @@ class IrPatchImpl(
     override val className: IrClassName,
     val constructorParameters: List<IrPatchImplConstructorParameter>,
     val initStrategy: InitStrategy,
-) : IrKotlinClassBlueprint(IrKotlinClassKind.CLASS)
+) : IrKotlinClassBlueprint(KPTypeKind.CLASS)
 
 sealed interface IrPatchImplConstructorParameter
 class IrPatchImplConstructorInstanceParameter(val typeName: IrTypeName) : IrPatchImplConstructorParameter

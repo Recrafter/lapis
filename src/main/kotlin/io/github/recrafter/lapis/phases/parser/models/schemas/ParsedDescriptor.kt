@@ -10,14 +10,16 @@ class ParsedDescriptor(
     val name: String,
     val classDeclaration: KSClassDeclaration,
     val isObject: Boolean,
-    val hasStaticAnnotation: Boolean,
+    val hasFieldAnnotation: Boolean,
+    val hasMethodAnnotation: Boolean,
+    val hasConstructorAnnotation: Boolean,
+    val isStatic: Boolean,
     val hasAccessAnnotation: Boolean,
     val isAccessUnfinal: Boolean,
     val accessStrategy: AccessStrategy?,
     val accessFieldOps: List<Op>,
     val hasMappingNameAnnotation: Boolean,
     val explicitMappingName: String?,
-    val superClassDeclaration: KSClassDeclaration?,
     val genericArgument: ParsedDescriptorGenericArgument?,
 ) : SymbolSource {
     override val symbol: KSNode = classDeclaration

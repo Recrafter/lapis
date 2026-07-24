@@ -2,7 +2,7 @@ package io.github.recrafter.lapis.phases.validator.models.patches
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import io.github.recrafter.lapis.extensions.jp.JPModifier
+import io.github.diskria.poetesse.java.JPModifier
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.validator.models.common.FunctionParameter

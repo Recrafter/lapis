@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.diskria.poetesse.java.JPCodeBlock
+import io.github.diskria.poetesse.java.JPMethodBuilder
 import io.github.recrafter.lapis.extensions.common.Builder
-import io.github.recrafter.lapis.extensions.jp.JPCodeBlock
-import io.github.recrafter.lapis.extensions.jp.JPMethodBuilder
 import io.github.recrafter.lapis.extensions.jp.buildJavaCodeBlock
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 

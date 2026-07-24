@@ -1,6 +1,9 @@
 package io.github.recrafter.lapis.phases.builtins
 
 import com.llamalad7.mixinextras.sugar.ref.*
+import io.github.diskria.poetesse.kotlin.KPClassName
+import io.github.diskria.poetesse.kotlin.KPModifier
+import io.github.diskria.poetesse.kotlin.KPType
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.builtins.SimpleBuiltin.LocalVar
 import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
@@ -20,7 +23,7 @@ enum class LocalVarImplBuiltin(
     private val referenceKClass: KClass<*>,
     private val getterCallable: KCallable<*>,
     private val setterCallable: KCallable<*>,
-) : Builtin<KPClass> {
+) : Builtin<KPType> {
 
     ObjectLocalVar(
         referenceKClass = LocalRef::class,
@@ -80,7 +83,7 @@ enum class LocalVarImplBuiltin(
 
     override val isInternal: Boolean = true
 
-    override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
+    override fun generate(resolveBuiltin: BuiltinResolver): KPType =
         buildKotlinClass(name) {
             val (genericTypeName, referenceTypeName) = if (valueKPClassName != null) {
                 valueKPClassName.asIrClassName() to referenceTypeName

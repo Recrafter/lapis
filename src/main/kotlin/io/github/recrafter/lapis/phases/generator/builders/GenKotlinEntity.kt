@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
-import io.github.recrafter.lapis.extensions.kp.KPFunction
-import io.github.recrafter.lapis.extensions.kp.KPProperty
+import io.github.diskria.poetesse.kotlin.KPFunction
+import io.github.diskria.poetesse.kotlin.KPProperty
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.format
 

@@ -5,6 +5,6 @@ import io.github.recrafter.lapis.phases.lowering.models.IrKotlinFileBlueprint
 
 class GenExtensionPack(
     override val originatingFiles: List<KSFile>,
-    packageName: String,
+    packageName: String?,
     fileName: String,
 ) : IrKotlinFileBlueprint(packageName, fileName)

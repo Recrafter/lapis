@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.phases.lowering.types
 
-import io.github.recrafter.lapis.extensions.jp.JPParameterizedTypeName
-import io.github.recrafter.lapis.extensions.kp.KPParameterizedTypeName
+import io.github.diskria.poetesse.java.JPParameterizedTypeName
+import io.github.diskria.poetesse.kotlin.KPParameterizedTypeName
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 

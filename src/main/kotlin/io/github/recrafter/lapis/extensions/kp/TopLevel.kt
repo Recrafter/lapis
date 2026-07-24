@@ -2,6 +2,7 @@ package io.github.recrafter.lapis.extensions.kp
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
+import io.github.diskria.poetesse.kotlin.*
 import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.GeneratorConstants
@@ -10,40 +11,6 @@ import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-
-typealias KPAnnotationBuilder = AnnotationSpec.Builder
-typealias KPAnnotation = AnnotationSpec
-
-typealias KPCodeBlockBuilder = CodeBlock.Builder
-typealias KPCodeBlock = CodeBlock
-
-typealias KPPropertyBuilder = PropertySpec.Builder
-typealias KPProperty = PropertySpec
-
-typealias KPFunctionBuilder = FunSpec.Builder
-typealias KPFunction = FunSpec
-
-typealias KPParameterBuilder = ParameterSpec.Builder
-typealias KPParameter = ParameterSpec
-
-typealias KPClassBuilder = TypeSpec.Builder
-typealias KPClass = TypeSpec
-
-typealias KPTypeAliasBuilder = TypeAliasSpec.Builder
-typealias KPTypeAlias = TypeAliasSpec
-
-typealias KPFileBuilder = FileSpec.Builder
-typealias KPFile = FileSpec
-
-typealias KPTypeName = TypeName
-typealias KPClassName = ClassName
-typealias KPParameterizedTypeName = ParameterizedTypeName
-typealias KPWildcardTypeName = WildcardTypeName
-typealias KPTypeVariableName = TypeVariableName
-typealias KPLambdaTypeName = LambdaTypeName
-typealias KPDynamic = Dynamic
-
-typealias KPModifier = KModifier
 
 val KPNothing: KPClassName = NOTHING
 
@@ -159,15 +126,18 @@ fun buildKotlinParameter(
 ): KPParameter =
     KPParameter.builder(name, typeName.kotlin).apply(builder).build()
 
-fun buildKotlinParameter(parameter: IrParameter, builder: Builder<KPParameterBuilder> = {}): KPParameter =
+fun buildKotlinParameter(
+    parameter: IrParameter,
+    builder: Builder<KPParameterBuilder> = {}
+): KPParameter =
     buildKotlinParameter(parameter.name, parameter.typeName, builder)
 
 fun buildKotlinInterface(
     name: String,
     visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
-    builder: Builder<KPClassBuilder> = {}
-): KPClass =
-    KPClass.interfaceBuilder(name).apply {
+    builder: Builder<KPTypeBuilder> = {}
+): KPType =
+    KPType.interfaceBuilder(name).apply {
         addModifiers(visibility.kotlin)
         builder()
     }.build()
@@ -184,9 +154,9 @@ fun buildKotlinConstructor(
 fun buildKotlinClass(
     name: String,
     visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
-    builder: Builder<KPClassBuilder> = {}
-): KPClass =
-    KPClass.classBuilder(name).apply {
+    builder: Builder<KPTypeBuilder> = {}
+): KPType =
+    KPType.classBuilder(name).apply {
         addModifiers(visibility.kotlin)
         builder()
     }.build()
@@ -194,9 +164,9 @@ fun buildKotlinClass(
 fun buildKotlinObject(
     name: String,
     visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
-    builder: Builder<KPClassBuilder> = {}
-): KPClass =
-    KPClass.objectBuilder(name).apply {
+    builder: Builder<KPTypeBuilder> = {}
+): KPType =
+    KPType.objectBuilder(name).apply {
         addModifiers(visibility.kotlin)
         builder()
     }.build()
@@ -212,8 +182,12 @@ fun buildKotlinTypeAlias(
         builder()
     }.build()
 
-fun buildKotlinFile(packageName: String, fileName: String, builder: Builder<KPFileBuilder> = {}): KPFile =
-    KPFile.builder(packageName, fileName)
+fun buildKotlinFile(
+    packageName: String?,
+    fileName: String,
+    builder: Builder<KPFileBuilder> = {}
+): KPFile =
+    KPFile.builder(packageName.orEmpty(), fileName)
         .addFileComment(GeneratorConstants.GENERATED_HEADER)
         .apply(builder)
         .indent(GeneratorConstants.INDENT)

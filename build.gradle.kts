@@ -10,7 +10,8 @@ dependencies {
     implementation(libs.bundles.ksp)
     implementation(libs.bundles.mixins)
     implementation(libs.bundles.asm)
-    implementation(libs.bundles.poets)
+    implementation(libs.poetesse)
+    implementation(libs.kotlin.poet.ksp)
 
     implementation(libs.lapis.annotations)
     implementation(libs.kotlin.serialization.json)
@@ -21,7 +22,7 @@ dependencies {
 
 projekt {
     kotlinLibrary {
-        jvmTarget = JvmTarget.JVM_1_8
+        jvmTarget = JvmTarget.JVM_17
     }
 }
 

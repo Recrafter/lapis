@@ -1,41 +1,12 @@
 package io.github.recrafter.lapis.extensions.jp
 
-import com.palantir.javapoet.*
+import io.github.diskria.poetesse.java.*
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.GeneratorConstants
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-
-typealias JPCodeBlockBuilder = CodeBlock.Builder
-typealias JPCodeBlock = CodeBlock
-
-typealias JPAnnotationBuilder = AnnotationSpec.Builder
-typealias JPAnnotation = AnnotationSpec
-
-typealias JPFieldBuilder = FieldSpec.Builder
-typealias JPField = FieldSpec
-
-typealias JPMethodBuilder = MethodSpec.Builder
-typealias JPMethod = MethodSpec
-
-typealias JPParameterBuilder = ParameterSpec.Builder
-typealias JPParameter = ParameterSpec
-
-typealias JPClassBuilder = TypeSpec.Builder
-typealias JPClass = TypeSpec
-
-typealias JPFile = JavaFile
-
-typealias JPTypeName = TypeName
-typealias JPClassName = ClassName
-typealias JPParameterizedTypeName = ParameterizedTypeName
-typealias JPWildcardTypeName = WildcardTypeName
-typealias JPTypeVariableName = TypeVariableName
-typealias JPArrayTypeName = ArrayTypeName
-
-typealias JPModifier = javax.lang.model.element.Modifier
 
 val JPBoolean: JPTypeName = JPTypeName.BOOLEAN
 val JPByte: JPTypeName = JPTypeName.BYTE
@@ -88,15 +59,19 @@ fun buildJavaMethod(
         builder()
     }.build()
 
-fun buildJavaParameter(name: String, typeName: IrTypeName, builder: Builder<JPParameterBuilder> = {}): JPParameter =
+fun buildJavaParameter(
+    name: String,
+    typeName: IrTypeName,
+    builder: Builder<JPParameterBuilder> = {}
+): JPParameter =
     JPParameter.builder(typeName.java, name).apply(builder).build()
 
 fun buildJavaInterface(
     name: String,
     visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
-    builder: Builder<JPClassBuilder> = {}
-): JPClass =
-    JPClass.interfaceBuilder(name).apply {
+    builder: Builder<JPTypeBuilder> = {}
+): JPType =
+    JPType.interfaceBuilder(name).apply {
         addModifiers(visibility.java)
         builder()
     }.build()
@@ -104,14 +79,14 @@ fun buildJavaInterface(
 fun buildJavaClass(
     name: String,
     visibility: IrVisibilityModifier = IrVisibilityModifier.PUBLIC,
-    builder: Builder<JPClassBuilder> = {}
-): JPClass =
-    JPClass.classBuilder(name).apply {
+    builder: Builder<JPTypeBuilder> = {}
+): JPType =
+    JPType.classBuilder(name).apply {
         addModifiers(visibility.java)
         builder()
     }.build()
 
-fun buildJavaFile(className: IrClassName, builder: () -> JPClass): JPFile =
+fun buildJavaFile(className: IrClassName, builder: () -> JPType): JPFile =
     JPFile
         .builder(className.packageName, builder())
         .addFileComment(GeneratorConstants.GENERATED_HEADER)

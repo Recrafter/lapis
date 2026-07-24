@@ -16,6 +16,6 @@ class ParsedDescriptorGenericArgumentFunctionType(
 ) : ParsedDescriptorGenericArgument
 
 class ParsedFunctionTypeParameter(
-    val type: KSType,
+    val type: KSType?,
     val name: String?,
 )

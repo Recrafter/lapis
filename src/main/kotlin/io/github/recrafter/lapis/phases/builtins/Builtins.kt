@@ -3,10 +3,10 @@ package io.github.recrafter.lapis.phases.builtins
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.squareup.kotlinpoet.ksp.writeTo
+import io.github.diskria.poetesse.kotlin.KPType
+import io.github.diskria.poetesse.kotlin.KPTypeAlias
 import io.github.recrafter.lapis.Lapis
 import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.kp.KPClass
-import io.github.recrafter.lapis.extensions.kp.KPTypeAlias
 import io.github.recrafter.lapis.extensions.kp.buildKotlinFile
 import io.github.recrafter.lapis.extensions.kp.buildKotlinObject
 import io.github.recrafter.lapis.phases.generator.models.GenDescriptorWrapperImplResult
@@ -27,7 +27,7 @@ class Builtins(
         IrClassName.of(generatedModPackageName, Lapis.NAME)
 
     private val internalClassName: IrClassName =
-        IrClassName.of(externalClassName.packageName, externalClassName.simpleName + "Internal")
+        IrClassName.of(generatedModPackageName, Lapis.NAME + "Internal")
 
     private val requestedInternalBuiltins: MutableMap<String, Builtin<*>> = mutableMapOf()
 
@@ -41,7 +41,7 @@ class Builtins(
                 addTypeAlias(it)
             }
             addType(buildKotlinObject(externalClassName.simpleName) {
-                addTypes(externalBuiltins.filterIsInstance<KPClass>())
+                addTypes(externalBuiltins.filterIsInstance<KPType>())
             })
         }.writeTo(codeGenerator, Dependencies.ALL_FILES)
         isExternalGenerated = true
@@ -58,7 +58,7 @@ class Builtins(
             val builtins = requestedInternalBuiltins.values.map { it.generate(::get) }
             builtins.filterIsInstance<KPTypeAlias>().forEach(::addTypeAlias)
             addType(buildKotlinObject(internalClassName.simpleName) {
-                addTypes(builtins.filterIsInstance<KPClass>())
+                addTypes(builtins.filterIsInstance<KPType>())
             })
         }.writeTo(codeGenerator, Dependencies.ALL_FILES)
         isInternalGenerated = true

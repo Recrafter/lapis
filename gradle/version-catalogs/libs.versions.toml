@@ -8,10 +8,10 @@ mixin-extras = "0.5.3"
 
 asm = "9.9.1"
 
-lapis-annotations = "0.8.7"
+lapis-annotations = "0.9.0"
 
-java-poet = "0.14.0"
-kotlin-poet = "2.3.0"
+poetesse = "0.1.0"
+kotlin-poet-ksp = "2.3.0"
 
 kotlin-serialization-json = "1.11.0"
 
@@ -35,8 +35,8 @@ asm-commons = { group = "org.ow2.asm", name = "asm-commons", version.ref = "asm"
 
 lapis-annotations = { group = "io.github.recrafter", name = "lapis-annotations", version.ref = "lapis-annotations" }
 
-java-poet = { group = "com.palantir.javapoet", name = "javapoet", version.ref = "java-poet" }
-kotlin-poet = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "kotlin-poet" }
+poetesse = { group = "io.github.diskria", name = "poetesse", version.ref = "poetesse" }
+kotlin-poet-ksp = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "kotlin-poet-ksp" }
 
 kotlin-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json-jvm", version.ref = "kotlin-serialization-json" }
 
@@ -56,8 +56,4 @@ ksp = [
 mixins = [
     "mixin",
     "mixin-extras",
-]
-poets = [
-    "java-poet",
-    "kotlin-poet",
 ]

@@ -1,6 +1,7 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
 import com.google.devtools.ksp.symbol.KSFile
+import io.github.diskria.poetesse.kotlin.KPTypeKind
 import io.github.recrafter.lapis.phases.builtins.DescriptorWrapperBuiltin
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
@@ -11,7 +12,7 @@ sealed class IrDescriptorWrapperImpl<T : IrDescriptorWrapperImpl<T>>(
     val descriptorClassName: IrClassName,
     val wrapperBuiltin: DescriptorWrapperBuiltin<T>,
     val receiverTypeName: IrTypeName?,
-) : IrKotlinClassBlueprint(IrKotlinClassKind.CLASS) {
+) : IrKotlinClassBlueprint(KPTypeKind.CLASS) {
     override val className: IrClassName = descriptorClassName.derived(wrapperBuiltin.name)
 }
 

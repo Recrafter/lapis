@@ -5,6 +5,7 @@ import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Variance
 import com.squareup.kotlinpoet.ksp.toClassName
+import io.github.diskria.poetesse.java.JPModifier
 import io.github.recrafter.lapis.annotations.AccessStrategy
 import io.github.recrafter.lapis.annotations.Ats
 import io.github.recrafter.lapis.annotations.Op
@@ -14,7 +15,6 @@ import io.github.recrafter.lapis.common.KSBaseTypes
 import io.github.recrafter.lapis.common.findArrayComponentType
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.indexOfFirstOrNull
-import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.extensions.kp.KPBoolean
 import io.github.recrafter.lapis.extensions.ks.isValid
 import io.github.recrafter.lapis.extensions.ks.starProjectedType
@@ -39,6 +39,7 @@ import io.github.recrafter.lapis.phases.validator.models.common.*
 import io.github.recrafter.lapis.phases.validator.models.patches.*
 import io.github.recrafter.lapis.phases.validator.models.patches.hooks.*
 import io.github.recrafter.lapis.phases.validator.models.schemas.*
+import javax.lang.model.element.Modifier
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
@@ -82,13 +83,13 @@ class FrontendValidator(
         validateClassDeclaration(originClassDeclaration)
         kspRequire(
             listOf(
-                hasSchemaAnnotation,
-                hasInnerSchemaAnnotation,
-                hasLocalSchemaAnnotation,
-                hasAnonymousSchemaAnnotation,
+                hasClassAnnotation,
+                hasInnerClassAnnotation,
+                hasLocalClassAnnotation,
+                hasAnonymousClassAnnotation,
             ).count { it } == 1
         ) { "90" }
-        if (hasSchemaAnnotation) {
+        if (hasClassAnnotation) {
             kspRequire(isTopLevel) { "92" }
         }
         kspRequire(hasPackageName) { "94" }
@@ -128,11 +129,17 @@ class FrontendValidator(
         isAccessibleSchema: Boolean,
     ): Descriptor {
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "130" }
-        validateClassDeclaration(superClassDeclaration)
         kspRequire(isObject) { "132" }
+        kspRequire(
+            listOf(
+                hasFieldAnnotation,
+                hasMethodAnnotation,
+                hasConstructorAnnotation,
+            ).count { it } == 1
+        ) { "139" }
         val mappingName = resolveMappingName(explicitMappingName, name)
         val receiverType = schemaOriginClassDeclaration.starProjectedType
-        if (superClassDeclaration.isBuiltin(SimpleBuiltin.Field)) {
+        if (hasFieldAnnotation) {
             kspRequire(genericArgument is ParsedDescriptorGenericArgumentSimpleType) { "136" }
             validateType(genericArgument.type)
             val accessRequest = resolveAccessRequest(
@@ -153,16 +160,17 @@ class FrontendValidator(
                     baseTypes,
                     genericArgument.typeArguments.filterNotNull()
                 ),
-                isStatic = hasStaticAnnotation,
+                isStatic = isStatic,
                 accessRequest = accessRequest,
             )
         }
         kspRequire(genericArgument is ParsedDescriptorGenericArgumentFunctionType) { "160" }
         kspRequire(genericArgument.receiverType == null) { "161" }
         val functionTypeParameters = genericArgument.parameters.map { parameter ->
-            kspRequire(!parameter.type.isFunctionType) { "163" }
+            val type = kspRequireNotNull(parameter.type) { "170" }
+            kspRequire(!type.isFunctionType) { "163" }
             FunctionTypeParameter(
-                type = parameter.type,
+                type = type,
                 name = parameter.name,
             )
         }
@@ -172,7 +180,7 @@ class FrontendValidator(
             emptyList(), functionTypeParameters,
         )
         return when {
-            superClassDeclaration.isBuiltin(SimpleBuiltin.Method) -> {
+            hasMethodAnnotation -> {
                 MethodDescriptor(
                     symbol = symbol,
                     classDeclaration = classDeclaration,
@@ -183,12 +191,12 @@ class FrontendValidator(
                     returnType = genericArgument.returnType,
                     mappingName = mappingName,
                     functionTypeParameters = functionTypeParameters,
-                    isStatic = hasStaticAnnotation,
+                    isStatic = isStatic,
                     accessRequest = accessRequest,
                 )
             }
 
-            superClassDeclaration.isBuiltin(SimpleBuiltin.Constructor) -> {
+            hasConstructorAnnotation -> {
                 kspRequire(genericArgument.returnType == null) { "192" }
                 kspRequire(!hasMappingNameAnnotation) { "193" }
                 if (accessRequest is MixinAccessRequest) {
@@ -791,10 +799,10 @@ class FrontendValidator(
                     explicitAtLiteralFloat?.let(::FloatHookLiteral),
                     explicitAtLiteralDouble?.let(::DoubleHookLiteral),
                     explicitAtLiteralString?.let(::StringHookLiteral),
-                    explicitAtLiteralClassType?.let {
-                        ClassHookLiteral(validateClassDeclaration(explicitAtLiteralClassDeclaration))
+                    explicitAtLiteralType?.let {
+                        ClassHookLiteral(validateClassDeclaration(explicitAtLiteralTypeClassDeclaration))
                     },
-                    explicitAtLiteralNull?.let { NullHookLiteral },
+                    if (isExplicitAtLiteralNull) NullHookLiteral else null,
                 ).singleOrNull()
             }
         ) { "800" }
@@ -853,10 +861,12 @@ class FrontendValidator(
                     MixinInvokableAccessRequest(parameters)
                 }
             }
+
+            AccessStrategy.Reflection -> TODO()
         }
     }
 
-    private fun SymbolSource.resolveModifiers(modifiers: List<JPModifier>, isMethod: Boolean): Set<JPModifier> {
+    private fun SymbolSource.resolveModifiers(modifiers: List<Modifier>, isMethod: Boolean): Set<Modifier> {
         val set = modifiers.toSet()
         val allowed = if (isMethod) JavaModifiers.methodAllowed else JavaModifiers.fieldAllowed
         kspRequire(allowed.containsAll(set)) { "862" }
@@ -866,12 +876,12 @@ class FrontendValidator(
             if (JPModifier.ABSTRACT in set) {
                 kspRequire(set.none { it in JavaModifiers.abstractIllegals }) { "867" }
             }
-            if (JPModifier.NATIVE in set) {
-                kspRequire(JPModifier.DEFAULT !in set) { "870" }
+            if (Modifier.NATIVE in set) {
+                kspRequire(Modifier.DEFAULT !in set) { "870" }
             }
         } else {
-            if (JPModifier.FINAL in set) {
-                kspRequire(JPModifier.VOLATILE !in set) { "874" }
+            if (Modifier.FINAL in set) {
+                kspRequire(Modifier.VOLATILE !in set) { "874" }
             }
         }
         return set

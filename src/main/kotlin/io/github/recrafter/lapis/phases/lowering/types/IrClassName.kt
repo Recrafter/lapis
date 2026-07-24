@@ -1,15 +1,17 @@
 package io.github.recrafter.lapis.phases.lowering.types
 
+import io.github.diskria.poetesse.java.JPClassName
+import io.github.diskria.poetesse.kotlin.KPClassName
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.lowering.asIrClassName
 
 class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
 
-    val packageName: String = kotlin.packageName
+    val packageName: String? = kotlin.packageName.takeIf { it.isNotEmpty() }
     val simpleName: String = kotlin.simpleName
     val nestedName: String = kotlin.simpleNames.joinToString(".")
-    val qualifiedName: String = "$packageName.$nestedName"
+    val qualifiedName: String = listOfNotNull(packageName, nestedName).joinToString(".")
     val binaryName: String get() = java.binaryName
     val internalName: String get() = java.internalName
 
@@ -35,7 +37,7 @@ class IrClassName(override val kotlin: KPClassName) : IrTypeName(kotlin) {
         of(packageName, (kotlin.simpleNames + suffix).joinToString("_"))
 
     companion object {
-        fun of(packageName: String, vararg names: String): IrClassName =
-            KPClassName(packageName, *names).asIrClassName()
+        fun of(packageName: String?, vararg names: String): IrClassName =
+            KPClassName(packageName.orEmpty(), *names).asIrClassName()
     }
 }

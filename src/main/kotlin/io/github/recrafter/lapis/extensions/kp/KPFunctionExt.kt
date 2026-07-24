@@ -3,6 +3,9 @@ package io.github.recrafter.lapis.extensions.kp
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
 import com.squareup.kotlinpoet.ContextParameter
 import com.squareup.kotlinpoet.ExperimentalKotlinPoetApi
+import io.github.diskria.poetesse.kotlin.KPAnnotationBuilder
+import io.github.diskria.poetesse.kotlin.KPFunctionBuilder
+import io.github.diskria.poetesse.kotlin.KPParameter
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.builders.GenKotlinFunctionBody
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter

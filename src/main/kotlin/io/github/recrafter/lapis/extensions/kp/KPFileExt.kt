@@ -1,6 +1,8 @@
 package io.github.recrafter.lapis.extensions.kp
 
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
+import io.github.diskria.poetesse.kotlin.KPAnnotationBuilder
+import io.github.diskria.poetesse.kotlin.KPFileBuilder
 import io.github.recrafter.lapis.extensions.common.Builder
 
 inline fun <reified A : Annotation> KPFileBuilder.addAnnotation(

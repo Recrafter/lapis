@@ -1,7 +1,8 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
 import com.google.devtools.ksp.symbol.KSFile
-import io.github.recrafter.lapis.extensions.jp.JPModifier
+import io.github.diskria.poetesse.java.JPModifier
+import io.github.diskria.poetesse.kotlin.KPTypeKind
 import io.github.recrafter.lapis.phases.lowering.models.common.IrMixinAnnotation
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
@@ -11,7 +12,7 @@ sealed class IrMixinBridge(
     override val originatingFiles: List<KSFile>,
     override val className: IrClassName,
     open val entries: List<IrMixinBridgeEntry>,
-) : IrKotlinClassBlueprint(IrKotlinClassKind.INTERFACE)
+) : IrKotlinClassBlueprint(KPTypeKind.INTERFACE)
 
 class IrMixinExternalBridge(
     originatingFiles: List<KSFile>,

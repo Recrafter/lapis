@@ -5,14 +5,17 @@ import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import io.github.diskria.poetesse.java.JPModifier
+import io.github.diskria.poetesse.kotlin.*
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.common.JavaModifiers
 import io.github.recrafter.lapis.common.binaryName
 import io.github.recrafter.lapis.common.getMixinReference
 import io.github.recrafter.lapis.extensions.common.lapisError
-import io.github.recrafter.lapis.extensions.jp.JPModifier
-import io.github.recrafter.lapis.extensions.kp.*
+import io.github.recrafter.lapis.extensions.kp.KPBoolean
+import io.github.recrafter.lapis.extensions.kp.KPInt
+import io.github.recrafter.lapis.extensions.kp.KPStar
 import io.github.recrafter.lapis.extensions.withInternalPrefix
 import io.github.recrafter.lapis.logging.Logger
 import io.github.recrafter.lapis.phases.bootstrap.Options
@@ -732,7 +735,7 @@ class Lowering(
             append(options.generatedMixinPackageName)
             if (sourcePackageName != sourcePackageLCP) {
                 append(".")
-                append(sourcePackageName.removePrefix("$sourcePackageLCP."))
+                append(sourcePackageName.orEmpty().removePrefix("$sourcePackageLCP."))
             }
         }
         return IrClassName.of(mixinPackageName, sourceClassName.simpleName).derived(suffix)
@@ -791,8 +794,8 @@ class Lowering(
 
     private fun findMixinSourcePackageLCP(sources: List<SourceFile>): String =
         sources.map { it.className.packageName }.reduceOrNull { lcp, next ->
-            val currentParts = lcp.split('.')
-            val nextParts = next.split('.')
+            val currentParts = lcp.orEmpty().split('.')
+            val nextParts = next.orEmpty().split('.')
             currentParts.zip(nextParts).takeWhile { (current, next) -> current == next }.joinToString(".") { it.first }
         }.orEmpty()
 

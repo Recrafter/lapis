@@ -13,6 +13,13 @@ import com.llamalad7.mixinextras.sugar.Local
 import com.llamalad7.mixinextras.sugar.Share
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ksp.writeTo
+import io.github.diskria.poetesse.PoetesseFile
+import io.github.diskria.poetesse.java.*
+import io.github.diskria.poetesse.kotlin.KPFileBuilder
+import io.github.diskria.poetesse.kotlin.KPModifier
+import io.github.diskria.poetesse.kotlin.KPTypeBuilder
+import io.github.diskria.poetesse.kotlin.KPTypeKind
+import io.github.diskria.poetesse.poetesse
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.common.JvmClassName
@@ -56,7 +63,39 @@ class Generator(
     private val codeGenerator: CodeGenerator,
     @Suppress("unused") private val logger: Logger,
 ) {
+    // TODO move to poetesse-ksp
+    fun PoetesseFile.writeWith(
+        codeGenerator: CodeGenerator,
+        aggregating: Boolean,
+        originatingKSFiles: Iterable<KSFile>,
+    ) {
+        writeWith(codeGenerator, Dependencies(aggregating, *originatingKSFiles.toList().toTypedArray()))
+    }
+
+    fun PoetesseFile.writeWith(codeGenerator: CodeGenerator, dependencies: Dependencies) {
+        codeGenerator
+            .createNewFile(dependencies, packageName.orEmpty(), fileName, extensionName)
+            .writer()
+            .use(::writeTo)
+    }
+
     fun generate(schemas: List<IrSchema>, patches: List<IrPatch>) {
+        // TODO remove :D
+        poetesse {
+            java.file("com.example", "HelloWorld") {
+                class_(fileName) {
+                    public(); abstract()
+                    method("main") {
+                        static()
+                        body {
+                            val greeting = "Hello, World!"
+                            line { "${T<System>()}.out.println(${S(greeting)})" }
+                        }
+                    }
+                }
+            }
+        }.writeWith(codeGenerator, dependencies = Dependencies.ALL_FILES)
+
         schemas.forEach { schema ->
             val extensionPackAccumulator = GenExtensionPackAccumulator()
             schema.descriptors.forEach { descriptor ->
@@ -363,7 +402,7 @@ class Generator(
         }
     }
 
-    private fun generatePatchInitializer(destination: JPClassBuilder, impl: IrPatchImpl): GenJavaEntity {
+    private fun generatePatchInitializer(destination: JPTypeBuilder, impl: IrPatchImpl): GenJavaEntity {
         val constructorArgumentCodeBlocks = impl.constructorParameters.map { parameter ->
             when (parameter) {
                 is IrPatchImplConstructorInstanceParameter -> {
@@ -498,123 +537,123 @@ class Generator(
                     val callbackParameterName = "callback".withInternalPrefix()
                     val annotations = listOf(
                         when (injection) {
-                        is IrWrapMethodHookInjection -> buildJavaAnnotation<WrapMethod> {
-                            setArgumentValue(WrapMethod::method, listOf(injection.methodMixinReference))
-                        }
+                            is IrWrapMethodHookInjection -> buildJavaAnnotation<WrapMethod> {
+                                setArgumentValue(WrapMethod::method, listOf(injection.methodMixinReference))
+                            }
 
-                        is IrInjectHookInjection -> buildJavaAnnotation<Inject> {
-                            setArgumentValue(Inject::method, listOf(injection.methodMixinReference))
-                            setArgumentValue<Inject, At>(Inject::at) {
-                                setArgumentValue(
-                                    At::value,
-                                    when (injection) {
-                                        is IrConstructorHeadHookInjection -> "CTOR_HEAD"
-                                        is IrMethodHeadHookInjection -> "HEAD"
-                                        is IrReturnHookInjection -> if (injection.isTail) "TAIL" else "RETURN"
+                            is IrInjectHookInjection -> buildJavaAnnotation<Inject> {
+                                setArgumentValue(Inject::method, listOf(injection.methodMixinReference))
+                                setArgumentValue<Inject, At>(Inject::at) {
+                                    setArgumentValue(
+                                        At::value,
+                                        when (injection) {
+                                            is IrConstructorHeadHookInjection -> "CTOR_HEAD"
+                                            is IrMethodHeadHookInjection -> "HEAD"
+                                            is IrReturnHookInjection -> if (injection.isTail) "TAIL" else "RETURN"
+                                        }
+                                    )
+                                    if (injection is IrConstructorHeadHookInjection) {
+                                        setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
                                     }
-                                )
-                                if (injection is IrConstructorHeadHookInjection) {
+                                    injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                    setArgumentValue(At::unsafe, true)
+                                }
+                                if (hasCancelArgument) {
+                                    setArgumentValue(Inject::cancellable, true)
+                                }
+                            }
+
+                            is IrModifyVariableHookInjection -> buildJavaAnnotation<ModifyVariable> {
+                                setArgumentValue(ModifyVariable::method, listOf(injection.methodMixinReference))
+                                when (val local = injection.local) {
+                                    is IrNamedLocal -> setArgumentValue(ModifyVariable::name, listOf(local.name))
+                                    is IrPositionalLocal -> setArgumentValue(ModifyVariable::ordinal, local.ordinal)
+                                }
+                                setArgumentValue<ModifyVariable, At>(ModifyVariable::at) {
+                                    val atCode = when (injection.op) {
+                                        Op.Get -> "LOAD"
+                                        Op.Set -> "STORE"
+                                    }
+                                    setArgumentValue(At::value, atCode)
+                                    injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                    setArgumentValue(At::unsafe, true)
+                                }
+                            }
+
+                            is IrModifyReturnValueHookInjection -> buildJavaAnnotation<ModifyReturnValue> {
+                                setArgumentValue(ModifyReturnValue::method, listOf(injection.methodMixinReference))
+                                setArgumentValue<ModifyReturnValue, At>(ModifyReturnValue::at) {
+                                    setArgumentValue(At::value, "RETURN")
+                                    injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                    setArgumentValue(At::unsafe, true)
+                                }
+                            }
+
+                            is IrWrapOperationHookInjection -> buildJavaAnnotation<WrapOperation> {
+                                setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
+                                setArgumentValue<WrapOperation, At>(WrapOperation::at) {
+                                    setArgumentValue(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
+                                    setArgumentValue(At::target, injection.targetMixinReference)
+                                    injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                    setArgumentValue(At::unsafe, true)
+                                }
+                            }
+
+                            is IrModifyExpressionValueHookInjection -> buildJavaAnnotation<ModifyExpressionValue> {
+                                setArgumentValue(ModifyExpressionValue::method, listOf(injection.methodMixinReference))
+                                setArgumentValue<ModifyExpressionValue, At>(ModifyExpressionValue::at) {
+                                    setArgumentValue(At::value, "CONSTANT")
                                     setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
+                                    injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                    setArgumentValue(At::unsafe, true)
                                 }
-                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                                setArgumentValue(At::unsafe, true)
                             }
-                            if (hasCancelArgument) {
-                                setArgumentValue(Inject::cancellable, true)
-                            }
-                        }
 
-                        is IrModifyVariableHookInjection -> buildJavaAnnotation<ModifyVariable> {
-                            setArgumentValue(ModifyVariable::method, listOf(injection.methodMixinReference))
-                            when (val local = injection.local) {
-                                is IrNamedLocal -> setArgumentValue(ModifyVariable::name, listOf(local.name))
-                                is IrPositionalLocal -> setArgumentValue(ModifyVariable::ordinal, local.ordinal)
-                            }
-                            setArgumentValue<ModifyVariable, At>(ModifyVariable::at) {
-                                val atCode = when (injection.op) {
-                                    Op.Get -> "LOAD"
-                                    Op.Set -> "STORE"
-                                }
-                                setArgumentValue(At::value, atCode)
-                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                                setArgumentValue(At::unsafe, true)
-                            }
-                        }
+                            is IrFieldGetHookInjection, is IrFieldSetHookInjection -> buildJavaAnnotation<WrapOperation> {
+                                setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
+                                setArgumentValue<WrapOperation, At>(WrapOperation::at) {
+                                    setArgumentValue(At::value, "FIELD")
+                                    setArgumentValue(At::target, injection.targetMixinReference)
+                                    val opcode = when (injection) {
+                                        is IrFieldGetHookInjection -> {
+                                            if (injection.isStaticTarget) Opcodes.GETSTATIC
+                                            else Opcodes.GETFIELD
+                                        }
 
-                        is IrModifyReturnValueHookInjection -> buildJavaAnnotation<ModifyReturnValue> {
-                            setArgumentValue(ModifyReturnValue::method, listOf(injection.methodMixinReference))
-                            setArgumentValue<ModifyReturnValue, At>(ModifyReturnValue::at) {
-                                setArgumentValue(At::value, "RETURN")
-                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                                setArgumentValue(At::unsafe, true)
-                            }
-                        }
-
-                        is IrWrapOperationHookInjection -> buildJavaAnnotation<WrapOperation> {
-                            setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
-                            setArgumentValue<WrapOperation, At>(WrapOperation::at) {
-                                setArgumentValue(At::value, if (injection.isConstructorCall) "NEW" else "INVOKE")
-                                setArgumentValue(At::target, injection.targetMixinReference)
-                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                                setArgumentValue(At::unsafe, true)
-                            }
-                        }
-
-                        is IrModifyExpressionValueHookInjection -> buildJavaAnnotation<ModifyExpressionValue> {
-                            setArgumentValue(ModifyExpressionValue::method, listOf(injection.methodMixinReference))
-                            setArgumentValue<ModifyExpressionValue, At>(ModifyExpressionValue::at) {
-                                setArgumentValue(At::value, "CONSTANT")
-                                setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
-                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                                setArgumentValue(At::unsafe, true)
-                            }
-                        }
-
-                        is IrFieldGetHookInjection, is IrFieldSetHookInjection -> buildJavaAnnotation<WrapOperation> {
-                            setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
-                            setArgumentValue<WrapOperation, At>(WrapOperation::at) {
-                                setArgumentValue(At::value, "FIELD")
-                                setArgumentValue(At::target, injection.targetMixinReference)
-                                val opcode = when (injection) {
-                                    is IrFieldGetHookInjection -> {
-                                        if (injection.isStaticTarget) Opcodes.GETSTATIC
-                                        else Opcodes.GETFIELD
+                                        is IrFieldSetHookInjection -> {
+                                            if (injection.isStaticTarget) Opcodes.PUTSTATIC
+                                            else Opcodes.PUTFIELD
+                                        }
                                     }
-
-                                    is IrFieldSetHookInjection -> {
-                                        if (injection.isStaticTarget) Opcodes.PUTSTATIC
-                                        else Opcodes.PUTFIELD
-                                    }
+                                    setArgumentValue(At::opcode, opcode)
+                                    injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                    setArgumentValue(At::unsafe, true)
                                 }
-                                setArgumentValue(At::opcode, opcode)
-                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                                setArgumentValue(At::unsafe, true)
                             }
-                        }
 
-                        is IrArrayHookInjection -> buildJavaAnnotation<Redirect> {
-                            setArgumentValue(Redirect::method, listOf(injection.methodMixinReference))
-                            setArgumentValue<Redirect, At>(Redirect::at) {
-                                setArgumentValue(At::value, "FIELD")
-                                setArgumentValue(At::target, injection.targetMixinReference)
-                                setArgumentValue(
-                                    At::opcode,
-                                    if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD
-                                )
-                                setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
-                                injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
-                                setArgumentValue(At::unsafe, true)
+                            is IrArrayHookInjection -> buildJavaAnnotation<Redirect> {
+                                setArgumentValue(Redirect::method, listOf(injection.methodMixinReference))
+                                setArgumentValue<Redirect, At>(Redirect::at) {
+                                    setArgumentValue(At::value, "FIELD")
+                                    setArgumentValue(At::target, injection.targetMixinReference)
+                                    setArgumentValue(
+                                        At::opcode,
+                                        if (injection.isStaticTarget) Opcodes.GETSTATIC else Opcodes.GETFIELD
+                                    )
+                                    setArgumentValue(At::args, injection.atArgs.map { "${it.first}=${it.second}" })
+                                    injection.ordinal?.let { setArgumentValue(At::ordinal, it) }
+                                    setArgumentValue(At::unsafe, true)
+                                }
                             }
-                        }
 
-                        is IrInstanceofHookInjection -> buildJavaAnnotation<WrapOperation> {
-                            setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
-                            setArgumentValue<WrapOperation, Constant>(WrapOperation::constant) {
-                                setArgumentValue(Constant::classValue, injection.className)
-                                injection.ordinal?.let { setArgumentValue(Constant::ordinal, it) }
+                            is IrInstanceofHookInjection -> buildJavaAnnotation<WrapOperation> {
+                                setArgumentValue(WrapOperation::method, listOf(injection.methodMixinReference))
+                                setArgumentValue<WrapOperation, Constant>(WrapOperation::constant) {
+                                    setArgumentValue(Constant::classValue, injection.className)
+                                    injection.ordinal?.let { setArgumentValue(Constant::ordinal, it) }
+                                }
                             }
-                        }
-                    })
+                        })
                     val parameters = injection.parameters.map { parameter ->
                         when (parameter) {
                             is IrInjectionReceiverParameter -> {
@@ -880,7 +919,7 @@ class Generator(
         override val originatingFiles: List<KSFile>,
         override val className: IrClassName,
         val entries: List<IrMixinInternalBridgeShadowEntry>,
-    ) : IrKotlinClassBlueprint(IrKotlinClassKind.OBJECT)
+    ) : IrKotlinClassBlueprint(KPTypeKind.OBJECT)
 
     private fun generateStaticBridge(
         bridge: IrMixinStaticBridge,
@@ -1180,7 +1219,7 @@ class Generator(
         blueprint: IrKotlinClassBlueprint,
         aggregating: Boolean,
         suppressNames: List<String> = emptyList(),
-        builder: Builder<KPClassBuilder> = {}
+        builder: Builder<KPTypeBuilder> = {}
     ) {
         val name = blueprint.className.simpleName
         val file = buildKotlinFile(blueprint.className) {
@@ -1190,10 +1229,10 @@ class Generator(
                 }
             }
             addType(
-                when (blueprint.classKind) {
-                    IrKotlinClassKind.INTERFACE -> buildKotlinInterface(name, builder = builder)
-                    IrKotlinClassKind.CLASS -> buildKotlinClass(name, builder = builder)
-                    IrKotlinClassKind.OBJECT -> buildKotlinObject(name, builder = builder)
+                when (blueprint.typeKind) {
+                    KPTypeKind.CLASS -> buildKotlinClass(name, builder = builder)
+                    KPTypeKind.OBJECT -> buildKotlinObject(name, builder = builder)
+                    KPTypeKind.INTERFACE -> buildKotlinInterface(name, builder = builder)
                 }
             )
         }
@@ -1204,11 +1243,11 @@ class Generator(
         blueprint: IrJavaFileBlueprint,
         aggregating: Boolean,
         suppressNames: List<String> = emptyList(),
-        builder: Builder<JPClassBuilder> = {}
+        builder: Builder<JPTypeBuilder> = {}
     ) {
         val name = blueprint.className.simpleName
         val file = buildJavaFile(blueprint.className) {
-            val builder: Builder<JPClassBuilder> = {
+            val builder: Builder<JPTypeBuilder> = {
                 if (suppressNames.isNotEmpty()) {
                     addAnnotation<SuppressWarnings> {
                         setArgumentValue(SuppressWarnings::value, suppressNames)
@@ -1216,14 +1255,15 @@ class Generator(
                 }
                 builder()
             }
-            when (blueprint.classKind) {
-                IrJavaClassKind.INTERFACE -> buildJavaInterface(name, builder = builder)
-                IrJavaClassKind.CLASS -> buildJavaClass(name, builder = builder)
+            when (blueprint.typeKind) {
+                JPTypeKind.CLASS -> buildJavaClass(name, builder = builder)
+                JPTypeKind.INTERFACE -> buildJavaInterface(name, builder = builder)
+                else -> TODO()
             }
         }
         codeGenerator.createNewFile(
             dependencies = Dependencies(aggregating, *blueprint.originatingFiles.toTypedArray()),
-            packageName = blueprint.className.packageName,
+            packageName = blueprint.className.packageName.orEmpty(),
             fileName = name,
             extensionName = "java",
         ).writer().use { file.writeTo(it) }
@@ -1231,10 +1271,10 @@ class Generator(
 
     private fun generateResourceFile(blueprint: IrResourceBlueprint, aggregating: Boolean, buildText: () -> String) {
         val text = buildText().trimEnd() + "\n"
-        codeGenerator.createNewFile(
+
+        codeGenerator.createNewFileByPath(
             dependencies = Dependencies(aggregating, *blueprint.originatingFiles.toTypedArray()),
-            packageName = "",
-            fileName = blueprint.path,
+            path = blueprint.path,
             extensionName = "",
         ).writer().use { it.write(text) }
     }

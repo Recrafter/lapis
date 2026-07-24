@@ -1,6 +1,6 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
-import io.github.recrafter.lapis.extensions.kp.KPProperty
+import io.github.diskria.poetesse.kotlin.KPProperty
 import io.github.recrafter.lapis.extensions.kp.buildKotlinProperty
 import io.github.recrafter.lapis.phases.lowering.IrVisibilityModifier
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName

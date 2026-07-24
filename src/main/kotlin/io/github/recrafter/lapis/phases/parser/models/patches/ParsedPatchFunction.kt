@@ -8,9 +8,9 @@ import io.github.recrafter.lapis.annotations.Ats
 import io.github.recrafter.lapis.annotations.ConstructorHeadPhase
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.annotations.ZeroCondition
-import io.github.recrafter.lapis.extensions.jp.JPModifier
 import io.github.recrafter.lapis.phases.parser.models.common.ParsedAnnotation
 import io.github.recrafter.lapis.phases.parser.models.common.SymbolSource
+import javax.lang.model.element.Modifier
 
 class ParsedPatchFunction(
     override val symbol: KSNode,
@@ -29,7 +29,7 @@ class ParsedPatchFunction(
     val hasExtensionAnnotation: Boolean,
     val hasShadowAnnotation: Boolean,
     val explicitMappingName: String?,
-    val shadowModifiers: List<JPModifier>,
+    val shadowModifiers: List<Modifier>,
 
     val hasHookAnnotation: Boolean,
     val hookDescClassDeclaration: KSClassDeclaration?,
@@ -60,9 +60,9 @@ class ParsedPatchFunction(
     val explicitAtLiteralFloat: Float?,
     val explicitAtLiteralDouble: Double?,
     val explicitAtLiteralString: String?,
-    val explicitAtLiteralClassType: KSType?,
-    val explicitAtLiteralClassDeclaration: KSClassDeclaration?,
-    val explicitAtLiteralNull: KSAnnotation?,
+    val explicitAtLiteralType: KSType?,
+    val explicitAtLiteralTypeClassDeclaration: KSClassDeclaration?,
+    val isExplicitAtLiteralNull: Boolean,
     val atLiteralOrdinals: List<Int>,
 
     val hasAtFieldAnnotation: Boolean,

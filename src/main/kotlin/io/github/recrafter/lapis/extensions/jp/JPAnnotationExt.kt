@@ -1,5 +1,6 @@
 package io.github.recrafter.lapis.extensions.jp
 
+import io.github.diskria.poetesse.java.JPAnnotationBuilder
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrJavaCodeBlock
 import io.github.recrafter.lapis.phases.generator.builders.toCodeBlock

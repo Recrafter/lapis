@@ -1,8 +1,8 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
+import io.github.diskria.poetesse.kotlin.KPCodeBlock
+import io.github.diskria.poetesse.kotlin.KPFunctionBuilder
 import io.github.recrafter.lapis.extensions.common.Builder
-import io.github.recrafter.lapis.extensions.kp.KPCodeBlock
-import io.github.recrafter.lapis.extensions.kp.KPFunctionBuilder
 import io.github.recrafter.lapis.extensions.kp.buildKotlinCodeBlock
 
 @JvmInline

@@ -24,14 +24,8 @@ value class KSBaseTypes(private val builtins: KSBuiltIns) {
     val array: KSType get() = builtins.arrayType
 }
 
-fun KSType.isNothing(baseTypes: KSBaseTypes): Boolean =
-    this == baseTypes.nothing
-
 fun KSType.isUnit(baseTypes: KSBaseTypes): Boolean =
     this == baseTypes.unit
-
-fun KSType.isAny(baseTypes: KSBaseTypes): Boolean =
-    this == baseTypes.any
 
 fun KSType.isArray(baseTypes: KSBaseTypes): Boolean =
     this == baseTypes.array

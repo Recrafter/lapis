@@ -1,9 +1,14 @@
 package io.github.recrafter.lapis.extensions.kp
 
+import io.github.diskria.poetesse.kotlin.KPParameter
+import io.github.diskria.poetesse.kotlin.KPParameterBuilder
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.builders.IrKotlinCodeBlock
 
-fun KPParameterBuilder.setDefaultValue(format: String, argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments>) {
+fun KPParameterBuilder.setDefaultValue(
+    format: String,
+    argumentsBuilder: Builder<IrKotlinCodeBlock.Arguments>
+) {
     defaultValue(buildKotlinCodeBlock(format, argumentsBuilder))
 }
 

@@ -1,6 +1,8 @@
 package io.github.recrafter.lapis.phases.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
+import io.github.diskria.poetesse.kotlin.KPModifier
+import io.github.diskria.poetesse.kotlin.KPType
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.phases.generator.builders.nullKotlinCodeBlock
 import io.github.recrafter.lapis.phases.generator.builders.toKotlinCodeBlock
@@ -12,44 +14,9 @@ import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.toKotlinConstructorProperty
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeVariableName
 
-enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPClass> {
-    Field {
-        override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
-            buildKotlinInterface(name) {
-                setVariableTypes(IrTypeVariableName.of("T"))
-            }
-    },
-    Callable {
-        override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
-            buildKotlinInterface(name) {
-                addModifiers(KPModifier.SEALED)
-                setVariableTypes(IrTypeVariableName.of("F", Function::class.asIrParameterizedTypeName()))
-            }
-    },
-    Method {
-        override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
-            buildKotlinInterface(name) {
-                val functionTypeVariableName = IrTypeVariableName.of(
-                    "F",
-                    Function::class.asIrParameterizedTypeName()
-                )
-                setVariableTypes(functionTypeVariableName)
-                addSuperInterface(resolveBuiltin(Callable).parameterizedBy(functionTypeVariableName))
-            }
-    },
-    Constructor {
-        override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
-            buildKotlinInterface(name) {
-                val functionTypeVariableName = IrTypeVariableName.of(
-                    "F",
-                    Function::class.asIrParameterizedTypeName()
-                )
-                setVariableTypes(functionTypeVariableName)
-                addSuperInterface(resolveBuiltin(Callable).parameterizedBy(functionTypeVariableName))
-            }
-    },
+enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPType> {
     LocalVar {
-        override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
+        override fun generate(resolveBuiltin: BuiltinResolver): KPType =
             buildKotlinInterface(name) {
                 addModifiers(KPModifier.SEALED)
                 val localTypeVariableName = IrTypeVariableName.of("T")
@@ -61,7 +28,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             }
     },
     Instanceof {
-        override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
+        override fun generate(resolveBuiltin: BuiltinResolver): KPType =
             buildKotlinClass(name) {
                 val valueParameter = IrParameter("value", KPAny.asIrClassName())
                 val operationParameter = IrParameter(
@@ -89,7 +56,7 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             }
     },
     CancelSignal(isInternal = true) {
-        override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
+        override fun generate(resolveBuiltin: BuiltinResolver): KPType =
             buildKotlinObject(name) {
                 setSuperClass(
                     RuntimeException::class.asIrTypeName(),
@@ -108,5 +75,5 @@ enum class SimpleBuiltin(override val isInternal: Boolean = false) : Builtin<KPC
             }
     };
 
-    abstract override fun generate(resolveBuiltin: BuiltinResolver): KPClass
+    abstract override fun generate(resolveBuiltin: BuiltinResolver): KPType
 }

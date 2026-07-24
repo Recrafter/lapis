@@ -1,6 +1,10 @@
 package io.github.recrafter.lapis.extensions.kp
 
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget
+import io.github.diskria.poetesse.kotlin.KPAnnotationBuilder
+import io.github.diskria.poetesse.kotlin.KPFunctionBuilder
+import io.github.diskria.poetesse.kotlin.KPProperty
+import io.github.diskria.poetesse.kotlin.KPPropertyBuilder
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 

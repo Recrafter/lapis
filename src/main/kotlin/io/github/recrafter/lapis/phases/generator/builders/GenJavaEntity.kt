@@ -1,7 +1,7 @@
 package io.github.recrafter.lapis.phases.generator.builders
 
-import io.github.recrafter.lapis.extensions.jp.JPField
-import io.github.recrafter.lapis.extensions.jp.JPMethod
+import io.github.diskria.poetesse.java.JPField
+import io.github.diskria.poetesse.java.JPMethod
 import io.github.recrafter.lapis.phases.lowering.models.IrParameter
 import io.github.recrafter.lapis.phases.lowering.models.format
 

@@ -1,10 +1,10 @@
 package io.github.recrafter.lapis.phases.lowering.types
 
+import io.github.diskria.poetesse.java.JPWildcardTypeName
+import io.github.diskria.poetesse.kotlin.KPWildcardTypeName
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.JPObject
-import io.github.recrafter.lapis.extensions.jp.JPWildcardTypeName
 import io.github.recrafter.lapis.extensions.kp.KPStar
-import io.github.recrafter.lapis.extensions.kp.KPWildcardTypeName
 import io.github.recrafter.lapis.extensions.quoted
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName
 

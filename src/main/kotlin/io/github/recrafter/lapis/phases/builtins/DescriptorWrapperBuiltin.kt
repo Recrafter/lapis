@@ -1,6 +1,9 @@
 package io.github.recrafter.lapis.phases.builtins
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation
+import io.github.diskria.poetesse.kotlin.KPModifier
+import io.github.diskria.poetesse.kotlin.KPParameter
+import io.github.diskria.poetesse.kotlin.KPType
 import io.github.recrafter.lapis.common.jvmDescriptor
 import io.github.recrafter.lapis.extensions.kp.*
 import io.github.recrafter.lapis.extensions.withInternalPrefix
@@ -20,12 +23,9 @@ import io.github.recrafter.lapis.phases.lowering.types.orVoid
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 
-sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
-    override val name: String,
-    val builtin: SimpleBuiltin,
-) : Builtin<KPClass> {
+sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(override val name: String) : Builtin<KPType> {
 
-    data object FieldGet : DescriptorWrapperBuiltin<IrFieldGetDescriptorWrapperImpl>("FieldGet", SimpleBuiltin.Field) {
+    data object FieldGet : DescriptorWrapperBuiltin<IrFieldGetDescriptorWrapperImpl>("FieldGet") {
         override fun generateImpl(
             impl: IrFieldGetDescriptorWrapperImpl,
             superClassTypeName: IrParameterizedTypeName,
@@ -73,7 +73,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
         }
     }
 
-    data object FieldSet : DescriptorWrapperBuiltin<IrFieldSetDescriptorWrapperImpl>("FieldSet", SimpleBuiltin.Field) {
+    data object FieldSet : DescriptorWrapperBuiltin<IrFieldSetDescriptorWrapperImpl>("FieldSet") {
         override fun generateImpl(
             impl: IrFieldSetDescriptorWrapperImpl,
             superClassTypeName: IrParameterizedTypeName,
@@ -135,7 +135,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
         }
     }
 
-    data object ArrayGet : DescriptorWrapperBuiltin<IrArrayGetDescriptorWrapperImpl>("ArrayGet", SimpleBuiltin.Field) {
+    data object ArrayGet : DescriptorWrapperBuiltin<IrArrayGetDescriptorWrapperImpl>("ArrayGet") {
         override fun generateImpl(
             impl: IrArrayGetDescriptorWrapperImpl,
             superClassTypeName: IrParameterizedTypeName,
@@ -188,7 +188,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
         }
     }
 
-    data object ArraySet : DescriptorWrapperBuiltin<IrArraySetDescriptorWrapperImpl>("ArraySet", SimpleBuiltin.Field) {
+    data object ArraySet : DescriptorWrapperBuiltin<IrArraySetDescriptorWrapperImpl>("ArraySet") {
         override fun generateImpl(
             impl: IrArraySetDescriptorWrapperImpl,
             superClassTypeName: IrParameterizedTypeName,
@@ -220,17 +220,16 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
                     }
                 }
             }.also { extensionPackEntities += GenKotlinPropertyEntity(it) }
-            val valueProperty = buildKotlinProperty(
-                "value", valueConstructorParameter.typeName, jvmNamespace = impl.className
-            ) {
-                setReceiverType(superClassTypeName)
-                setGetter {
-                    addModifiers(KPModifier.INLINE)
-                    setBody {
-                        return_("(this as %T).%N") { +impl.className; +valueConstructorParameter }
+            val valueProperty =
+                buildKotlinProperty("value", valueConstructorParameter.typeName, jvmNamespace = impl.className) {
+                    setReceiverType(superClassTypeName)
+                    setGetter {
+                        addModifiers(KPModifier.INLINE)
+                        setBody {
+                            return_("(this as %T).%N") { +impl.className; +valueConstructorParameter }
+                        }
                     }
-                }
-            }.also { extensionPackEntities += GenKotlinPropertyEntity(it) }
+                }.also { extensionPackEntities += GenKotlinPropertyEntity(it) }
             buildKotlinFunction("invoke", jvmNamespace = impl.className) {
                 addModifiers(KPModifier.INLINE, KPModifier.OPERATOR)
                 setReceiverType(superClassTypeName)
@@ -257,7 +256,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
         }
     }
 
-    data object Body : DescriptorWrapperBuiltin<IrBodyDescriptorWrapperImpl>("Body", SimpleBuiltin.Method) {
+    data object Body : DescriptorWrapperBuiltin<IrBodyDescriptorWrapperImpl>("Body") {
         override fun generateImpl(
             impl: IrBodyDescriptorWrapperImpl,
             superClassTypeName: IrParameterizedTypeName,
@@ -300,7 +299,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
         }
     }
 
-    data object Call : DescriptorWrapperBuiltin<IrCallDescriptorWrapperImpl>("Call", SimpleBuiltin.Callable) {
+    data object Call : DescriptorWrapperBuiltin<IrCallDescriptorWrapperImpl>("Call") {
         override fun generateImpl(
             impl: IrCallDescriptorWrapperImpl,
             superClassTypeName: IrParameterizedTypeName,
@@ -380,7 +379,7 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
         }
     }
 
-    data object Cancel : DescriptorWrapperBuiltin<IrCancelDescriptorWrapperImpl>("Cancel", SimpleBuiltin.Method) {
+    data object Cancel : DescriptorWrapperBuiltin<IrCancelDescriptorWrapperImpl>("Cancel") {
         override fun generateImpl(
             impl: IrCancelDescriptorWrapperImpl,
             superClassTypeName: IrParameterizedTypeName,
@@ -453,9 +452,9 @@ sealed class DescriptorWrapperBuiltin<T : IrDescriptorWrapperImpl<T>>(
 
     override val isInternal: Boolean = false
 
-    override fun generate(resolveBuiltin: BuiltinResolver): KPClass =
+    override fun generate(resolveBuiltin: BuiltinResolver): KPType =
         buildKotlinInterface(name) {
-            setVariableTypes(IrTypeVariableName.of("D", resolveBuiltin(builtin).parameterizedByStar()))
+            setVariableTypes(IrTypeVariableName.of("D"))
         }
 
     abstract fun generateImpl(

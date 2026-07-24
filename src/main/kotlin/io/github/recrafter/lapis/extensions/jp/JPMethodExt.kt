@@ -1,5 +1,8 @@
 package io.github.recrafter.lapis.extensions.jp
 
+import io.github.diskria.poetesse.java.JPAnnotationBuilder
+import io.github.diskria.poetesse.java.JPMethodBuilder
+import io.github.diskria.poetesse.java.JPParameter
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.phases.generator.builders.GenJavaMethodBody
 import io.github.recrafter.lapis.phases.lowering.asIrTypeName

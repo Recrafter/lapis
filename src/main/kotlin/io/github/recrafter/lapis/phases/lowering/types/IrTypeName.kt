@@ -1,6 +1,9 @@
 package io.github.recrafter.lapis.phases.lowering.types
 
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import io.github.diskria.poetesse.java.JPArrayTypeName
+import io.github.diskria.poetesse.java.JPTypeName
+import io.github.diskria.poetesse.kotlin.*
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.extensions.kp.*

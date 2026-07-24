@@ -1,5 +1,9 @@
 package io.github.recrafter.lapis.common
 
+import io.github.diskria.poetesse.java.JPArrayTypeName
+import io.github.diskria.poetesse.java.JPClassName
+import io.github.diskria.poetesse.java.JPParameterizedTypeName
+import io.github.diskria.poetesse.java.JPTypeName
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
