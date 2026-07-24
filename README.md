@@ -45,6 +45,7 @@ abstract class AdvancementsScreenPatch(@Origin val screen: AdvancementsScreen) {
     // Just drop @Extension on any property or function, and it seamlessly becomes a part of the game class!
     @Extension
     var wasHorizontallyScrolled: Boolean = false
+        private set
 
     // Inside 'mouseScrolled', we intercept the call to 'scroll' on the advancement tab.
     @Hook<_AdvancementsScreen.mouseScrolled>(Ats.Call)
