@@ -18,12 +18,23 @@ First, map your target classes and methods using simple Kotlin objects. No raw s
 ```kotlin
 @Class(AdvancementsScreen::class, side = Side.ClientOnly)
 object _AdvancementsScreen {
+
+    // Method: mouseScrolled(x: Double, y: Double, dx: Double, dy: Double) -> Boolean
+    // Declares target method with 4 double params and boolean return
     @Method<(x: Double, y: Double, dx: Double, dy: Double) -> Boolean>
     object mouseScrolled
 }
 
 @Class(AdvancementTab::class, side = Side.ClientOnly)
 object _AdvancementTab {
+
+    // @MappingName works like @SerialName — maps real name to "centered", 
+    // allowing you to use a much cleaner 'isCenterSet' identifier in your mod code!
+    @MappingName("centered")
+    @Access(field = [Op.Set]) // Generates a clean, public standalone setter for this private field
+    @Field<Boolean>
+    object isCenterSet
+
     @Method<(scrollX: Double, scrollY: Double) -> Unit>
     object scroll
 }
@@ -67,9 +78,15 @@ abstract class AdvancementsScreenPatch(@Origin val screen: AdvancementsScreen) {
 KSP takes your clean Kotlin patch, automatically resolves descriptors, manages bridges/extensions, wraps original operations, and spits out a 100% compliant, fully optimized Java Mixin:
 
 ```java
-@Mixin(
-        targets = {"net/minecraft/client/gui/screens/advancements/AdvancementsScreen"}
-)
+// Standard Mixin Accessor generated under the hood to expose the vanilla field
+@Mixin(targets = {"net/minecraft/client/gui/screens/advancements/AdvancementTab"})
+public interface _AdvancementTab_Accessor {
+    @Accessor("centered")
+    void _access_set_isCenterSet(boolean newValue);
+}
+
+// Standard Mixin generated under the hood to bridge your Kotlin patch logic with the vanilla class
+@Mixin(targets = {"net/minecraft/client/gui/screens/advancements/AdvancementsScreen"})
 public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScreenPatch_ExternalBridge, AdvancementsScreenPatch_InternalBridge {
 
     @Unique
@@ -82,7 +99,6 @@ public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScree
     @Unique
     private AdvancementsScreenPatch_Impl _lapis_getOrInitPatch() {
         if (_lapis_patch == null) {
-            // Double cast and escaping out of Mixin into your patch instance!
             _lapis_patch = new AdvancementsScreenPatch_Impl((AdvancementsScreen) (Object) this, this);
         }
         return _lapis_patch;
@@ -90,21 +106,29 @@ public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScree
 
     @Override
     public boolean _advancements_fullscreen_getWasHorizontallyScrolled() {
-        return _lapis_getOrInitPatch().getWasHorizontallyScrolled(); // Bridges the custom @Extension field to the outside world
+        return _lapis_getOrInitPatch().getWasHorizontallyScrolled();
     }
 
     @Override
     public Map<AdvancementHolder, AdvancementTab> _advancements_fullscreen_getTabs() {
-        return tabs; // Automatically exposes the original @Shadow via bridge interface
+        return tabs;
     }
 
     @WrapOperation(
-            method = {"mouseScrolled(DDDD)Z"},
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/advancements/AdvancementTab;scroll(DD)V", ordinal = 0, unsafe = true)}
+        method = {"mouseScrolled(DDDD)Z"},
+        at = {@At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/screens/advancements/AdvancementTab;scroll(DD)V",
+            ordinal = 0,
+            unsafe = true
+        )}
     )
-    private void invertScrollWhenShiftDown_ordinal0(AdvancementTab _lapis_receiver,
-            double _argument_scrollX, double _argument_scrollY, Operation<Void> _lapis_original) {
-        // Automatically captures context and wraps arguments into a clean lambda-like object
+    private void invertScrollWhenShiftDown_ordinal0(
+        AdvancementTab _lapis_receiver,
+        double _argument_scrollX,
+        double _argument_scrollY,
+        Operation<Void> _lapis_original
+    ) {
         _lapis_getOrInitPatch().invertScrollWhenShiftDown(new _AdvancementTab_scroll_Call(_lapis_receiver, _argument_scrollX, _argument_scrollY, _lapis_original));
     }
 }
@@ -113,51 +137,48 @@ public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScree
 ...and also some Kotlin sugar:
 
 ```kotlin
-public class _AdvancementTab_scroll_Call public constructor(
-    public val _lapis_receiver: AdvancementTab,
-    public val _argument_scrollX: Double,
-    public val _argument_scrollY: Double,
-    public val _lapis_operation: Operation<Void>,
-) : Lapis.Call<_AdvancementTab.scroll>
-
-@get:JvmName(name = "_AdvancementTab_scroll_Call_scrollX")
-public inline val Lapis.Call<_AdvancementTab.scroll>.scrollX: Double
-    get() {
-        return (this as _AdvancementTab_scroll_Call)._argument_scrollX
-    }
-
-@get:JvmName(name = "_AdvancementTab_scroll_Call_scrollY")
-public inline val Lapis.Call<_AdvancementTab.scroll>.scrollY: Double
-    get() {
-        return (this as _AdvancementTab_scroll_Call)._argument_scrollY
-    }
-
-@JvmName(name = "_AdvancementTab_scroll_Call_getReceiver")
-public inline fun Lapis.Call<_AdvancementTab.scroll>.getReceiver(): AdvancementTab {
-    return (this as _AdvancementTab_scroll_Call)._lapis_receiver
+// Generates an extension function for the accessor, abstracting away the Mixin interface completely.
+inline fun AdvancementTab.isCenterSet(newValue: Boolean) {
+    (this as _AdvancementTab_Accessor)._access_set_isCenterSet(newValue)
 }
 
-@JvmName(name = "_AdvancementTab_scroll_Call_invoke")
-public inline operator fun Lapis.Call<_AdvancementTab.scroll>.invoke(scrollX: Double = this.scrollX, scrollY: Double = this.scrollY) {
+// Behind the scenes, Lapis creates a light wrapper for intercepted operations.
+// This allows you to destructure arguments and use clean named parameters!
+class _AdvancementTab_scroll_Call constructor(
+    val _lapis_receiver: AdvancementTab,
+    val _argument_scrollX: Double,
+    val _argument_scrollY: Double,
+    val _lapis_operation: Operation<Void>,
+) : Lapis.Call<_AdvancementTab.scroll>
+
+inline val Lapis.Call<_AdvancementTab.scroll>.scrollX: Double
+    get() = (this as _AdvancementTab_scroll_Call)._argument_scrollX
+
+inline val Lapis.Call<_AdvancementTab.scroll>.scrollY: Double
+    get() = (this as _AdvancementTab_scroll_Call)._argument_scrollY
+
+inline fun Lapis.Call<_AdvancementTab.scroll>.getReceiver(): AdvancementTab =
+    (this as _AdvancementTab_scroll_Call)._lapis_receiver
+
+inline operator fun Lapis.Call<_AdvancementTab.scroll>.invoke(
+    scrollX: Double = this.scrollX,
+    scrollY: Double = this.scrollY,
+) {
     (this as _AdvancementTab_scroll_Call)._lapis_operation.call(getReceiver(), scrollX, scrollY)
 }
 
 context(_receiver: AdvancementTab)
-@JvmName(name = "_AdvancementTab_scroll_Call_call")
-public inline fun Lapis.Call<_AdvancementTab.scroll>.call(scrollX: Double = this.scrollX, scrollY: Double = this.scrollY) {
+inline fun Lapis.Call<_AdvancementTab.scroll>.call(
+    scrollX: Double = this.scrollX,
+    scrollY: Double = this.scrollY,
+) {
     (this as _AdvancementTab_scroll_Call)._lapis_operation.call(_receiver, scrollX, scrollY)
-}
-
-public inline fun AdvancementTab.centered(newValue: Boolean) {
-    (this as _AdvancementTab_Accessor)._access_set_centered(newValue)
 }
 
 // Lapis generates a clean, public extension property for your mod.
 // No casting or bridges in your business logic — it feels like a native Minecraft property!
-public inline val AdvancementsScreen.wasHorizontallyScrolled: Boolean
-    get() {
-        return (this as AdvancementsScreenPatch_ExternalBridge)._advancements_fullscreen_getWasHorizontallyScrolled()
-    }
+inline val AdvancementsScreen.wasHorizontallyScrolled: Boolean
+    get() = (this as AdvancementsScreenPatch_ExternalBridge)._advancements_fullscreen_getWasHorizontallyScrolled()
 ```
 
 ### 🪟 The Ultimate Escape Hatch: Raw Mixin Power
