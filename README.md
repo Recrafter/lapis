@@ -113,6 +113,45 @@ public abstract class AdvancementsScreenPatch_Mixin implements AdvancementsScree
 ...and also some Kotlin sugar:
 
 ```kotlin
+public class _AdvancementTab_scroll_Call public constructor(
+    public val _lapis_receiver: AdvancementTab,
+    public val _argument_scrollX: Double,
+    public val _argument_scrollY: Double,
+    public val _lapis_operation: Operation<Void>,
+) : Lapis.Call<_AdvancementTab.scroll>
+
+@get:JvmName(name = "_AdvancementTab_scroll_Call_scrollX")
+public inline val Lapis.Call<_AdvancementTab.scroll>.scrollX: Double
+    get() {
+        return (this as _AdvancementTab_scroll_Call)._argument_scrollX
+    }
+
+@get:JvmName(name = "_AdvancementTab_scroll_Call_scrollY")
+public inline val Lapis.Call<_AdvancementTab.scroll>.scrollY: Double
+    get() {
+        return (this as _AdvancementTab_scroll_Call)._argument_scrollY
+    }
+
+@JvmName(name = "_AdvancementTab_scroll_Call_getReceiver")
+public inline fun Lapis.Call<_AdvancementTab.scroll>.getReceiver(): AdvancementTab {
+    return (this as _AdvancementTab_scroll_Call)._lapis_receiver
+}
+
+@JvmName(name = "_AdvancementTab_scroll_Call_invoke")
+public inline operator fun Lapis.Call<_AdvancementTab.scroll>.invoke(scrollX: Double = this.scrollX, scrollY: Double = this.scrollY) {
+    (this as _AdvancementTab_scroll_Call)._lapis_operation.call(getReceiver(), scrollX, scrollY)
+}
+
+context(_receiver: AdvancementTab)
+@JvmName(name = "_AdvancementTab_scroll_Call_call")
+public inline fun Lapis.Call<_AdvancementTab.scroll>.call(scrollX: Double = this.scrollX, scrollY: Double = this.scrollY) {
+    (this as _AdvancementTab_scroll_Call)._lapis_operation.call(_receiver, scrollX, scrollY)
+}
+
+public inline fun AdvancementTab.centered(newValue: Boolean) {
+    (this as _AdvancementTab_Accessor)._access_set_centered(newValue)
+}
+
 // Lapis generates a clean, public extension property for your mod.
 // No casting or bridges in your business logic — it feels like a native Minecraft property!
 public inline val AdvancementsScreen.wasHorizontallyScrolled: Boolean
