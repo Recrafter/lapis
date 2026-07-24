@@ -144,7 +144,7 @@ inline fun AdvancementTab.isCenterSet(newValue: Boolean) {
 
 // Behind the scenes, Lapis creates a light wrapper for intercepted operations.
 // This allows you to destructure arguments and use clean named parameters!
-class _AdvancementTab_scroll_Call constructor(
+class _AdvancementTab_scroll_Call(
     val _lapis_receiver: AdvancementTab,
     val _argument_scrollX: Double,
     val _argument_scrollY: Double,
