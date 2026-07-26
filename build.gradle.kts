@@ -7,13 +7,16 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.bundles.ksp)
-    implementation(libs.bundles.mixins)
-    implementation(libs.bundles.asm)
-    implementation(libs.poetesse)
+    implementation(libs.ksp.api)
     implementation(libs.kotlin.poet.ksp)
 
     implementation(libs.lapis.annotations)
+    implementation(libs.poetesse)
+
+    implementation(libs.mixin)
+    implementation(libs.mixin.extras)
+    implementation(libs.asm)
+
     implementation(libs.kotlin.serialization.json)
 
     ksp(libs.auto.service)

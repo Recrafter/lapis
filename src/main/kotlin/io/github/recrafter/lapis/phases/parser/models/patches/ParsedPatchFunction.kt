@@ -24,7 +24,7 @@ class ParsedPatchFunction(
     val isPublic: Boolean,
     val isOpen: Boolean,
     val isAbstract: Boolean,
-    val hasExtensionReceiver: Boolean,
+    val extensionReceiverClassDeclaration: KSClassDeclaration?,
 
     val hasExtensionAnnotation: Boolean,
     val hasShadowAnnotation: Boolean,

@@ -309,7 +309,7 @@ class SymbolParser(
             isPublic = isPublic(),
             isOpen = isExplicitlyOpen,
             isAbstract = isAbstract,
-            hasExtensionReceiver = hasExtensionReceiver,
+            extensionReceiverClassDeclaration = extensionReceiver?.resolve()?.toClassDeclaration(),
 
             hasExtensionAnnotation = hasAnnotation<Extension>(),
             hasShadowAnnotation = shadowAnnotation != null,

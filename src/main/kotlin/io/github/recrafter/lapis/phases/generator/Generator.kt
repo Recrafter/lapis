@@ -47,6 +47,7 @@ import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.models.common.*
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrLambdaTypeName
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.orVoid
 import kotlinx.serialization.json.Json
 import org.objectweb.asm.Opcodes
@@ -405,14 +406,7 @@ class Generator(
     private fun generatePatchInitializer(destination: JPTypeBuilder, impl: IrPatchImpl): GenJavaEntity {
         val constructorArgumentCodeBlocks = impl.constructorParameters.map { parameter ->
             when (parameter) {
-                is IrPatchImplConstructorInstanceParameter -> {
-                    if (parameter.typeName != KPAny.asIrClassName()) {
-                        buildJavaCodeBlock("(%T) (%T) this") { +parameter.typeName; +Object::class }
-                    } else {
-                        buildJavaCodeBlock("this")
-                    }
-                }
-
+                is IrPatchImplConstructorInstanceParameter -> parameter.typeName.toDoubleCaseCodeBlock()
                 is IrPatchImplConstructorInternalBridgeParameter -> buildJavaCodeBlock("this")
             }
         }
@@ -526,7 +520,10 @@ class Generator(
                     Triple(
                         injection.mixinAnnotations.map { buildMixinAnnotation(it) },
                         parameters,
-                        parameters.map { it.toCodeBlock() },
+                        buildList {
+                            injection.hookExtensionReceiverTypeName?.let { add(it.toDoubleCaseCodeBlock()) }
+                            addAll(parameters.map { it.toCodeBlock() })
+                        },
                     )
                 }
 
@@ -736,6 +733,7 @@ class Generator(
                     }
                     val argumentCodeBlocks = injection.hookArguments.map { argument ->
                         when (argument) {
+                            is IrHookExtensionReceiverArgument -> argument.typeName.toDoubleCaseCodeBlock()
                             is IrHookOriginValueArgument -> valueParameterName.toJavaCodeBlock()
                             is IrHookOriginDescriptorWrapperImplArgument<*> -> {
                                 val constructorArgumentCodeBlocks = buildList {
@@ -1154,6 +1152,13 @@ class Generator(
                 addMember(argument.name, valueCodeBlock)
             }
         }.build()
+
+    private fun IrTypeName.toDoubleCaseCodeBlock(): JPCodeBlock =
+        if (this != KPAny.asIrClassName()) {
+            buildJavaCodeBlock("(%T) (%T) this") { +this@toDoubleCaseCodeBlock; +Object::class }
+        } else {
+            buildJavaCodeBlock("this")
+        }
 
     private fun generateMixinConfig(mixinBlueprints: List<IrMixinRelatedBlueprint>) {
         val mixinConfig = GenMixinConfig(mixinBlueprints.flatMap { it.originatingFiles }, options.mixinConfig)

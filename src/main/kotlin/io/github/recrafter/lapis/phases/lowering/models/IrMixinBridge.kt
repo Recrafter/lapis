@@ -6,7 +6,6 @@ import io.github.diskria.poetesse.kotlin.KPTypeKind
 import io.github.recrafter.lapis.phases.lowering.models.common.IrMixinAnnotation
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
-import ksp.org.jetbrains.kotlin.builtins.functions.BuiltInFunctionArity
 
 sealed class IrMixinBridge(
     override val originatingFiles: List<KSFile>,
@@ -38,7 +37,7 @@ sealed interface IrMixinBridgeEntryKind : IrReturnable {
     override val returnTypeName: IrTypeName?
 
     val hasBigArity: Boolean
-        get() = parameters.size >= BuiltInFunctionArity.BIG_ARITY
+        get() = parameters.size >= 23
 }
 
 sealed class IrMixinBridgePropertyEntry(

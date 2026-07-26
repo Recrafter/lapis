@@ -1,9 +1,11 @@
 package io.github.recrafter.lapis.phases.lowering.models
 
 import io.github.recrafter.lapis.phases.builtins.LocalVarImplBuiltin
+import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 
 sealed interface IrHookArgument
 
+class IrHookExtensionReceiverArgument(val typeName: IrTypeName) : IrHookArgument
 sealed interface IrHookOriginArgument : IrHookArgument
 object IrHookOriginValueArgument : IrHookOriginArgument
 

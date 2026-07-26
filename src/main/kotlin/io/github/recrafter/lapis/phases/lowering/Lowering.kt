@@ -306,6 +306,7 @@ class Lowering(
                 listOf(
                     IrNativeInjection(
                         jvmName = hook.jvmName,
+                        hookExtensionReceiverTypeName = hook.extensionReceiverTypeName,
                         mixinAnnotations = hook.mixinAnnotations.map(::lowerMixinAnnotation),
                         isStatic = hook.isStatic,
                         parameters = hook.parameters.map { parameter ->
@@ -391,7 +392,10 @@ class Lowering(
                     }
                     addAll(hook.parameters.mapNotNull { lowerInjectionLocalParameter(it, hook) })
                 }
-                val hookArguments = hook.parameters.map(::lowerHookArgument)
+                val hookArguments = buildList {
+                    hook.extensionReceiverTypeName?.let { add(IrHookExtensionReceiverArgument(it)) }
+                    addAll(hook.parameters.map(::lowerHookArgument))
+                }
                 return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->
                     val methodMixinReference = hook.methodDescriptor.getMixinReference()
                     when (hook) {

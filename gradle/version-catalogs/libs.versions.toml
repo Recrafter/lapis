@@ -23,15 +23,12 @@ projektor = { id = "io.github.diskria.projektor", version.ref = "projektor" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [libraries]
-ks-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
-ka-api = { group = "com.google.devtools.ksp", name = "symbol-processing-aa-embeddable", version.ref = "ksp" }
+ksp-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 
 mixin = { group = "org.spongepowered", name = "mixin", version.ref = "mixin" }
 mixin-extras = { group = "io.github.llamalad7", name = "mixinextras-common", version.ref = "mixin-extras" }
 
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
-asm-util = { group = "org.ow2.asm", name = "asm-util", version.ref = "asm" }
-asm-commons = { group = "org.ow2.asm", name = "asm-commons", version.ref = "asm" }
 
 lapis-annotations = { group = "io.github.recrafter", name = "lapis-annotations", version.ref = "lapis-annotations" }
 
@@ -42,18 +39,3 @@ kotlin-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-s
 
 auto-service = { group = "dev.zacsweers.autoservice", name = "auto-service-ksp", version.ref = "auto-service" }
 auto-service-annotations = { group = "com.google.auto.service", name = "auto-service-annotations", version.ref = "auto-service-annotations" }
-
-[bundles]
-asm = [
-    "asm",
-    "asm-util",
-    "asm-commons",
-]
-ksp = [
-    "ks-api",
-    "ka-api",
-]
-mixins = [
-    "mixin",
-    "mixin-extras",
-]
