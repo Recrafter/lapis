@@ -436,7 +436,7 @@ class FrontendValidator(
         }
         if (isInCompanionObject) {
             kspRequire(extensionReceiverClassDeclaration == null) { "438" }
-        } else if (extensionReceiverClassDeclaration != null) {
+        } else if (originClassDeclaration != null && extensionReceiverClassDeclaration != null) {
             kspRequire(extensionReceiverClassDeclaration == originClassDeclaration) { "441" }
         }
         if (mixinAnnotations.isNotEmpty()) {
