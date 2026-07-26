@@ -129,7 +129,6 @@ class FrontendValidator(
         isAccessibleSchema: Boolean,
     ): Descriptor {
         kspRequire(classDeclaration.typeParameters.isEmpty()) { "130" }
-        kspRequire(isObject) { "132" }
         kspRequire(
             listOf(
                 hasFieldAnnotation,
@@ -147,6 +146,9 @@ class FrontendValidator(
                 hasAccessAnnotation, accessStrategy, isAccessUnfinal, isAccessibleSchema,
                 accessFieldOps, emptyList(),
             )
+            if (accessRequest != null && accessRequest !is TweakAccessRequest && (isStatic || !isAccessibleSchema)) {
+                kspRequire(isObject) { "195" }
+            }
             return FieldDescriptor(
                 symbol = symbol,
                 classDeclaration = classDeclaration,
@@ -179,6 +181,11 @@ class FrontendValidator(
             hasAccessAnnotation, accessStrategy, isAccessUnfinal, isAccessibleSchema,
             emptyList(), functionTypeParameters,
         )
+        if (accessRequest != null && accessRequest !is TweakAccessRequest &&
+            (hasConstructorAnnotation || isStatic || !isAccessibleSchema)
+        ) {
+            kspRequire(isObject) { "195" }
+        }
         return when {
             hasMethodAnnotation -> {
                 MethodDescriptor(
@@ -311,11 +318,13 @@ class FrontendValidator(
         validateType(type)
         return when {
             hasOriginAnnotation -> {
-                validateClassDeclaration(originClassDeclaration)
-                val instanceClassDeclaration = type.toClassDeclaration()
-                kspRequire(instanceClassDeclaration == originClassDeclaration) { "308" }
+                val typeClassDeclaration = type.toClassDeclaration()
+                validateClassDeclaration(typeClassDeclaration)
+                if (originClassDeclaration != null) {
+                    kspRequire(typeClassDeclaration == originClassDeclaration) { "308" }
+                }
                 kspRequire(type.arguments.none { it.variance != Variance.STAR }) { "309" }
-                PatchConstructorOriginParameter(instanceClassDeclaration)
+                PatchConstructorOriginParameter(typeClassDeclaration)
             }
 
             else -> skipWithError { "313" }
@@ -782,7 +791,7 @@ class FrontendValidator(
     @OptIn(ExperimentalContracts::class)
     private fun SymbolSource.validateClassDeclaration(classDeclaration: KSClassDeclaration?): KSClassDeclaration {
         contract { returns() implies (classDeclaration != null) }
-        kspRequire(classDeclaration?.isValid == true) { "777" }
+        kspRequire(classDeclaration?.isValid == true) { lapisError("!"); "777" }
         return classDeclaration
     }
 

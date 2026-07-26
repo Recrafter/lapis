@@ -150,9 +150,8 @@ value class IrJavaCodeBlock(private val builder: JPCodeBlockBuilder) {
 
         fun build(): Array<Any> = arguments.toTypedArray()
 
-        private fun asName(name: String) {
-            arguments += buildJavaMethod(name)
-        }
+        private fun asName(name: String): JPMethod =
+            buildJavaMethod(name)
     }
 }
 

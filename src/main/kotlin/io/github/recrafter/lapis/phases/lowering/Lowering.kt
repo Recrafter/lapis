@@ -181,7 +181,7 @@ class Lowering(
     private fun lowerPatchConstructorArgument(parameter: PatchConstructorParameter): IrPatchConstructorArgument =
         when (parameter) {
             is PatchConstructorOriginParameter -> {
-                IrPatchConstructorOriginArgument(parameter.instanceClassDeclaration.asIrClassName())
+                IrPatchConstructorOriginArgument(parameter.typeClassDeclaration.asIrClassName())
             }
         }
 

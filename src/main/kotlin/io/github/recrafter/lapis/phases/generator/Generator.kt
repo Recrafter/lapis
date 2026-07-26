@@ -84,7 +84,7 @@ class Generator(
         poetesse {
             java.file("com.example", "HelloWorld") {
                 class_(fileName) {
-                    public(); abstract()
+                    public()
                     method("main") {
                         static()
                         body {

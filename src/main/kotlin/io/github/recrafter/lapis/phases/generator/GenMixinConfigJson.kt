@@ -61,6 +61,6 @@ data class GenMixinConfigJson(
             )
 
         private fun Map<Side, List<IrClassName>>.getRelativeNames(side: Side, basePackage: String): List<String>? =
-            get(side)?.ifEmpty { null }?.map { it.qualifiedName.removePrefix("$basePackage.") }
+            get(side)?.takeIf { it.isNotEmpty() }?.map { it.qualifiedName.removePrefix("$basePackage.") }
     }
 }

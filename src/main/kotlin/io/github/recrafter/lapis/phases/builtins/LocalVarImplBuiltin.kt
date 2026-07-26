@@ -115,6 +115,6 @@ enum class LocalVarImplBuiltin(
 
     companion object {
         fun of(valueTypeName: IrTypeName): LocalVarImplBuiltin =
-            LocalVarImplBuiltin.entries.find { valueTypeName == it.valueKPClassName } ?: ObjectLocalVar
+            LocalVarImplBuiltin.entries.find { valueTypeName == it.valueKPClassName?.asIrClassName() } ?: ObjectLocalVar
     }
 }

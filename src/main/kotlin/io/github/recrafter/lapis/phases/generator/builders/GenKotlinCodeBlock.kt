@@ -66,11 +66,11 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
         }
 
         operator fun JPField.unaryPlus() {
-            asName(name())
+            arguments += asName(name())
         }
 
         operator fun JPMethod.unaryPlus() {
-            asName(name())
+            arguments += asName(name())
         }
 
         operator fun GenJavaEntity.invoke() {
@@ -99,14 +99,13 @@ value class IrKotlinCodeBlock(private val builder: KPCodeBlockBuilder) {
         }
 
         operator fun IrParameter.unaryPlus() {
-            asName(name)
+            arguments += asName(name)
         }
 
         fun build(): Array<Any> = arguments.toTypedArray()
 
-        private fun asName(name: String) {
-            arguments += buildKotlinFunction(name)
-        }
+        private fun asName(name: String): KPFunction =
+            buildKotlinFunction(name)
     }
 }
 
