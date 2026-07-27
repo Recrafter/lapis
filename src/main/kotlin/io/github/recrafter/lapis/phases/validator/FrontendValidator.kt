@@ -443,7 +443,7 @@ class FrontendValidator(
             kspRequire(!hasHookAnnotation) { "416" }
             return PatchNativeInjection(
                 jvmName = jvmName,
-                extensionReceiver = extensionReceiverClassDeclaration,
+                extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                 mixinAnnotations = mixinAnnotations,
                 isStatic = isInCompanionObject,
                 parameters = parameters.map { it.validateAsNativeInjectionParameter() },
@@ -477,7 +477,7 @@ class FrontendValidator(
                         kspRequire(hasAtConstructorHeadAnnotation) { "449" }
                         ConstructorHeadHook(
                             jvmName = jvmName,
-                            extensionReceiver = extensionReceiverClassDeclaration,
+                            extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                             methodDescriptor = hookMethodDescriptor,
                             phase = kspRequireNotNull(atConstructorHeadPhase) { "453" },
                             parameters = parameters(),
@@ -486,7 +486,7 @@ class FrontendValidator(
 
                     is MethodDescriptor -> MethodHeadHook(
                         jvmName = jvmName,
-                        extensionReceiver = extensionReceiverClassDeclaration,
+                        extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                         methodDescriptor = hookMethodDescriptor,
                         parameters = parameters(),
                     )
@@ -498,7 +498,7 @@ class FrontendValidator(
                 kspRequire(returnType == hookMethodDescriptor.returnType) { "468" }
                 BodyHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     returnType = returnType,
                     parameters = parameters(),
@@ -509,7 +509,7 @@ class FrontendValidator(
                 kspRequire(returnType == null) { "478" }
                 TailHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     parameters = parameters(),
                 )
@@ -521,7 +521,7 @@ class FrontendValidator(
                 kspRequire(returnType == validateType(atLocalType)) { "489" }
                 LocalHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     type = atLocalType,
                     ordinals = resolveOrdinals(atLocalOpOrdinals),
@@ -537,7 +537,7 @@ class FrontendValidator(
                 kspRequire(returnType?.toClassName()?.asIrTypeName() == KPBoolean.asIrTypeName()) { "504" }
                 InstanceofHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     typeClassDeclaration = atInstanceofTypeClassDeclaration,
                     returnType = returnType,
@@ -551,7 +551,7 @@ class FrontendValidator(
                 kspRequire(returnType == hookMethodDescriptor.returnType) { "517" }
                 ReturnHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     type = returnType,
                     ordinals = resolveOrdinals(atReturnOrdinals),
@@ -571,7 +571,7 @@ class FrontendValidator(
                 }
                 LiteralHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     type = type,
                     literal = literal,
@@ -590,7 +590,7 @@ class FrontendValidator(
                         kspRequire(returnType?.makeNotNullable() == targetDescriptor.fieldType) { "554" }
                         FieldGetHook(
                             jvmName = jvmName,
-                            extensionReceiver = extensionReceiverClassDeclaration,
+                            extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                             methodDescriptor = hookMethodDescriptor,
                             type = targetDescriptor.fieldType,
                             ordinals = resolveOrdinals(atFieldOrdinals),
@@ -603,7 +603,7 @@ class FrontendValidator(
                         kspRequire(returnType == null) { "566" }
                         FieldSetHook(
                             jvmName = jvmName,
-                            extensionReceiver = extensionReceiverClassDeclaration,
+                            extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                             methodDescriptor = hookMethodDescriptor,
                             type = targetDescriptor.fieldType,
                             ordinals = resolveOrdinals(atFieldOrdinals),
@@ -627,7 +627,7 @@ class FrontendValidator(
                 }
                 ArrayHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     op = atArrayOp,
                     type = targetDescriptor.fieldType,
@@ -645,7 +645,7 @@ class FrontendValidator(
                 kspRequire(returnType?.makeNotNullable() == targetDescriptor.returnType) { "606" }
                 CallHook(
                     jvmName = jvmName,
-                    extensionReceiver = extensionReceiverClassDeclaration,
+                    extensionReceiverClassDeclaration = extensionReceiverClassDeclaration,
                     methodDescriptor = hookMethodDescriptor,
                     returnType = returnType,
                     targetDescriptor = targetDescriptor,

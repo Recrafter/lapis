@@ -23,6 +23,7 @@ import io.github.diskria.poetesse.poetesse
 import io.github.recrafter.lapis.annotations.InitStrategy
 import io.github.recrafter.lapis.annotations.Op
 import io.github.recrafter.lapis.common.JvmClassName
+import io.github.recrafter.lapis.extensions.capitalize
 import io.github.recrafter.lapis.extensions.common.Builder
 import io.github.recrafter.lapis.extensions.common.lapisError
 import io.github.recrafter.lapis.extensions.jp.*
@@ -47,7 +48,6 @@ import io.github.recrafter.lapis.phases.lowering.models.*
 import io.github.recrafter.lapis.phases.lowering.models.common.*
 import io.github.recrafter.lapis.phases.lowering.types.IrClassName
 import io.github.recrafter.lapis.phases.lowering.types.IrLambdaTypeName
-import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.lowering.types.orVoid
 import kotlinx.serialization.json.Json
 import org.objectweb.asm.Opcodes
@@ -337,7 +337,7 @@ class Generator(
             val constructorParameters = impl.constructorParameters.map { parameter ->
                 when (parameter) {
                     is IrPatchImplConstructorInstanceParameter -> {
-                        IrParameter(instanceParameterName, parameter.typeName)
+                        IrParameter(instanceParameterName, parameter.className)
                     }
 
                     is IrPatchImplConstructorInternalBridgeParameter -> {
@@ -356,7 +356,7 @@ class Generator(
                 constructorArguments = patch.constructorArguments.map { argument ->
                     when (argument) {
                         is IrPatchConstructorOriginArgument -> {
-                            IrParameter(instanceParameterName, argument.typeName).toKotlinCodeBlock()
+                            IrParameter(instanceParameterName, argument.className).toKotlinCodeBlock()
                         }
                     }
                 }
@@ -406,7 +406,7 @@ class Generator(
     private fun generatePatchInitializer(destination: JPTypeBuilder, impl: IrPatchImpl): GenJavaEntity {
         val constructorArgumentCodeBlocks = impl.constructorParameters.map { parameter ->
             when (parameter) {
-                is IrPatchImplConstructorInstanceParameter -> parameter.typeName.toDoubleCaseCodeBlock()
+                is IrPatchImplConstructorInstanceParameter -> buildDoubleCastJavaCodeBlock(parameter.className)
                 is IrPatchImplConstructorInternalBridgeParameter -> buildJavaCodeBlock("this")
             }
         }
@@ -521,7 +521,7 @@ class Generator(
                         injection.mixinAnnotations.map { buildMixinAnnotation(it) },
                         parameters,
                         buildList {
-                            injection.hookExtensionReceiverTypeName?.let { add(it.toDoubleCaseCodeBlock()) }
+                            injection.hookExtensionReceiverClassName?.let { add(buildDoubleCastJavaCodeBlock(it)) }
                             addAll(parameters.map { it.toCodeBlock() })
                         },
                     )
@@ -733,7 +733,7 @@ class Generator(
                     }
                     val argumentCodeBlocks = injection.hookArguments.map { argument ->
                         when (argument) {
-                            is IrHookExtensionReceiverArgument -> argument.typeName.toDoubleCaseCodeBlock()
+                            is IrHookExtensionReceiverArgument -> buildDoubleCastJavaCodeBlock(argument.className)
                             is IrHookOriginValueArgument -> valueParameterName.toJavaCodeBlock()
                             is IrHookOriginDescriptorWrapperImplArgument<*> -> {
                                 val constructorArgumentCodeBlocks = buildList {
@@ -1033,7 +1033,7 @@ class Generator(
                 when (member) {
                     is IrMixinAccessorFieldMember -> {
                         member.ops.forEach { op ->
-                            val name = (op.name.lowercase() + "_" + member.name).withInternalPrefix(ACCESS)
+                            val name = op.name.lowercase() + member.mappingName.capitalize()
                             val parameters = when (op) {
                                 Op.Get -> emptyList()
                                 Op.Set -> listOf(IrSetterParameter(member.typeName))
@@ -1043,9 +1043,7 @@ class Generator(
                                 if (op == Op.Set && member.removeFinal) {
                                     addAnnotation<Mutable>()
                                 }
-                                addAnnotation<Accessor> {
-                                    setArgumentValue(Accessor::value, member.mappingName)
-                                }
+                                addAnnotation<Accessor>()
                                 setParameters(parameters)
                                 if (op == Op.Get) {
                                     setReturnType(member.typeName)
@@ -1072,10 +1070,13 @@ class Generator(
                     }
 
                     is IrMixinAccessorMethodMember -> {
-                        val invokerMethod = buildJavaMethod(member.name.withInternalPrefix(ACCESS)) {
+                        val name = if (member.isConstructor) "create" else "invoke" + member.mappingName.capitalize()
+                        val invokerMethod = buildJavaMethod(name) {
                             addModifiers(if (member.isStatic) JPModifier.STATIC else JPModifier.ABSTRACT)
                             addAnnotation<Invoker> {
-                                setArgumentValue(Invoker::value, member.mappingName)
+                                if (member.isConstructor) {
+                                    setArgumentValue(Invoker::value, member.mappingName)
+                                }
                             }
                             setParameters(member.parameters)
                             setReturnType(member.returnTypeName)
@@ -1153,9 +1154,9 @@ class Generator(
             }
         }.build()
 
-    private fun IrTypeName.toDoubleCaseCodeBlock(): JPCodeBlock =
-        if (this != KPAny.asIrClassName()) {
-            buildJavaCodeBlock("(%T) (%T) this") { +this@toDoubleCaseCodeBlock; +Object::class }
+    private fun buildDoubleCastJavaCodeBlock(targetClassName: IrClassName): JPCodeBlock =
+        if (targetClassName != KPAny.asIrClassName()) {
+            buildJavaCodeBlock("(%T) (%T) this") { +targetClassName; +Object::class }
         } else {
             buildJavaCodeBlock("this")
         }

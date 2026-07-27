@@ -152,6 +152,7 @@ class Lowering(
                     mappingName = descriptor.binaryName,
                     parameters = accessRequest.parameters,
                     returnTypeName = descriptor.returnTypeName,
+                    isConstructor = descriptor is ConstructorDescriptor,
                     isStatic = descriptor is ConstructorDescriptor || descriptor.isStatic,
                     descriptorClassName = descriptor.className,
                 )
@@ -192,7 +193,7 @@ class Lowering(
                 className = patch.className.derived("Impl"),
                 constructorParameters = buildList {
                     constructorArguments.filterIsInstance<IrPatchConstructorOriginArgument>().firstOrNull()?.let {
-                        add(IrPatchImplConstructorInstanceParameter(it.typeName))
+                        add(IrPatchImplConstructorInstanceParameter(it.className))
                     }
                     if (patch.shadowSources.isNotEmpty()) {
                         add(IrPatchImplConstructorInternalBridgeParameter)
@@ -306,7 +307,7 @@ class Lowering(
                 listOf(
                     IrNativeInjection(
                         jvmName = hook.jvmName,
-                        hookExtensionReceiverTypeName = hook.extensionReceiverTypeName,
+                        hookExtensionReceiverClassName = hook.extensionReceiverClassName,
                         mixinAnnotations = hook.mixinAnnotations.map(::lowerMixinAnnotation),
                         isStatic = hook.isStatic,
                         parameters = hook.parameters.map { parameter ->
@@ -393,7 +394,7 @@ class Lowering(
                     addAll(hook.parameters.mapNotNull { lowerInjectionLocalParameter(it, hook) })
                 }
                 val hookArguments = buildList {
-                    hook.extensionReceiverTypeName?.let { add(IrHookExtensionReceiverArgument(it)) }
+                    hook.extensionReceiverClassName?.let { add(IrHookExtensionReceiverArgument(it)) }
                     addAll(hook.parameters.map(::lowerHookArgument))
                 }
                 return hook.ordinals.ifEmpty { listOf(null) }.map { ordinal ->

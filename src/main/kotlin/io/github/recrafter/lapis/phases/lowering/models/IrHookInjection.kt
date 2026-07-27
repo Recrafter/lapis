@@ -15,7 +15,7 @@ sealed interface IrInjection : IrReturnable {
 
 class IrNativeInjection(
     override val jvmName: String,
-    val hookExtensionReceiverTypeName: IrTypeName?,
+    val hookExtensionReceiverClassName: IrClassName?,
     val mixinAnnotations: List<IrMixinAnnotation>,
     override val isStatic: Boolean,
     val parameters: List<IrNativeInjectionParameter>,

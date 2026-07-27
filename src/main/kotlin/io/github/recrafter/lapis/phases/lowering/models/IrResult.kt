@@ -62,6 +62,7 @@ class IrMixinAccessorMethodMember(
     val mappingName: String,
     val parameters: List<IrParameter>,
     override val returnTypeName: IrTypeName?,
+    val isConstructor: Boolean,
     isStatic: Boolean,
     descriptorClassName: IrClassName,
 ) : IrMixinAccessorMember(name, isStatic, descriptorClassName), IrReturnable
@@ -92,7 +93,7 @@ class IrMixin(
 ) : IrMixinRelatedBlueprint(JPTypeKind.CLASS)
 
 sealed interface IrPatchConstructorArgument
-class IrPatchConstructorOriginArgument(val typeName: IrTypeName) : IrPatchConstructorArgument
+class IrPatchConstructorOriginArgument(val className: IrClassName) : IrPatchConstructorArgument
 
 class IrPatchImpl(
     override val originatingFiles: List<KSFile>,
@@ -102,5 +103,5 @@ class IrPatchImpl(
 ) : IrKotlinClassBlueprint(KPTypeKind.CLASS)
 
 sealed interface IrPatchImplConstructorParameter
-class IrPatchImplConstructorInstanceParameter(val typeName: IrTypeName) : IrPatchImplConstructorParameter
+class IrPatchImplConstructorInstanceParameter(val className: IrClassName) : IrPatchImplConstructorParameter
 object IrPatchImplConstructorInternalBridgeParameter : IrPatchImplConstructorParameter

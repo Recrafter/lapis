@@ -11,23 +11,23 @@ import io.github.recrafter.lapis.phases.lowering.types.IrTypeName
 import io.github.recrafter.lapis.phases.validator.models.common.MixinAnnotation
 import io.github.recrafter.lapis.phases.validator.models.schemas.*
 
-sealed interface PatchInjection {
-    val jvmName: String
-    val extensionReceiver: KSClassDeclaration?
-    val isStatic: Boolean
+sealed class PatchInjection {
+    abstract val jvmName: String
+    protected abstract val extensionReceiverClassDeclaration: KSClassDeclaration?
+    abstract val isStatic: Boolean
 
-    val extensionReceiverTypeName: IrTypeName?
-        get() = extensionReceiver?.asIrClassName()
+    val extensionReceiverClassName: IrClassName?
+        get() = extensionReceiverClassDeclaration?.asIrClassName()
 }
 
 class PatchNativeInjection(
     override val jvmName: String,
-    override val extensionReceiver: KSClassDeclaration?,
+    override val extensionReceiverClassDeclaration: KSClassDeclaration?,
     val mixinAnnotations: List<MixinAnnotation>,
     override val isStatic: Boolean,
     val parameters: List<PatchNativeInjectionParameter>,
     val returnType: KSType?,
-) : PatchInjection
+) : PatchInjection()
 
 class PatchNativeInjectionParameter(
     val name: String,
@@ -37,12 +37,12 @@ class PatchNativeInjectionParameter(
 
 sealed class PatchHook(
     override val jvmName: String,
-    override val extensionReceiver: KSClassDeclaration?,
+    override val extensionReceiverClassDeclaration: KSClassDeclaration?,
     val methodDescriptor: Descriptor,
     returnType: KSType?,
     val parameters: List<HookParameter>,
     val ordinals: Set<Int>,
-) : PatchInjection {
+) : PatchInjection() {
     open val returnTypeName: IrTypeName? = returnType?.asIrTypeName()
     open val isInjectBased: Boolean = false
     override val isStatic: Boolean = methodDescriptor.isStatic
@@ -54,117 +54,120 @@ sealed interface HookWithTarget {
 
 class MethodHeadHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: MethodDescriptor,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, null, parameters, emptySet()) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, null, parameters, emptySet()) {
     override val isInjectBased: Boolean = true
 }
 
 class ConstructorHeadHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: ConstructorDescriptor,
     parameters: List<HookParameter>,
     val phase: ConstructorHeadPhase,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, null, parameters, emptySet()) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, null, parameters, emptySet()) {
     override val isInjectBased: Boolean = true
 }
 
 class BodyHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: MethodDescriptor,
     returnType: KSType?,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, returnType, parameters, emptySet()), HookWithTarget {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, returnType, parameters, emptySet()),
+    HookWithTarget {
     override val targetDescriptor: Descriptor = methodDescriptor
 }
 
 class TailHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, null, parameters, emptySet()) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, null, parameters, emptySet()) {
     override val isInjectBased: Boolean = true
 }
 
 class LocalHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     type: KSType,
     parameters: List<HookParameter>,
     ordinals: Set<Int>,
     val local: HookLocal,
     val op: Op,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class InstanceofHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     typeClassDeclaration: KSClassDeclaration,
     returnType: KSType,
     parameters: List<HookParameter>,
     ordinals: Set<Int>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, returnType, parameters, ordinals) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, returnType, parameters, ordinals) {
     val typeClassName: IrClassName = typeClassDeclaration.asIrClassName()
 }
 
 class ReturnHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     type: KSType?,
     parameters: List<HookParameter>,
     ordinals: Set<Int>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, type, parameters, ordinals) {
     override val isInjectBased: Boolean = type == null
 }
 
 class LiteralHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     parameters: List<HookParameter>,
     type: KSType,
     val literal: HookLiteral,
     ordinals: Set<Int>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class FieldGetHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     type: KSType,
     override val targetDescriptor: FieldDescriptor,
     ordinals: Set<Int>,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, type, parameters, ordinals), HookWithTarget {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, type, parameters, ordinals),
+    HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class FieldSetHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     type: KSType,
     override val targetDescriptor: FieldDescriptor,
     ordinals: Set<Int>,
     parameters: List<HookParameter>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, type, parameters, ordinals), HookWithTarget {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, type, parameters, ordinals),
+    HookWithTarget {
     val typeName: IrTypeName = type.asIrTypeName()
 }
 
 class ArrayHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     type: KSType,
     val componentType: KSType,
@@ -172,17 +175,18 @@ class ArrayHook(
     ordinals: Set<Int>,
     parameters: List<HookParameter>,
     val op: Op,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, type, parameters, ordinals) {
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, type, parameters, ordinals) {
     val typeName: IrTypeName = type.asIrTypeName()
     val componentTypeName: IrTypeName = componentType.asIrTypeName()
 }
 
 class CallHook(
     jvmName: String,
-    extensionReceiver: KSClassDeclaration?,
+    extensionReceiverClassDeclaration: KSClassDeclaration?,
     methodDescriptor: InvokableDescriptor,
     returnType: KSType?,
     parameters: List<HookParameter>,
     override val targetDescriptor: InvokableDescriptor,
     ordinals: Set<Int>,
-) : PatchHook(jvmName, extensionReceiver, methodDescriptor, returnType, parameters, ordinals), HookWithTarget
+) : PatchHook(jvmName, extensionReceiverClassDeclaration, methodDescriptor, returnType, parameters, ordinals),
+    HookWithTarget
