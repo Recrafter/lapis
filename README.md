@@ -56,7 +56,7 @@ abstract class AdvancementsScreenPatch(@Origin val screen: AdvancementsScreen) {
     // Forget about shadow rules for static fields or member types.
     // Just copy-paste modifiers from the game code. In your patch, it's ALWAYS an abstract property or function!
     @KShadow(Modifier.PRIVATE, Modifier.FINAL)
-    abstract val tabs: Map<AdvancementHolder, AdvancementTab>
+    abstract var tabs: Map<AdvancementHolder, AdvancementTab>
 
     // Forget about unique fields, manual interfaces, or interface injection.
     // Just drop @Extension on any property or function, and it feels like a native part of the class!
