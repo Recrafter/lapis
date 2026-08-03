@@ -82,6 +82,15 @@ abstract class AdvancementsScreenPatch(@Origin val screen: AdvancementsScreen) {
 
 ### 3. Relax! (What Lapis Generates for You)
 
+> [!TIP]
+> ### 💡 The "Escape from Mixin" Architecture
+> 
+> Standard Sponge Mixins force you to play by their bytecode rules: you can't easily inherit state from abstract classes, share contracts between mixins, or build deep OOP hierarchies without hitting runtime crashes.
+> 
+> Because Lapis decouples your code into a **pure Kotlin class (`@Patch`)** and a **thin generated bridge (`@Mixin`)**, you get the best of both worlds:
+> 1. **Real Type System**: Your patch feels and behaves like a regular class. Extend abstract handlers, implement custom interfaces, and hold complex state natively.
+> 2. **Clean Runtime Class**: Your custom interfaces stay in the Patch and don't pollute the target Minecraft class at runtime. The generated Mixin only carries the lightweight, generated bridges it actually needs.
+
 ```java
 // The @Access annotation on a descriptors within a schema triggers the generation of a 
 // @Mixin interface to expose private members of the class:
@@ -267,6 +276,7 @@ fun drawBackground(graphics: GuiGraphicsExtractor?, ci: CallbackInfo?) {
   quirks. Leave that to Lapis, and just write your code!
 * **Feature-based structure** — since patches aren't the entry point for Mixin engine, they don't need to be isolated in
   a separate package, and you can store them right next to your regular classes!
+* **True OOP** — Thanks to our architecture, your `@Patch` is a real, standalone class at runtime, not a Sponge Mixin itself. This allows you to build proper abstract classes, share state between patches, and enforce contracts across multiple injections — without polluting the runtime target class with manual interfaces or hitting Mixin inheritance limits!
 * **Single Point of Maintenance** — if Mojang or mappings update a method signature, you only change it *once* in your
   Schema. Your actual Patches don't even need to be touched!
 * **Zero Infrastructure Pain** — Lapis automatically generates AW/AT configurations and your `mixin.json` behind the
@@ -304,6 +314,7 @@ fun drawBackground(graphics: GuiGraphicsExtractor?, ci: CallbackInfo?) {
   better here—a double cast or inheriting the mixin from a target's subclass? Instead of building features, your brain
   is entirely hijacked by fixing, clean-coding, and micromanaging boilerplate that shouldn't even exist in the first
   place.
+* **Hierarchy Traps & Rigid Inheritance**: Standard Mixins tie your code directly to the target class's type hierarchy. Want to abstract common logic or state across 10 different mixins using a shared abstract class? Sponge Mixin will slap you with runtime hierarchy checks.
 * **Too much freedom**: Without modern abstractions, raw and unrestricted access turns flexibility into an architectural
   mess. Combined with the tool's low-level nature, it pushes the industry toward "optimization for the sake of
   optimization". Instead of focusing on future maintainability, developers obsess over writing hyperefficient
